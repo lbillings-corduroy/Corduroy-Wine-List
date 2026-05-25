@@ -10,11 +10,20 @@ const TOAST_CLIENT_SECRET = process.env.TOAST_CLIENT_SECRET;
 const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
  
 async function getToastToken() {
-  const response = await axios.post(`${TOAST_API_URL}/authentication/v1/authentication/login`, {
-    clientId: TOAST_CLIENT_ID,
-    clientSecret: TOAST_CLIENT_SECRET,
-    userAccessType: 'TOAST_MACHINE_CLIENT'
-  });
+  const response = await axios.post(
+    `${TOAST_API_URL}/authentication/v1/authentication/login`,
+    {
+      clientId: TOAST_CLIENT_ID,
+      clientSecret: TOAST_CLIENT_SECRET,
+      userAccessType: 'TOAST_MACHINE_CLIENT'
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID
+      }
+    }
+  );
   return response.data.token.accessToken;
 }
  
@@ -43,11 +52,13 @@ exports.syncWineMenu = functions.pubsub
   .onRun(async (context) => {
     try {
       console.log('Starting Toast API sync...');
+ 
       const token = await getToastToken();
       console.log('Got Toast token successfully');
  
       const menus = await getWineMenu(token);
       const stock = await getStockData(token);
+ 
       console.log('Got menu data:', JSON.stringify(menus).substring(0, 500));
  
       const db = admin.database();
