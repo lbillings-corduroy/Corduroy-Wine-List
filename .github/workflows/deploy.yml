@@ -1,62 +1,29 @@
 name: Deploy to Firebase
  
 on:
-
   push:
-
     branches:
-
       - main
  
 jobs:
-
   build_and_deploy:
-
     runs-on: ubuntu-latest
-
     steps:
-
       - uses: actions/checkout@v3
  
       - name: Setup Node.js
-
         uses: actions/setup-node@v3
-
         with:
-
           node-version: '20'
  
       - name: Install app dependencies
-
         run: npm install
  
       - name: Build React app
-
         run: npm run build
  
       - name: Install function dependencies
-
         run: cd functions && npm install
  
-      - name: Deploy to Firebase
-
-        uses: FirebaseExtended/action-hosting-deploy@v0
-
-        with:
-
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-          channelId: live
-
-          projectId: corduroy-wine-list
-
-        env:
-
-          TOAST_CLIENT_ID: ${{ secrets.TOAST_CLIENT_ID }}
-
-          TOAST_CLIENT_SECRET: ${{ secrets.TOAST_CLIENT_SECRET }}
-
-          TOAST_RESTAURANT_GUID: ${{ secrets.TOAST_RESTAURANT_GUID }}
- 
+      - name: Deploy hosting and functions to Firebase
+        run: npx firebase-tools deploy --token "${{ secrets.FIREBASE_TOKEN }}" --project corduroy-wine-list
