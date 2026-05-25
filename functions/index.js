@@ -51,6 +51,41 @@ async function getStockData(token) {
   }
 }
 
+// Recursively extract all menu items from nested menu groups
+function extractItemsFromGroup(group, stockMap, parentTier, wines) {
+  const tierName = group.name || parentTier;
+
+  // Extract items at this level
+  if (group.menuItems && group.menuItems.length > 0) {
+    group.menuItems.forEach(item => {
+      const stockInfo = stockMap[item.guid];
+      const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+
+      // Avoid duplicates by checking if guid already exists
+      if (!wines.find(w => w.id === item.guid)) {
+        wines.push({
+          id: item.guid,
+          name: item.name,
+          description: item.description || '',
+          price: item.price || null,
+          tier: parentTier || tierName,
+          subgroup: group.name,
+          available: isAvailable,
+          imageUrl: item.imageUrl || null,
+          masterId: item.masterId
+        });
+      }
+    });
+  }
+
+  // Recurse into nested menu groups
+  if (group.menuGroups && group.menuGroups.length > 0) {
+    group.menuGroups.forEach(subGroup => {
+      extractItemsFromGroup(subGroup, stockMap, parentTier || tierName, wines);
+    });
+  }
+}
+
 function extractWines(menus, stockData) {
   const wines = [];
 
@@ -73,31 +108,36 @@ function extractWines(menus, stockData) {
     });
   }
 
-  // Extract wines from each menu group (HOUSE, CELLAR, etc.)
-  wineMenu.menuGroups.forEach(group => {
-    console.log(`Processing group: ${group.name}`);
-    
-    if (group.menuItems) {
-      group.menuItems.forEach(item => {
-        // Check stock status
-        const stockInfo = stockMap[item.guid];
-        const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+  // Process top-level groups (HOUSE, CELLAR, etc.)
+  if (wineMenu.menuGroups) {
+    wineMenu.menuGroups.forEach(group => {
+      console.log(`Processing top-level group: ${group.name}`);
+      extractItemsFromGroup(group, stockMap, group.name, wines);
+    });
+  }
 
+  // Also check for items directly on the menu
+  if (wineMenu.menuItems) {
+    wineMenu.menuItems.forEach(item => {
+      const stockInfo = stockMap[item.guid];
+      const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+      if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
           name: item.name,
           description: item.description || '',
-          price: item.price,
-          tier: group.name, // HOUSE, CELLAR, etc.
+          price: item.price || null,
+          tier: 'Wine',
+          subgroup: 'Wine',
           available: isAvailable,
           imageUrl: item.imageUrl || null,
           masterId: item.masterId
         });
-      });
-    }
-  });
+      }
+    });
+  }
 
-  console.log(`Extracted ${wines.length} wines`);
+  console.log(`Extracted ${wines.length} wines total`);
   return wines;
 }
 
@@ -112,7 +152,6 @@ exports.syncWineMenu = functions.pubsub
 
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-
       const wines = extractWines(menus, stockData);
 
       const db = admin.database();
@@ -137,10 +176,10 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
     const db = admin.database();
     const winesSnapshot = await db.ref('wines').once('value');
     const lastUpdatedSnapshot = await db.ref('lastUpdated').once('value');
-    
+
     const wines = winesSnapshot.val();
     const lastUpdated = lastUpdatedSnapshot.val();
-    
+
     res.json({
       wines: wines || [],
       lastUpdated: lastUpdated || null
