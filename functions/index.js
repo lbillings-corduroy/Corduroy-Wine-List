@@ -4,10 +4,10 @@ const axios = require('axios');
  
 admin.initializeApp();
  
-const TOAST_API_URL = functions.config().toast.api_url;
-const TOAST_CLIENT_ID = functions.config().toast.client_id;
-const TOAST_CLIENT_SECRET = functions.config().toast.client_secret;
-const TOAST_RESTAURANT_GUID = functions.config().toast.restaurant_guid;
+const TOAST_API_URL = process.env.TOAST_API_URL || 'https://ws-api.toasttab.com';
+const TOAST_CLIENT_ID = process.env.TOAST_CLIENT_ID;
+const TOAST_CLIENT_SECRET = process.env.TOAST_CLIENT_SECRET;
+const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
  
 async function getToastToken() {
   const response = await axios.post(`${TOAST_API_URL}/authentication/v1/authentication/login`, {
