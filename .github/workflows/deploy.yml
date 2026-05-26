@@ -1,4 +1,4 @@
-name: Deploy to Firebase
+name: Deploy Functions to Firebase
  
 on:
 
@@ -10,7 +10,7 @@ on:
  
 jobs:
 
-  build_and_deploy:
+  deploy_functions:
 
     runs-on: ubuntu-latest
 
@@ -26,31 +26,9 @@ jobs:
 
           node-version: '20'
  
-      - name: Install app dependencies
-
-        run: npm install
- 
-      - name: Build React app
-
-        run: npm run build
- 
       - name: Install function dependencies
 
         run: cd functions && npm install
- 
-      - name: Deploy hosting to Firebase
-
-        uses: FirebaseExtended/action-hosting-deploy@v0
-
-        with:
-
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-          projectId: corduroy-wine-list
-
-          channelId: live
  
       - name: Deploy functions to Firebase
 
@@ -63,5 +41,48 @@ jobs:
           cp .env.functions functions/.env
 
           npx firebase-tools@latest deploy --only functions --project corduroy-wine-list
+ 
+name: Deploy Functions to Firebase
+ 
+on:
 
+  push:
+
+    branches:
+
+      - main
+ 
+jobs:
+
+  deploy_functions:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v3
+ 
+      - name: Setup Node.js
+
+        uses: actions/setup-node@v3
+
+        with:
+
+          node-version: '20'
+ 
+      - name: Install function dependencies
+
+        run: cd functions && npm install
+ 
+      - name: Deploy functions to Firebase
+
+        run: |
+
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service-account.json
+
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
+
+          cp .env.functions functions/.env
+
+          npx firebase-tools@latest deploy --only functions --project corduroy-wine-list
  
