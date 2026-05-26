@@ -1,88 +1,31 @@
 name: Deploy Functions to Firebase
  
 on:
-
   push:
-
     branches:
-
       - main
  
 jobs:
-
   deploy_functions:
-
     runs-on: ubuntu-latest
-
     steps:
-
       - uses: actions/checkout@v3
  
       - name: Setup Node.js
-
         uses: actions/setup-node@v3
-
         with:
-
           node-version: '20'
  
       - name: Install function dependencies
-
         run: cd functions && npm install
  
       - name: Deploy functions to Firebase
-
         run: |
-
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service-account.json
-
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
-
-          cp .env.functions functions/.env
-
+          echo "TOAST_API_URL=https://ws-api.toasttab.com" > functions/.env
+          echo "TOAST_CLIENT_ID=${{ secrets.TOAST_CLIENT_ID }}" >> functions/.env
+          echo "TOAST_CLIENT_SECRET=${{ secrets.TOAST_CLIENT_SECRET }}" >> functions/.env
+          echo "TOAST_RESTAURANT_GUID=${{ secrets.TOAST_RESTAURANT_GUID }}" >> functions/.env
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> functions/.env
           npx firebase-tools@latest deploy --only functions --project corduroy-wine-list
- 
-name: Deploy Functions to Firebase
- 
-on:
-
-  push:
-
-    branches:
-
-      - main
- 
-jobs:
-
-  deploy_functions:
-
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - uses: actions/checkout@v3
- 
-      - name: Setup Node.js
-
-        uses: actions/setup-node@v3
-
-        with:
-
-          node-version: '20'
- 
-      - name: Install function dependencies
-
-        run: cd functions && npm install
- 
-      - name: Deploy functions to Firebase
-
-        run: |
-
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service-account.json
-
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
-
-          cp .env.functions functions/.env
-
-          npx firebase-tools@latest deploy --only functions --project corduroy-wine-list
- 
