@@ -42,6 +42,42 @@ async function getStockData(token) {
   }
 }
 
+// ─── Price Extraction ─────────────────────────────────────────────────────────
+
+function extractPrices(item) {
+  // Base price (cellar wines - bottle only)
+  if (item.price) {
+    return { glassPrice: null, bottlePrice: item.price };
+  }
+
+  // Size prices (house wines - glass and bottle)
+  if (item.sizePrices && item.sizePrices.length > 0) {
+    let glassPrice = null;
+    let bottlePrice = null;
+
+    item.sizePrices.forEach(sp => {
+      const sizeName = (sp.size && sp.size.name || '').toLowerCase();
+      if (sizeName.includes('glass') || sizeName === 'glass') {
+        glassPrice = sp.price;
+      } else if (sizeName.includes('bottle') || sizeName === 'bottle') {
+        bottlePrice = sp.price;
+      }
+    });
+
+    // If we couldn't match by name, use first as glass, second as bottle
+    if (!glassPrice && !bottlePrice && item.sizePrices.length >= 2) {
+      glassPrice = item.sizePrices[0].price;
+      bottlePrice = item.sizePrices[1].price;
+    } else if (!glassPrice && !bottlePrice && item.sizePrices.length === 1) {
+      bottlePrice = item.sizePrices[0].price;
+    }
+
+    return { glassPrice, bottlePrice };
+  }
+
+  return { glassPrice: null, bottlePrice: null };
+}
+
 // ─── Wine Extraction ──────────────────────────────────────────────────────────
 
 function extractItemsFromGroup(group, stockMap, topTier, wines) {
@@ -49,12 +85,15 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
     group.menuItems.forEach(item => {
       const stockInfo = stockMap[item.guid];
       const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+      const { glassPrice, bottlePrice } = extractPrices(item);
+
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
           name: item.name,
           toastDescription: item.description || '',
-          price: item.price || null,
+          glassPrice: glassPrice,
+          bottlePrice: bottlePrice,
           tier: topTier,
           subgroup: group.name,
           available: isAvailable,
@@ -215,8 +254,12 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
 
     const mergedWines = (Array.isArray(wines) ? wines : Object.values(wines || {})).map(wine => ({
       ...wine,
-      ...(enrichment[wine.id] || {}),
-      description: enrichment[wine.id]?.description || null
+      varietal: enrichment[wine.id]?.varietal || null,
+      region: enrichment[wine.id]?.region || null,
+      description: enrichment[wine.id]?.description || null,
+      reviews: enrichment[wine.id]?.reviews || null,
+      labelImageQuery: enrichment[wine.id]?.labelImageQuery || null,
+      vintage: enrichment[wine.id]?.vintage || null,
     }));
 
     res.json({ wines: mergedWines, lastUpdated });
