@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const axios = require('axios');
- 
+
 admin.initializeApp();
 
 const TOAST_API_URL = process.env.TOAST_API_URL || 'https://ws-api.toasttab.com';
@@ -121,7 +121,7 @@ If you don't recognize the wine, make reasonable inferences from the name and pr
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }]
       },
@@ -139,6 +139,7 @@ If you don't recognize the wine, make reasonable inferences from the name and pr
     return JSON.parse(clean);
   } catch (e) {
     console.error(`Claude enrichment failed for ${wineName}:`, e.message);
+    if (e.response) console.error('Response:', JSON.stringify(e.response.data));
     return null;
   }
 }
@@ -164,7 +165,6 @@ exports.syncWineMenu = functions
       await db.ref('lastUpdated').set(Date.now());
       console.log(`Saved ${freshWines.length} wines to Firebase`);
 
-      // Only enrich wines not yet enriched — no limit on scheduled sync
       const toEnrich = freshWines.filter(w => !existingEnrichment[w.id]);
       let enrichedCount = 0;
 
