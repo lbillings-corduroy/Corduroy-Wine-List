@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const axios = require('axios');
-
+ 
 admin.initializeApp();
 
 const TOAST_API_URL = process.env.TOAST_API_URL || 'https://ws-api.toasttab.com';
