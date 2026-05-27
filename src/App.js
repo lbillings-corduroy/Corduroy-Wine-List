@@ -52,6 +52,30 @@ function FilterBtn({ label, active, onClick, small }) {
   );
 }
 
+// ─── Copy Button ─────────────────────────────────────────────────────────────
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button onClick={handleCopy} style={{
+      background: copied ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.2)",
+      border: `0.5px solid ${copied ? "#4caf7d" : "#c9a96e"}`,
+      color: copied ? "#4caf7d" : "#c9a96e",
+      fontSize: 11, padding: "4px 12px", borderRadius: 5,
+      cursor: "pointer", fontFamily: "Georgia, serif",
+      transition: "all 0.2s", whiteSpace: "nowrap"
+    }}>
+      {copied ? "✓ Copied" : "Copy Name"}
+    </button>
+  );
+}
+
 // ─── Manager Screen ───────────────────────────────────────────────────────────
 
 function ManagerScreen({ wines, onClose }) {
@@ -121,9 +145,27 @@ function ManagerScreen({ wines, onClose }) {
                   <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
                     {wine.subgroup} · {wine.tier}
                   </div>
-                  {activeTab === "uncertain" && wine.uncertainReason && (
-                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>
-                      ⚠️ {wine.uncertainReason}
+                  {activeTab === "uncertain" && (
+                    <div style={{ marginTop: 6 }}>
+                      {(wine.uncertainReason || wine.uncertain_reason) && (
+                        <div style={{ color: "#e8a050", fontSize: 11, marginBottom: 6, fontStyle: "italic" }}>
+                          {wine.uncertainReason || wine.uncertain_reason}
+                        </div>
+                      )}
+                      {wine.correctedName && wine.correctedName !== wine.name ? (
+                        <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px" }}>
+                          <div style={{ color: "#9a8060", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
+                          <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8 }}>{wine.correctedName}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <CopyButton text={wine.correctedName} />
+                            <span style={{ color: "#6a5040", fontSize: 10 }}>Copy, then paste into Toast to fix</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>
+                          Fix the name in Toast — it will update on next sync
+                        </div>
+                      )}
                     </div>
                   )}
                   {activeTab === "noprice" && (
