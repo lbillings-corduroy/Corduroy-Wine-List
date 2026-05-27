@@ -78,6 +78,35 @@ function CopyButton({ text }) {
 
 // ─── Manager Screen ───────────────────────────────────────────────────────────
 
+function normalizeName(name) {
+  return (name || "")
+    .toLowerCase()
+    .replace(/\b(glass|bottle|btl|gls)\b/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findDuplicates(wines) {
+  const groups = {};
+  wines.forEach(w => {
+    const key = normalizeName(w.name);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(w);
+  });
+  // Return groups with more than one wine, excluding valid glass/bottle pairs
+  return Object.values(groups).filter(group => {
+    if (group.length < 2) return false;
+    // If exactly 2 wines and one has glassPrice and the other has bottlePrice — valid pair, not a duplicate
+    if (group.length === 2) {
+      const hasGlass = group.some(w => w.glassPrice && !w.bottlePrice);
+      const hasBottle = group.some(w => w.bottlePrice && !w.glassPrice);
+      if (hasGlass && hasBottle) return false;
+    }
+    return true;
+  });
+}
+
 function ManagerScreen({ wines, onClose }) {
   const [activeTab, setActiveTab] = useState("uncertain");
 
@@ -85,12 +114,14 @@ function ManagerScreen({ wines, onClose }) {
   const noImage = wines.filter(w => !w.imageUrl);
   const noPrice = wines.filter(w => !w.glassPrice && !w.bottlePrice);
   const unenriched = wines.filter(w => !w.description && !w.varietal);
+  const duplicateGroups = findDuplicates(wines);
 
   const tabs = [
     { id: "uncertain", label: "⚠️ Review", count: uncertain.length },
     { id: "noimage", label: "🖼 No Image", count: noImage.length },
     { id: "noprice", label: "$ No Price", count: noPrice.length },
     { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
+    { id: "duplicates", label: "♊ Dupes", count: duplicateGroups.length },
   ];
 
   const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
@@ -127,7 +158,45 @@ function ManagerScreen({ wines, onClose }) {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {current.length === 0 ? (
+        {activeTab === "duplicates" ? (
+          duplicateGroups.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14 }}>No duplicates found</div>
+            </div>
+          ) : duplicateGroups.map((group, gi) => {
+            const hasPriceDiff = group.some(w => {
+              const price = w.glassPrice || w.bottlePrice;
+              return group.some(w2 => (w2.glassPrice || w2.bottlePrice) !== price);
+            });
+            return (
+              <div key={gi} style={{ background: "rgba(255,255,255,0.04)", border: `0.5px solid ${hasPriceDiff ? "rgba(232,80,80,0.4)" : "#2a1400"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ color: hasPriceDiff ? "#e85050" : "#e8a050", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
+                  {hasPriceDiff ? "⚠️ Price conflict" : "Duplicate entry"} · {group.length} entries in Toast
+                </div>
+                {group.map((wine, i) => (
+                  <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? "0.5px solid #1a0f00" : "none" }}>
+                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#1a0a00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
+                      {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: "#f0e8d8", fontSize: 13 }}>{wine.name}</div>
+                      <div style={{ color: "#6a5040", fontSize: 10 }}>{wine.subgroup} · {wine.tier}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                      {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                      {!wine.glassPrice && !wine.bottlePrice && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>No price</div>}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 10, color: "#6a5040", fontSize: 11, fontStyle: "italic", borderTop: "0.5px solid #1a0f00", paddingTop: 8 }}>
+                  Remove the duplicate{hasPriceDiff ? " and correct the price" : ""} in Toast — it will update on next sync
+                </div>
+              </div>
+            );
+          })
+        ) : current.length === 0 ? (
           <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 14 }}>All clear</div>
