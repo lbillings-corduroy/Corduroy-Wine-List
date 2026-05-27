@@ -25,4 +25,4 @@ jobs:
           echo "TOAST_CLIENT_SECRET=${{ secrets.TOAST_CLIENT_SECRET }}" >> functions/.env
           echo "TOAST_RESTAURANT_GUID=${{ secrets.TOAST_RESTAURANT_GUID }}" >> functions/.env
           echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> functions/.env
-          npx firebase-tools@latest deploy --only functions --project corduroy-wine-list
+          npx firebase-tools@latest deploy --only functions --project corduroy-wine-list --force
