@@ -68,15 +68,8 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       const stockInfo = stockMap[item.guid];
       const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
       if (!wines.find(w => w.id === item.guid)) {
-        const imageVal = item.image || item.images?.[0] || item.imageUrl || null;
-        if (item.name.toLowerCase().includes('caymus')) {
-          console.log('CAYMUS IMAGE DEBUG:', JSON.stringify({
-            image: item.image,
-            images: item.images,
-            imageUrl: item.imageUrl,
-            imageVal
-          }));
-        }
+        const rawImage = item.image || item.images?.[0] || item.imageUrl;
+        const toastImageUrl = (typeof rawImage === 'string' && rawImage.length > 0) ? rawImage : '';
         wines.push({
           id: item.guid,
           name: item.name,
@@ -84,7 +77,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
           tier: topTier,
           subgroup: group.name,
           available: isAvailable,
-          toastImageUrl: imageVal,
+          toastImageUrl: toastImageUrl,
           masterId: item.masterId
         });
       }
@@ -391,7 +384,7 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
       return {
         ...wine,
         name: e.correctedName || wine.name,
-        imageUrl: wine.toastImageUrl || null,
+        imageUrl: (wine.toastImageUrl && wine.toastImageUrl.length > 0) ? wine.toastImageUrl : null,
         varietal: e.varietal || null,
         region: e.region || null,
         description: e.description || null,
