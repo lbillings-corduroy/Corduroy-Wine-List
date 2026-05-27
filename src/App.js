@@ -328,9 +328,94 @@ function PinScreen({ onSuccess, onCancel }) {
   );
 }
 
+// ─── Home Screen ─────────────────────────────────────────────────────────────
+
+function HomeScreen({ onNavigate }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
+
+  const buttons = [
+    { id: "wine", label: "Wine List", icon: "🍷", available: true },
+    { id: "beer", label: "Craft Beers", icon: "🍺", available: false },
+    { id: "pours", label: "Premium Pours", icon: "🥃", available: false },
+    { id: "cocktails", label: "Signature Cocktails", icon: "🍸", available: false },
+  ];
+
+  return (
+    <div style={{
+      background: "#0a0500", minHeight: "100vh", fontFamily: "Georgia, serif",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", padding: "40px 32px",
+      opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
+      maxWidth: 680, margin: "0 auto"
+    }}>
+      {/* Ambient glow */}
+      <div style={{
+        position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)",
+        width: 600, height: 300, pointerEvents: "none",
+        background: "radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.08) 0%, transparent 70%)"
+      }} />
+
+      {/* Logo */}
+      <div style={{ marginBottom: 56, textAlign: "center" }}>
+        <img
+          src="/Appalachia Kitchen Logo colour (1).png"
+          alt="Appalachia Kitchen"
+          style={{ width: "min(340px, 80vw)", opacity: 0.95 }}
+        />
+      </div>
+
+      {/* Menu buttons */}
+      <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 14 }}>
+        {buttons.map(btn => (
+          <button
+            key={btn.id}
+            onClick={() => btn.available && onNavigate(btn.id)}
+            style={{
+              background: btn.available
+                ? "rgba(201,169,110,0.08)"
+                : "rgba(255,255,255,0.02)",
+              border: `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: 8, padding: "18px 24px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              cursor: btn.available ? "pointer" : "default",
+              transition: "all 0.2s", width: "100%",
+              opacity: btn.available ? 1 : 0.35,
+            }}
+            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = "rgba(201,169,110,0.14)"; }}
+            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = "rgba(201,169,110,0.08)"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ fontSize: 20 }}>{btn.icon}</span>
+              <span style={{
+                color: btn.available ? "#e8d9b8" : "#5a4a30",
+                fontSize: 15, letterSpacing: "2px", textTransform: "uppercase",
+                fontFamily: "Georgia, serif"
+              }}>
+                {btn.label}
+              </span>
+            </div>
+            {btn.available ? (
+              <span style={{ color: "#c9a96e", fontSize: 18, lineHeight: 1 }}>›</span>
+            ) : (
+              <span style={{ color: "#3a2a10", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ marginTop: 56, color: "#3a2a10", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+        Corduroy Inn & Lodge · Snowshoe Mountain
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [screen, setScreen] = useState("home");
   const [wines, setWines] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -399,6 +484,8 @@ export default function App() {
   // Preserve Toast order for group headers
   const groupOrder = [...new Map(filtered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
+  if (screen === "home") return <HomeScreen onNavigate={setScreen} />;
+
   if (loading) return (
     <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ fontSize: 32 }}>🍷</div>
@@ -418,6 +505,16 @@ export default function App() {
 
   return (
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {/* Back to home */}
+      <div style={{ background: "#0d0800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
+        <button onClick={() => setScreen("home")} style={{
+          background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
+          fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
+          display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
+        }}>
+          ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
+        </button>
+      </div>
 
       {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
       {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
