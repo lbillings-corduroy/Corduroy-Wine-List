@@ -3,14 +3,9 @@ import { useState, useEffect, useRef } from "react";
 const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getWines";
 const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
 
-const TIER_ORDER = ["House Wines", "Cellar Wines", "London's List"];
+// Tiers and subgroups are derived dynamically from Toast data in arrival order.
+// TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
 const TIER_LABELS = { "House Wines": "House", "Cellar Wines": "Cellar", "London's List": "London's List" };
-const SUBGROUP_ORDER = [
-  "House Reds", "House Whites",
-  "Cellar Red Bottles", "Cellar White Bottles",
-  "Cellar Premium Reds", "Cellar Premium Whites",
-  "London's List"
-];
 
 const VARIETAL_GROUPS = {
   "Sparkling": ["Prosecco", "Champagne", "Sparkling", "Cava"],
@@ -384,9 +379,12 @@ export default function App() {
   }
 
   const availableWines = wines.filter(w => w.available !== false);
-  const tiers = ["All", ...TIER_ORDER.filter(t => availableWines.some(w => w.tier === t))];
+  // Build tiers and subgroups in Toast arrival order (no hardcoded lists needed)
+  const tierOrder = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
+  const tiers = ["All", ...tierOrder];
   const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
-  const subgroups = ["All", ...SUBGROUP_ORDER.filter(s => filteredByTier.some(w => w.subgroup === s))];
+  const subgroupOrder = [...new Map(filteredByTier.map(w => [w.subgroup, true])).keys()].filter(Boolean);
+  const subgroups = ["All", ...subgroupOrder];
   const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
   const varietalSet = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
   const varietals = ["All", ...Array.from(varietalSet).sort()];
@@ -398,7 +396,8 @@ export default function App() {
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(wine);
   });
-  const groupOrder = SUBGROUP_ORDER.filter(s => grouped[s]);
+  // Preserve Toast order for group headers
+  const groupOrder = [...new Map(filtered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
   if (loading) return (
     <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
