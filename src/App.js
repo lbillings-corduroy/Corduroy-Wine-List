@@ -11,6 +11,21 @@ const SUBGROUP_ORDER = [
   "London's List"
 ];
 
+// Consolidate similar varietals for the filter
+const VARIETAL_GROUPS = {
+  "Sparkling": ["Prosecco", "Champagne", "Sparkling", "Cava"],
+  "Rosé": ["Rosé"],
+  "Port": ["Port"],
+};
+
+function consolidateVarietal(v) {
+  if (!v) return null;
+  for (const [group, members] of Object.entries(VARIETAL_GROUPS)) {
+    if (members.includes(v)) return group;
+  }
+  return v;
+}
+
 function formatPrice(p) { return p ? `$${Math.round(p)}` : null; }
 function timeAgo(ts) {
   if (!ts) return "";
@@ -21,15 +36,14 @@ function timeAgo(ts) {
   return `${Math.round(mins / 60)}hr ago`;
 }
 
-// Filter button component for reuse
 function FilterBtn({ label, active, onClick, small }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? "#c9a96e" : "rgba(255,255,255,0.08)",
-      border: `0.5px solid ${active ? "#c9a96e" : "rgba(201,169,110,0.3)"}`,
-      color: active ? "#0f0800" : "#d4b896",
+      background: active ? "#c9a96e" : "rgba(255,255,255,0.07)",
+      border: `0.5px solid ${active ? "#c9a96e" : "rgba(201,169,110,0.25)"}`,
+      color: active ? "#0f0800" : "#c8a878",
       fontSize: small ? 10 : 11,
-      padding: small ? "4px 11px" : "5px 14px",
+      padding: small ? "4px 11px" : "6px 15px",
       borderRadius: 20, cursor: "pointer",
       letterSpacing: "0.5px", fontFamily: "Georgia, serif",
       fontWeight: active ? 600 : 400, transition: "all 0.15s",
@@ -75,8 +89,14 @@ export default function App() {
   const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
   const subgroups = ["All", ...SUBGROUP_ORDER.filter(s => filteredByTier.some(w => w.subgroup === s))];
   const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
-  const varietals = ["All", ...Array.from(new Set(filteredBySubgroup.map(w => w.varietal).filter(Boolean))).sort()];
-  const filtered = activeVarietal === "All" ? filteredBySubgroup : filteredBySubgroup.filter(w => w.varietal === activeVarietal);
+
+  // Build consolidated varietal list
+  const varietalSet = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
+  const varietals = ["All", ...Array.from(varietalSet).sort()];
+
+  const filtered = activeVarietal === "All"
+    ? filteredBySubgroup
+    : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
 
   const grouped = {};
   filtered.forEach(wine => {
@@ -87,18 +107,18 @@ export default function App() {
   const groupOrder = SUBGROUP_ORDER.filter(s => grouped[s]);
 
   if (loading) return (
-    <div style={{ background: "#0f0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+    <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ fontSize: 32 }}>🍷</div>
       <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading Wine List</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#0f0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#c9a96e", fontFamily: "Georgia, serif", textAlign: "center" }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🍷</div>
         <div>{error}</div>
-        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#0f0800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#120800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
@@ -107,27 +127,27 @@ export default function App() {
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
 
       {/* Header */}
-      <div style={{ background: "#1a0800", padding: "20px 20px 0", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid #3a2010" }}>
+      <div style={{ background: "#120800", padding: "20px 20px 12px", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid #2a1400" }}>
 
         {/* Logo row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(201,169,110,0.1)" }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#a08060", fontSize: 10, letterSpacing: "2.5px", textTransform: "uppercase" }}>Corduroy Inn &amp; Lodge · Snowshoe Mountain</div>
-            <div style={{ color: "#f0e8d8", fontSize: 19, letterSpacing: "0.3px" }}>Appalachia Kitchen</div>
+            <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "2.5px", textTransform: "uppercase" }}>Corduroy Inn &amp; Lodge · Snowshoe Mountain</div>
+            <div style={{ color: "#f0e8d8", fontSize: 19 }}>Appalachia Kitchen</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf7d" }} />
               <span style={{ color: "#4caf7d", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Live</span>
             </div>
-            <div style={{ color: "#6a5040", fontSize: 10, marginTop: 2 }}>{timeAgo(lastUpdated)}</div>
+            <div style={{ color: "#5a4030", fontSize: 10, marginTop: 2 }}>{timeAgo(lastUpdated)}</div>
           </div>
         </div>
 
-        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e55, transparent)", marginBottom: 12 }} />
+        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 12 }} />
 
         {/* Tier filters */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -140,8 +160,8 @@ export default function App() {
 
         {/* Subgroup filters */}
         {activeTier !== "All" && subgroups.length > 2 && (
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
-            <span style={{ color: "#7a6050", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", alignSelf: "center", marginRight: 2 }}>Type</span>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
             {subgroups.map(s => (
               <FilterBtn key={s} small label={s === "All" ? "All" : s.replace(/^(Cellar |House )/, "")}
                 active={activeSubgroup === s}
@@ -150,23 +170,21 @@ export default function App() {
           </div>
         )}
 
-        {/* Varietal filters */}
+        {/* Varietal filters — only show when we have enriched varietals */}
         {varietals.length > 2 && (
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
-            <span style={{ color: "#7a6050", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", alignSelf: "center", marginRight: 2 }}>Grape</span>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
+            <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
             {varietals.map(v => (
-              <FilterBtn key={v} small label={v === "All" ? "All" : v}
+              <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
                 active={activeVarietal === v}
                 onClick={() => { setActiveVarietal(v); setSelectedWine(null); }} />
             ))}
           </div>
         )}
-
-        <div style={{ height: "0.5px", background: "#2a1500", marginTop: 4 }} />
       </div>
 
-      {/* Wine count bar */}
-      <div style={{ background: "#1a0800", padding: "7px 20px 10px", color: "#7a6050", fontSize: 11, letterSpacing: "1px" }}>
+      {/* Wine count */}
+      <div style={{ background: "#120800", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {filtered.length} {filtered.length === 1 ? "wine" : "wines"}
         {activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
       </div>
@@ -241,7 +259,7 @@ export default function App() {
               )}
             </div>
 
-            <button style={{ background: "#1a0800", color: "#c9a96e", border: "none", padding: "13px 24px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", width: "100%" }}>
+            <button style={{ background: "#120800", color: "#c9a96e", border: "none", padding: "13px 24px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", width: "100%" }}>
               Ask your server about this wine
             </button>
           </div>
@@ -255,6 +273,9 @@ export default function App() {
 
 function WineCard({ wine, selected, onSelect }) {
   const [hovered, setHovered] = useState(false);
+  const showGlass = wine.glassPrice;
+  const showBottle = wine.bottlePrice;
+
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       display: "flex", alignItems: "center", gap: 12,
@@ -266,6 +287,7 @@ function WineCard({ wine, selected, onSelect }) {
       <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
@@ -279,15 +301,16 @@ function WineCard({ wine, selected, onSelect }) {
           <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
         )}
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0, minWidth: 48 }}>
+
+      <div style={{ textAlign: "right", flexShrink: 0, minWidth: 52 }}>
         {wine.available === false ? (
           <div style={{ background: "#f0ebe0", color: "#c0b0a0", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0d8c8" }}>86'd</div>
-        ) : wine.glassPrice ? (
+        ) : showGlass ? (
           <>
             <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>glass</div>
           </>
-        ) : wine.bottlePrice ? (
+        ) : showBottle ? (
           <>
             <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>bottle</div>
