@@ -68,6 +68,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       const stockInfo = stockMap[item.guid];
       const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
       if (!wines.find(w => w.id === item.guid)) {
+        console.log('ITEM FIELDS:', item.name, JSON.stringify(Object.keys(item)));
         wines.push({
           id: item.guid,
           name: item.name,
@@ -75,7 +76,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
           tier: topTier,
           subgroup: group.name,
           available: isAvailable,
-          toastImageUrl: item.imageUrl || null,
+          toastImageUrl: item.imageUrl || item.imageUrls?.[0] || item.image || null,
           masterId: item.masterId
         });
       }
