@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getWines";
+const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getBeers";
+const POURS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPours";
 const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
@@ -328,6 +330,179 @@ function PinScreen({ onSuccess, onCancel }) {
   );
 }
 
+// ─── Generic Item List Screen (Beer, Pours, Cocktails) ───────────────────────
+
+function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeGroup, setActiveGroup] = useState("All");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    fetch(endpoint)
+      .then(r => r.json())
+      .then(data => {
+        setItems(data[dataKey] || []);
+        setLoading(false);
+        setTimeout(() => setVisible(true), 50);
+      })
+      .catch(() => { setError("Unable to load menu"); setLoading(false); });
+  }, [endpoint, dataKey]);
+
+  const available = items.filter(i => i.available !== false);
+  const groupOrder = [...new Map(available.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
+  const groups = ["All", ...groupOrder];
+  const filtered = activeGroup === "All" ? available : available.filter(i => i.subgroup === activeGroup || i.tier === activeGroup);
+
+  const grouped = {};
+  filtered.forEach(item => {
+    const key = item.subgroup || item.tier || "Menu";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(item);
+  });
+  const filteredGroupOrder = [...new Map(filtered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
+
+  if (loading) return (
+    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading {title}...</div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: accentColor, fontFamily: "Georgia, serif", textAlign: "center" }}>
+        <div>{error}</div>
+        <button onClick={() => window.location.reload()} style={{ marginTop: 16, background: accentColor, color: "#0d0800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {/* Header */}
+      <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: accentColor, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
+          </button>
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ color: accentColor, fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+          </div>
+          <div style={{ width: 60 }} />
+        </div>
+
+        <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${accentColor}44, transparent)`, marginBottom: 10 }} />
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {groups.map(g => (
+            <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
+              background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
+              border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
+              color: activeGroup === g ? "#0d0800" : "#c8a878",
+              fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
+              fontFamily: "Georgia, serif", whiteSpace: "nowrap",
+              fontWeight: activeGroup === g ? 600 : 400
+            }}>{g === "All" ? `All ${title}` : g}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "#120800", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+        {filtered.length} {filtered.length === 1 ? "item" : "items"}
+      </div>
+
+      <div style={{ background: "#faf8f4" }}>
+        {filteredGroupOrder.map((group, gi) => (
+          <div key={group}>
+            <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
+              <div style={{ color: accentColor, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{group}</div>
+            </div>
+            <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
+              {grouped[group].map(item => (
+                <div key={item.id} onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    background: selectedItem === item.id ? "#f0ebe0" : "transparent",
+                    borderLeft: selectedItem === item.id ? `2px solid ${accentColor}` : "2px solid transparent",
+                    borderRadius: 8, padding: "11px 8px", cursor: "pointer", transition: "all 0.15s"
+                  }}>
+                  <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
+                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    {(item.style || item.category) && (
+                      <div style={{ color: accentColor, fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
+                        {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
+                      </div>
+                    )}
+                    {item.description ? (
+                      <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description}</div>
+                    ) : (
+                      <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
+                    {item.price ? (
+                      <>
+                        <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>each</div>
+                      </>
+                    ) : (
+                      <span style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Ask</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>
+            {items.length === 0 ? "Menu coming soon" : "No items in this selection"}
+          </div>
+        )}
+      </div>
+
+      {/* Expanded detail panel */}
+      {selectedItem && (() => {
+        const item = items.find(i => i.id === selectedItem);
+        if (!item) return null;
+        return (
+          <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)" }}>
+            <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+              <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#1a0a00", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
+                {(item.brewery || item.producer) && <div style={{ color: "#8a7060", fontSize: 11 }}>{item.brewery || item.producer}</div>}
+                <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                  {item.abv && <span style={{ color: "#8a7060", fontSize: 11 }}>{item.abv} ABV</span>}
+                  {item.age && <span style={{ color: "#8a7060", fontSize: 11 }}>{item.age}</span>}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {item.price && <div style={{ color: "#1a0a00", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+              </div>
+            </div>
+            {item.description && (
+              <div style={{ color: "#5a4030", fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10 }}>
+                {item.description}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      <div style={{ height: 32 }} />
+    </div>
+  );
+}
+
 // ─── Home Screen ─────────────────────────────────────────────────────────────
 
 function HomeScreen({ onNavigate }) {
@@ -336,8 +511,8 @@ function HomeScreen({ onNavigate }) {
 
   const buttons = [
     { id: "wine", label: "Wine List", icon: "🍷", available: true },
-    { id: "beer", label: "Craft Beers", icon: "🍺", available: false },
-    { id: "pours", label: "Premium Pours", icon: "🥃", available: false },
+    { id: "beer", label: "Craft Beers", icon: "🍺", available: true },
+    { id: "pours", label: "Premium Pours", icon: "🥃", available: true },
     { id: "cocktails", label: "Signature Cocktails", icon: "🍸", available: false },
   ];
 
@@ -485,6 +660,8 @@ export default function App() {
   const groupOrder = [...new Map(filtered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
   if (screen === "home") return <HomeScreen onNavigate={setScreen} />;
+  if (screen === "beer") return <ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} />;
+  if (screen === "pours") return <ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} />;
 
   if (loading) return (
     <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
