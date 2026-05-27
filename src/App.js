@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getWines";
+const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
 
 const TIER_ORDER = ["House Wines", "Cellar Wines", "London's List"];
 const TIER_LABELS = { "House Wines": "House", "Cellar Wines": "Cellar", "London's List": "London's List" };
@@ -11,7 +12,6 @@ const SUBGROUP_ORDER = [
   "London's List"
 ];
 
-// Consolidate similar varietals for the filter
 const VARIETAL_GROUPS = {
   "Sparkling": ["Prosecco", "Champagne", "Sparkling", "Cava"],
   "Rosé": ["Rosé"],
@@ -52,6 +52,178 @@ function FilterBtn({ label, active, onClick, small }) {
   );
 }
 
+// ─── Manager Screen ───────────────────────────────────────────────────────────
+
+function ManagerScreen({ wines, onClose }) {
+  const [activeTab, setActiveTab] = useState("uncertain");
+
+  const uncertain = wines.filter(w => w.uncertain);
+  const noImage = wines.filter(w => !w.imageUrl);
+  const noPrice = wines.filter(w => !w.glassPrice && !w.bottlePrice);
+  const unenriched = wines.filter(w => !w.description && !w.varietal);
+
+  const tabs = [
+    { id: "uncertain", label: "⚠️ Review", count: uncertain.length },
+    { id: "noimage", label: "🖼 No Image", count: noImage.length },
+    { id: "noprice", label: "$ No Price", count: noPrice.length },
+    { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
+  ];
+
+  const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
+  const current = lists[activeTab] || [];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#0a0500", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+      {/* Header */}
+      <div style={{ background: "#150a00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
+            <div style={{ color: "#f0e8d8", fontSize: 18 }}>Wine List Dashboard</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+            Close
+          </button>
+        </div>
+
+        {/* Summary row */}
+        <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              flex: 1, background: activeTab === t.id ? "rgba(201,169,110,0.15)" : "rgba(255,255,255,0.04)",
+              border: `0.5px solid ${activeTab === t.id ? "#c9a96e" : "#2a1400"}`,
+              borderRadius: 8, padding: "10px 6px", cursor: "pointer", textAlign: "center"
+            }}>
+              <div style={{ color: t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: 20, fontWeight: 600, marginBottom: 2 }}>{t.count}</div>
+              <div style={{ color: "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {current.length === 0 ? (
+          <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+            <div style={{ fontSize: 14 }}>All clear</div>
+          </div>
+        ) : (
+          current.map(wine => (
+            <div key={wine.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                {/* Image or placeholder */}
+                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#1a0a00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
+                  {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 2 }}>{wine.name}</div>
+                  <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
+                    {wine.subgroup} · {wine.tier}
+                  </div>
+                  {activeTab === "uncertain" && wine.uncertainReason && (
+                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>
+                      ⚠️ {wine.uncertainReason}
+                    </div>
+                  )}
+                  {activeTab === "noprice" && (
+                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4 }}>
+                      No price in Toast — update menu item
+                    </div>
+                  )}
+                  {activeTab === "noimage" && (
+                    <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>
+                      Upload label image in Toast to display here
+                    </div>
+                  )}
+                  {activeTab === "unenriched" && (
+                    <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>
+                      Pending AI enrichment — will auto-populate next sync
+                    </div>
+                  )}
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                  {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ background: "#150a00", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
+        <div style={{ color: "#3a2010", fontSize: 10, letterSpacing: "1px" }}>
+          {wines.length} total wines · Tap AK logo 5× to access this screen
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN Screen ───────────────────────────────────────────────────────────────
+
+function PinScreen({ onSuccess, onCancel }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
+
+  function handleDigit(d) {
+    if (pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    setError(false);
+    if (next.length === 4) {
+      if (next === MANAGER_PIN) {
+        onSuccess();
+      } else {
+        setTimeout(() => { setPin(""); setError(true); }, 300);
+      }
+    }
+  }
+
+  function handleDelete() { setPin(p => p.slice(0, -1)); setError(false); }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#150a00", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
+        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Manager Access</div>
+        <div style={{ color: "#f0e8d8", fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
+
+        {/* PIN dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 24 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{
+              width: 14, height: 14, borderRadius: "50%",
+              background: i < pin.length ? (error ? "#e85050" : "#c9a96e") : "transparent",
+              border: `2px solid ${error ? "#e85050" : i < pin.length ? "#c9a96e" : "#3a2010"}`,
+              transition: "all 0.15s"
+            }} />
+          ))}
+        </div>
+
+        {error && <div style={{ color: "#e85050", fontSize: 12, marginBottom: 16 }}>Incorrect PIN</div>}
+
+        {/* Keypad */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+          {[1,2,3,4,5,6,7,8,9].map(d => (
+            <button key={d} onClick={() => handleDigit(String(d))} style={{
+              background: "rgba(255,255,255,0.06)", border: "0.5px solid #2a1400",
+              color: "#f0e8d8", fontSize: 20, padding: "14px", borderRadius: 10,
+              cursor: "pointer", fontFamily: "Georgia, serif"
+            }}>{d}</button>
+          ))}
+          <button onClick={onCancel} style={{ background: "transparent", border: "0.5px solid #2a1400", color: "#6a5040", fontSize: 12, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
+          <button onClick={() => handleDigit("0")} style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid #2a1400", color: "#f0e8d8", fontSize: 20, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif" }}>0</button>
+          <button onClick={handleDelete} style={{ background: "transparent", border: "0.5px solid #2a1400", color: "#6a5040", fontSize: 18, padding: "14px", borderRadius: 10, cursor: "pointer" }}>⌫</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
 export default function App() {
   const [wines, setWines] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -62,6 +234,10 @@ export default function App() {
   const [activeVarietal, setActiveVarietal] = useState("All");
   const [selectedWine, setSelectedWine] = useState(null);
   const [visible, setVisible] = useState(false);
+  const [logoTaps, setLogoTaps] = useState(0);
+  const [showPin, setShowPin] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+  const logoTapTimer = useRef(null);
 
   useEffect(() => {
     fetchWines();
@@ -84,19 +260,26 @@ export default function App() {
     finally { setLoading(false); }
   }
 
+  function handleLogoTap() {
+    const next = logoTaps + 1;
+    setLogoTaps(next);
+    if (logoTapTimer.current) clearTimeout(logoTapTimer.current);
+    if (next >= 5) {
+      setLogoTaps(0);
+      setShowPin(true);
+    } else {
+      logoTapTimer.current = setTimeout(() => setLogoTaps(0), 2000);
+    }
+  }
+
   const availableWines = wines.filter(w => w.available !== false);
   const tiers = ["All", ...TIER_ORDER.filter(t => availableWines.some(w => w.tier === t))];
   const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
   const subgroups = ["All", ...SUBGROUP_ORDER.filter(s => filteredByTier.some(w => w.subgroup === s))];
   const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
-
-  // Build consolidated varietal list
   const varietalSet = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
   const varietals = ["All", ...Array.from(varietalSet).sort()];
-
-  const filtered = activeVarietal === "All"
-    ? filteredBySubgroup
-    : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
+  const filtered = activeVarietal === "All" ? filteredBySubgroup : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
 
   const grouped = {};
   filtered.forEach(wine => {
@@ -126,12 +309,13 @@ export default function App() {
   return (
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
 
+      {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
+      {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
+
       {/* Header */}
       <div style={{ background: "#120800", padding: "20px 20px 12px", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid #2a1400" }}>
-
-        {/* Logo row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div onClick={handleLogoTap} style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", userSelect: "none" }}>
             <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
           </div>
           <div style={{ flex: 1 }}>
@@ -149,7 +333,6 @@ export default function App() {
 
         <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 12 }} />
 
-        {/* Tier filters */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {tiers.map(t => (
             <FilterBtn key={t} label={t === "All" ? "All Wines" : TIER_LABELS[t] || t}
@@ -158,7 +341,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Subgroup filters */}
         {activeTier !== "All" && subgroups.length > 2 && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
             <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
@@ -170,7 +352,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Varietal filters — only show when we have enriched varietals */}
         {varietals.length > 2 && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
             <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
@@ -183,13 +364,11 @@ export default function App() {
         )}
       </div>
 
-      {/* Wine count */}
       <div style={{ background: "#120800", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {filtered.length} {filtered.length === 1 ? "wine" : "wines"}
         {activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
       </div>
 
-      {/* Wine list */}
       <div style={{ background: "#faf8f4" }}>
         {groupOrder.map((group, gi) => (
           <div key={group}>
@@ -209,7 +388,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Detail panel */}
       {selectedWine && (() => {
         const wine = wines.find(w => w.id === selectedWine);
         if (!wine) return null;
@@ -273,9 +451,6 @@ export default function App() {
 
 function WineCard({ wine, selected, onSelect }) {
   const [hovered, setHovered] = useState(false);
-  const showGlass = wine.glassPrice;
-  const showBottle = wine.bottlePrice;
-
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       display: "flex", alignItems: "center", gap: 12,
@@ -287,7 +462,6 @@ function WineCard({ wine, selected, onSelect }) {
       <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
-
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
@@ -301,16 +475,15 @@ function WineCard({ wine, selected, onSelect }) {
           <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
         )}
       </div>
-
       <div style={{ textAlign: "right", flexShrink: 0, minWidth: 52 }}>
         {wine.available === false ? (
           <div style={{ background: "#f0ebe0", color: "#c0b0a0", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0d8c8" }}>86'd</div>
-        ) : showGlass ? (
+        ) : wine.glassPrice ? (
           <>
             <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>glass</div>
           </>
-        ) : showBottle ? (
+        ) : wine.bottlePrice ? (
           <>
             <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>bottle</div>
