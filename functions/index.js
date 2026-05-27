@@ -68,8 +68,6 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       const stockInfo = stockMap[item.guid];
       const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
       if (!wines.find(w => w.id === item.guid)) {
-        const rawImage = item.image || item.images?.[0] || item.imageUrl;
-        const toastImageUrl = (typeof rawImage === 'string' && rawImage.length > 0) ? rawImage : '';
         wines.push({
           id: item.guid,
           name: item.name,
@@ -77,7 +75,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
           tier: topTier,
           subgroup: group.name,
           available: isAvailable,
-          toastImageUrl: toastImageUrl,
+          toastImageUrl: item.image || item.images?.[0] || item.imageUrl || null,
           masterId: item.masterId
         });
       }
@@ -322,7 +320,12 @@ exports.syncWineMenu = functions
       const enrichmentSnap = await db.ref('wineEnrichment').once('value');
       const existingEnrichment = enrichmentSnap.val() || {};
 
-      await db.ref('wines').set(freshWines);
+      // Store as keyed object by wine ID to prevent Firebase from stripping fields
+      const winesById = {};
+      freshWines.forEach(w => { winesById[w.id] = w; });
+      await db.ref('wines').set(winesById);
+      // Also store ordering separately so we can restore Toast order in the app
+      await db.ref('wineOrder').set(freshWines.map(w => w.id));
       await db.ref('lastUpdated').set(Date.now());
       console.log(`Saved ${freshWines.length} merged wines`);
 
@@ -369,22 +372,29 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [winesSnap, enrichmentSnap, lastUpdatedSnap] = await Promise.all([
+    const [winesSnap, enrichmentSnap, lastUpdatedSnap, wineOrderSnap] = await Promise.all([
       db.ref('wines').once('value'),
       db.ref('wineEnrichment').once('value'),
-      db.ref('lastUpdated').once('value')
+      db.ref('lastUpdated').once('value'),
+      db.ref('wineOrder').once('value')
     ]);
 
-    const wines = winesSnap.val();
+    const winesById = winesSnap.val() || {};
+    const wineOrder = wineOrderSnap.val() || [];
     const enrichment = enrichmentSnap.val() || {};
     const lastUpdated = lastUpdatedSnap.val();
 
-    const mergedWines = (Array.isArray(wines) ? wines : Object.values(wines || {})).map(wine => {
+    // Restore Toast order using wineOrder, fall back to object values order
+    const orderedWines = wineOrder.length > 0
+      ? wineOrder.map(id => winesById[id]).filter(Boolean)
+      : Object.values(winesById);
+
+    const mergedWines = orderedWines.map(wine => {
       const e = enrichment[wine.id] || {};
       return {
         ...wine,
         name: e.correctedName || wine.name,
-        imageUrl: (wine.toastImageUrl && wine.toastImageUrl.length > 0) ? wine.toastImageUrl : null,
+        imageUrl: wine.toastImageUrl || null,
         varietal: e.varietal || null,
         region: e.region || null,
         description: e.description || null,
