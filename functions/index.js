@@ -165,7 +165,7 @@ function mergeGlassBottle(wines) {
         ...wine,
         glassPrice: null,
         bottlePrice: wine.price,
-        price: null
+        price: undefined
       });
     }
   });
@@ -382,6 +382,7 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
       return {
         ...wine,
         name: e.correctedName || wine.name,
+        imageUrl: wine.toastImageUrl || null,
         varietal: e.varietal || null,
         region: e.region || null,
         description: e.description || null,
@@ -389,6 +390,7 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
         labelImageQuery: e.labelImageQuery || null,
         vintage: e.vintage || null,
         uncertain: e.uncertain || false,
+        uncertainReason: e.uncertainReason || null,
       };
     });
 
