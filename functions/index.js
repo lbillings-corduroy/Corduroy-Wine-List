@@ -165,7 +165,7 @@ function mergeGlassBottle(wines) {
         ...wine,
         glassPrice: null,
         bottlePrice: wine.price,
-        price: undefined
+        price: null
       });
     }
   });
