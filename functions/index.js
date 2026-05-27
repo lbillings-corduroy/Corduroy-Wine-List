@@ -12,6 +12,14 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
 
+// Words that indicate an item should be excluded from the guest wine list
+const EXCLUDE_KEYWORDS = ['cooking', 'cook wine', 'cork fee', 'wine dinner', 'liter'];
+
+function shouldExclude(name) {
+  const lower = name.toLowerCase();
+  return EXCLUDE_KEYWORDS.some(k => lower.includes(k));
+}
+
 // ─── Toast Auth ───────────────────────────────────────────────────────────────
 
 async function getToastToken() {
@@ -42,58 +50,25 @@ async function getStockData(token) {
   }
 }
 
-// ─── Price Extraction ─────────────────────────────────────────────────────────
-
-function extractPrices(item) {
-  // Base price (cellar wines - bottle only)
-  if (item.price) {
-    return { glassPrice: null, bottlePrice: item.price };
-  }
-
-  // Size prices (house wines - glass and bottle)
-  if (item.sizePrices && item.sizePrices.length > 0) {
-    let glassPrice = null;
-    let bottlePrice = null;
-
-    item.sizePrices.forEach(sp => {
-      const sizeName = (sp.size && sp.size.name || '').toLowerCase();
-      if (sizeName.includes('glass') || sizeName === 'glass') {
-        glassPrice = sp.price;
-      } else if (sizeName.includes('bottle') || sizeName === 'bottle') {
-        bottlePrice = sp.price;
-      }
-    });
-
-    // If we couldn't match by name, use first as glass, second as bottle
-    if (!glassPrice && !bottlePrice && item.sizePrices.length >= 2) {
-      glassPrice = item.sizePrices[0].price;
-      bottlePrice = item.sizePrices[1].price;
-    } else if (!glassPrice && !bottlePrice && item.sizePrices.length === 1) {
-      bottlePrice = item.sizePrices[0].price;
-    }
-
-    return { glassPrice, bottlePrice };
-  }
-
-  return { glassPrice: null, bottlePrice: null };
-}
-
 // ─── Wine Extraction ──────────────────────────────────────────────────────────
 
 function extractItemsFromGroup(group, stockMap, topTier, wines) {
   if (group.menuItems && group.menuItems.length > 0) {
     group.menuItems.forEach(item => {
+      if (shouldExclude(item.name)) {
+        console.log(`Excluding: ${item.name}`);
+        return;
+      }
       const stockInfo = stockMap[item.guid];
       const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
-      const { glassPrice, bottlePrice } = extractPrices(item);
+      const price = item.price || null;
 
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
           name: item.name,
           toastDescription: item.description || '',
-          glassPrice: glassPrice,
-          bottlePrice: bottlePrice,
+          price: price,
           tier: topTier,
           subgroup: group.name,
           available: isAvailable,
@@ -119,8 +94,88 @@ function extractWines(menus, stockData) {
   if (wineMenu.menuGroups) {
     wineMenu.menuGroups.forEach(g => extractItemsFromGroup(g, stockMap, g.name, wines));
   }
-  console.log(`Extracted ${wines.length} wines`);
+  console.log(`Extracted ${wines.length} wines before merge`);
   return wines;
+}
+
+// ─── Smart Merge Glass/Bottle ─────────────────────────────────────────────────
+
+function mergeGlassBottle(wines) {
+  const merged = [];
+  const processed = new Set();
+
+  wines.forEach(wine => {
+    if (processed.has(wine.id)) return;
+
+    const nameUpper = wine.name.toUpperCase();
+    const isGlass = nameUpper.includes(' GLASS');
+    const isBottle = nameUpper.includes(' BOTTLE');
+
+    if (isGlass || isBottle) {
+      // Get base name by removing Glass/Bottle suffix
+      const baseName = wine.name
+        .replace(/\s+Glass$/i, '')
+        .replace(/\s+Bottle$/i, '')
+        .replace(/\s+1L\s+Bottle$/i, '')
+        .trim();
+
+      // Find the matching pair
+      const pair = wines.find(w =>
+        w.id !== wine.id &&
+        !processed.has(w.id) &&
+        (w.name.replace(/\s+Glass$/i, '').replace(/\s+Bottle$/i, '').replace(/\s+1L\s+Bottle$/i, '').trim() === baseName)
+      );
+
+      let glassPrice = null;
+      let bottlePrice = null;
+      let glassId = null;
+      let bottleId = null;
+
+      if (isGlass) {
+        glassPrice = wine.price;
+        glassId = wine.id;
+        if (pair) {
+          bottlePrice = pair.price;
+          bottleId = pair.id;
+          processed.add(pair.id);
+        }
+      } else {
+        bottlePrice = wine.price;
+        bottleId = wine.id;
+        if (pair) {
+          glassPrice = pair.price;
+          glassId = pair.id;
+          processed.add(pair.id);
+        }
+      }
+
+      processed.add(wine.id);
+
+      merged.push({
+        ...wine,
+        id: bottleId || glassId || wine.id, // prefer bottle ID as primary
+        glassId: glassId,
+        bottleId: bottleId,
+        name: baseName,
+        glassPrice: glassPrice,
+        bottlePrice: bottlePrice,
+        price: null // clear the raw price field
+      });
+
+    } else {
+      // No Glass/Bottle suffix — treat as bottle only
+      processed.add(wine.id);
+      merged.push({
+        ...wine,
+        glassPrice: null,
+        bottlePrice: wine.price,
+        price: null
+      });
+    }
+  });
+
+  console.log(`After merge: ${merged.length} wine entries`);
+  return merged;
 }
 
 // ─── Vintage Parser ───────────────────────────────────────────────────────────
@@ -147,14 +202,14 @@ ${vintageNote}
 
 Please research this wine and provide the following in JSON format only (no other text):
 {
-  "varietal": "the primary grape varietal(s), e.g. Cabernet Sauvignon, Pinot Noir, Chardonnay, Red Blend, etc.",
-  "region": "wine region and country, e.g. Napa Valley, California or Burgundy, France",
+  "varietal": "SHORT grape varietal name only. Use simple names: Cabernet Sauvignon, Pinot Noir, Chardonnay, Merlot, Malbec, Sauvignon Blanc, Pinot Grigio, Riesling, Moscato, Prosecco, Champagne, Sparkling, Port, Rosé, Red Blend, White Blend, Bordeaux Blend, Rhône Blend, GSM Blend. NEVER use long lists of grape names. If it is a blend, use the shortest appropriate blend name.",
+  "region": "wine region and country, e.g. Napa Valley, California or Burgundy, France. Keep it concise.",
   "description": "2-3 sentence sommelier tasting note describing aromas, flavors, and finish. Write for a restaurant guest, not a wine expert. Be evocative and appetizing.",
   "reviews": "any notable critic scores or awards if known, e.g. 92pts Wine Spectator, or null if unknown",
   "labelImageQuery": "a specific Google image search query to find a clean flat label image (not bottle photo) for this wine, e.g. Duckhorn Merlot Napa 2022 label flat"
 }
 
-If you don't recognize the wine, make reasonable inferences from the name and provide your best assessment. Always return valid JSON.`;
+Always return valid JSON. Keep varietal names SHORT — maximum 3 words.`;
 
   try {
     const response = await axios.post(
@@ -194,7 +249,8 @@ exports.syncWineMenu = functions
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshWines = extractWines(menus, stockData);
+      const rawWines = extractWines(menus, stockData);
+      const freshWines = mergeGlassBottle(rawWines);
 
       const db = admin.database();
       const enrichmentSnap = await db.ref('wineEnrichment').once('value');
