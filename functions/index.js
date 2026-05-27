@@ -165,7 +165,7 @@ function mergeGlassBottle(wines) {
         ...wine,
         glassPrice: null,
         bottlePrice: wine.price,
-        price: undefined
+        price: null
       });
     }
   });
@@ -320,7 +320,8 @@ exports.syncWineMenu = functions
       const enrichmentSnap = await db.ref('wineEnrichment').once('value');
       const existingEnrichment = enrichmentSnap.val() || {};
 
-      // Store as keyed object by wine ID to prevent Firebase from stripping fields
+      // Delete wines node first to prevent Firebase array conversion, then write keyed object
+      await db.ref('wines').remove();
       const winesById = {};
       freshWines.forEach(w => { winesById[w.id] = w; });
       await db.ref('wines').set(winesById);
