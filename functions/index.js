@@ -11,6 +11,8 @@ const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
+const BEER_MENU_GUID = 'ae7ea1cf-e85d-497a-a210-9a7271daa0ac';
+const POURS_MENU_GUID = 'c07d9143-a7c5-497a-8434-2ab85d44ea48';
 
 const EXCLUDE_KEYWORDS = ['cooking', 'cook wine', 'cork fee', 'wine dinner', 'liter'];
 
@@ -19,7 +21,6 @@ function shouldExclude(name) {
   return EXCLUDE_KEYWORDS.some(k => lower.includes(k));
 }
 
-// Strip Glass/Bottle suffix and clean the name
 function cleanWineName(name) {
   return name
     .replace(/\s+Glass$/i, '')
@@ -57,6 +58,51 @@ async function getStockData(token) {
     console.log('Stock unavailable:', e.message);
     return [];
   }
+}
+
+// ─── Generic Item Extraction (Beer, Pours, Cocktails) ────────────────────────
+
+function extractItemsFromMenu(menus, menuGuid, stockData) {
+  const items = [];
+  const menu = menus.menus.find(m => m.guid === menuGuid);
+  if (!menu) { console.log(`Menu ${menuGuid} not found`); return items; }
+
+  const stockMap = {};
+  if (Array.isArray(stockData)) {
+    stockData.forEach(item => { if (item.menuItem?.guid) stockMap[item.menuItem.guid] = item; });
+  }
+
+  function extractGroup(group, topGroup) {
+    if (group.menuItems && group.menuItems.length > 0) {
+      group.menuItems.forEach(item => {
+        if (shouldExclude(item.name)) return;
+        const stockInfo = stockMap[item.guid];
+        const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+        if (!items.find(i => i.id === item.guid)) {
+          items.push({
+            id: item.guid,
+            name: item.name,
+            price: item.price || item.pricingRules?.[0]?.price || null,
+            groupPrice: group.price || null, // capture group-level inherited price
+            tier: topGroup,
+            subgroup: group.name,
+            available: isAvailable,
+            toastImageUrl: item.image || item.images?.[0] || item.imageUrl || null,
+            masterId: item.masterId
+          });
+        }
+      });
+    }
+    if (group.menuGroups && group.menuGroups.length > 0) {
+      group.menuGroups.forEach(sub => extractGroup(sub, topGroup));
+    }
+  }
+
+  if (menu.menuGroups) {
+    menu.menuGroups.forEach(g => extractGroup(g, g.name));
+  }
+
+  return items;
 }
 
 // ─── Wine Extraction ──────────────────────────────────────────────────────────
@@ -108,15 +154,11 @@ function mergeGlassBottle(wines) {
 
   wines.forEach(wine => {
     if (processed.has(wine.id)) return;
-
-    const nameUpper = wine.name.toUpperCase();
     const isGlass = /\sGLASS$/i.test(wine.name);
     const isBottle = /\sBOTTLE$/i.test(wine.name) || /\s1L\sBOTTLE$/i.test(wine.name);
 
     if (isGlass || isBottle) {
       const baseName = cleanWineName(wine.name);
-
-      // Find matching pair by base name
       const pair = wines.find(w =>
         w.id !== wine.id &&
         !processed.has(w.id) &&
@@ -130,43 +172,22 @@ function mergeGlassBottle(wines) {
 
       if (isGlass) {
         glassPrice = wine.price;
-        if (pair) {
-          bottlePrice = pair.price;
-          processed.add(pair.id);
-          primaryId = pair.id; // Use bottle ID as primary
-        }
+        if (pair) { bottlePrice = pair.price; processed.add(pair.id); primaryId = pair.id; }
       } else {
         bottlePrice = wine.price;
         primaryId = wine.id;
-        if (pair) {
-          glassPrice = pair.price;
-          processed.add(pair.id);
-        }
+        if (pair) { glassPrice = pair.price; processed.add(pair.id); }
       }
 
       processed.add(wine.id);
-
       merged.push({
-        id: primaryId,
-        name: baseName,
-        glassPrice,
-        bottlePrice,
-        tier: wine.tier,
-        subgroup: wine.subgroup,
-        available: wine.available,
-        toastImageUrl: wine.toastImageUrl || null,
-        masterId: wine.masterId
+        id: primaryId, name: baseName, glassPrice, bottlePrice,
+        tier: wine.tier, subgroup: wine.subgroup, available: wine.available,
+        toastImageUrl: wine.toastImageUrl || null, masterId: wine.masterId
       });
-
     } else {
-      // No suffix — bottle only
       processed.add(wine.id);
-      merged.push({
-        ...wine,
-        glassPrice: null,
-        bottlePrice: wine.price,
-        price: null
-      });
+      merged.push({ ...wine, glassPrice: null, bottlePrice: wine.price, price: null });
     }
   });
 
@@ -184,72 +205,41 @@ function parseVintage(name) {
 // ─── Varietal Normalizer ──────────────────────────────────────────────────────
 
 const VARIETAL_MAP = {
-  'cabernet sauvignon': 'Cabernet Sauvignon',
-  'cabernet': 'Cabernet Sauvignon',
-  'pinot noir': 'Pinot Noir',
-  'chardonnay': 'Chardonnay',
-  'merlot': 'Merlot',
-  'malbec': 'Malbec',
-  'sauvignon blanc': 'Sauvignon Blanc',
-  'pinot grigio': 'Pinot Grigio',
-  'pinot gris': 'Pinot Grigio',
-  'riesling': 'Riesling',
-  'moscato': 'Moscato',
-  'prosecco': 'Prosecco',
-  'champagne': 'Champagne',
-  'sparkling': 'Sparkling',
-  'rosé': 'Rosé',
-  'rose': 'Rosé',
-  'port': 'Port',
-  'tawny': 'Port',
-  'zinfandel': 'Zinfandel',
-  'shiraz': 'Shiraz',
-  'syrah': 'Shiraz',
-  'viognier': 'Viognier',
-  'albarino': 'Albariño',
-  'albariño': 'Albariño',
-  'chianti': 'Sangiovese',
-  'sangiovese': 'Sangiovese',
-  'tempranillo': 'Tempranillo',
-  'garnacha': 'Grenache',
-  'grenache': 'Grenache',
-  'red blend': 'Red Blend',
-  'bordeaux blend': 'Bordeaux Blend',
-  'rhône blend': 'Red Blend',
-  'gsm blend': 'Red Blend',
-  'gsm': 'Red Blend',
-  'white blend': 'White Blend',
-  'sparkling blend': 'Sparkling',
-  'port blend': 'Port',
-  'fortified': 'Port',
+  'cabernet sauvignon': 'Cabernet Sauvignon', 'cabernet': 'Cabernet Sauvignon',
+  'pinot noir': 'Pinot Noir', 'chardonnay': 'Chardonnay', 'merlot': 'Merlot',
+  'malbec': 'Malbec', 'sauvignon blanc': 'Sauvignon Blanc', 'pinot grigio': 'Pinot Grigio',
+  'pinot gris': 'Pinot Grigio', 'riesling': 'Riesling', 'moscato': 'Moscato',
+  'prosecco': 'Prosecco', 'champagne': 'Champagne', 'sparkling': 'Sparkling',
+  'rosé': 'Rosé', 'rose': 'Rosé', 'port': 'Port', 'tawny': 'Port',
+  'zinfandel': 'Zinfandel', 'shiraz': 'Shiraz', 'syrah': 'Shiraz',
+  'viognier': 'Viognier', 'albarino': 'Albariño', 'albariño': 'Albariño',
+  'chianti': 'Sangiovese', 'sangiovese': 'Sangiovese', 'tempranillo': 'Tempranillo',
+  'garnacha': 'Grenache', 'grenache': 'Grenache', 'red blend': 'Red Blend',
+  'bordeaux blend': 'Bordeaux Blend', 'rhône blend': 'Red Blend', 'gsm blend': 'Red Blend',
+  'gsm': 'Red Blend', 'white blend': 'White Blend', 'sparkling blend': 'Sparkling',
+  'port blend': 'Port', 'fortified': 'Port',
 };
 
 function normalizeVarietal(raw) {
   if (!raw) return null;
   const lower = raw.toLowerCase().trim();
-  // Direct match
   if (VARIETAL_MAP[lower]) return VARIETAL_MAP[lower];
-  // Partial match — if the raw name contains a known varietal
   for (const [key, val] of Object.entries(VARIETAL_MAP)) {
     if (lower.includes(key)) return val;
   }
-  // If it contains slashes or commas it's a blend
   if (lower.includes('/') || lower.includes(',') || lower.includes('&')) {
     if (lower.includes('white') || lower.includes('blanc') || lower.includes('chardonnay') || lower.includes('viognier')) return 'White Blend';
     return 'Red Blend';
   }
-  // Return as-is if short enough, otherwise Red Blend
   const words = raw.split(' ');
   return words.length <= 3 ? raw : 'Red Blend';
 }
 
-// ─── Claude Enrichment ────────────────────────────────────────────────────────
+// ─── Claude Enrichment — Wine ─────────────────────────────────────────────────
 
 async function enrichWineWithClaude(wineName, vintage) {
   if (!ANTHROPIC_API_KEY) return null;
-
   const vintageNote = vintage ? `The vintage is ${vintage}.` : 'This is a house pour with no specific vintage.';
-
   const prompt = `You are a professional sommelier and wine data expert. I need accurate information about this wine for a restaurant iPad wine list.
 
 Wine: "${wineName}"
@@ -274,35 +264,92 @@ Respond in JSON only (no other text):
   try {
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
-      {
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      },
-      {
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
-        }
-      }
+      { model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] },
+      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
     );
-
     const text = response.data.content[0].text;
     const clean = text.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
-
-    // Normalize varietal to our standard list
     data.varietal = normalizeVarietal(data.varietal);
     return data;
-
   } catch (e) {
     console.error(`Claude enrichment failed for ${wineName}:`, e.message);
     return null;
   }
 }
 
-// ─── Main Sync Function ───────────────────────────────────────────────────────
+// ─── Claude Enrichment — Beer ─────────────────────────────────────────────────
+
+async function enrichBeerWithClaude(beerName) {
+  if (!ANTHROPIC_API_KEY) return null;
+  const prompt = `You are a craft beer expert. I need accurate information about this beer for a restaurant menu app.
+
+Beer: "${beerName}"
+
+Respond in JSON only (no other text):
+{
+  "correctedName": "properly spelled and capitalized beer name, or same as input if correct",
+  "uncertain": false,
+  "uncertainReason": null,
+  "style": "beer style, e.g. IPA, Lager, Stout, Wheat, Pale Ale, Pilsner, Sour, Porter",
+  "brewery": "brewery name and location, e.g. Sierra Nevada, Chico CA",
+  "abv": "ABV if known, e.g. 5.6%, or null",
+  "description": "2 sentence tasting note — approachable, appetizing, guest-friendly.",
+  "imageQuery": "Google image search query for this beer can or bottle label, e.g. Sierra Nevada Torpedo IPA can"
+}`;
+
+  try {
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
+      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
+    );
+    const text = response.data.content[0].text;
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.error(`Beer enrichment failed for ${beerName}:`, e.message);
+    return null;
+  }
+}
+
+// ─── Claude Enrichment — Premium Pours ───────────────────────────────────────
+
+async function enrichPourWithClaude(pourName) {
+  if (!ANTHROPIC_API_KEY) return null;
+  const prompt = `You are a spirits expert. I need accurate information about this spirit for a restaurant premium pours menu.
+
+Spirit: "${pourName}"
+
+Respond in JSON only (no other text):
+{
+  "correctedName": "properly spelled and capitalized spirit name, or same as input if correct",
+  "uncertain": false,
+  "uncertainReason": null,
+  "category": "spirit category, e.g. Bourbon, Scotch, Rye Whiskey, Tequila, Mezcal, Rum, Gin, Vodka, Cognac, Brandy",
+  "producer": "distillery or producer name and region, e.g. Buffalo Trace, Frankfort KY",
+  "abv": "ABV if known, e.g. 45%, or null",
+  "age": "age statement if known, e.g. 12 Year, or null",
+  "description": "2 sentence tasting note — evocative, guest-friendly, suitable for a premium bar menu.",
+  "imageQuery": "Google image search query for this spirit bottle label, e.g. Buffalo Trace Bourbon bottle"
+}`;
+
+  try {
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
+      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
+    );
+    const text = response.data.content[0].text;
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.error(`Pour enrichment failed for ${pourName}:`, e.message);
+    return null;
+  }
+}
+
+// ─── Main Wine Sync ───────────────────────────────────────────────────────────
 
 exports.syncWineMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
@@ -320,12 +367,10 @@ exports.syncWineMenu = functions
       const enrichmentSnap = await db.ref('wineEnrichment').once('value');
       const existingEnrichment = enrichmentSnap.val() || {};
 
-      // Delete wines node first to prevent Firebase array conversion, then write keyed object
       await db.ref('wines').remove();
       const winesById = {};
       freshWines.forEach(w => { winesById[w.id] = w; });
       await db.ref('wines').set(winesById);
-      // Also store ordering separately so we can restore Toast order in the app
       await db.ref('wineOrder').set(freshWines.map(w => w.id));
       await db.ref('lastUpdated').set(Date.now());
       console.log(`Saved ${freshWines.length} merged wines`);
@@ -350,16 +395,13 @@ exports.syncWineMenu = functions
             enrichedAt: Date.now()
           });
           enrichedCount++;
-          if (enrichment.uncertain) {
-            console.log(`⚠️ UNCERTAIN: ${wine.name} — ${enrichment.uncertainReason}`);
-          }
+          if (enrichment.uncertain) console.log(`⚠️ UNCERTAIN: ${wine.name} — ${enrichment.uncertainReason}`);
         }
         await new Promise(r => setTimeout(r, 500));
       }
 
-      console.log(`Enrichment complete — ${enrichedCount} wines enriched`);
+      console.log(`Wine enrichment complete — ${enrichedCount} wines enriched`);
       return null;
-
     } catch (error) {
       console.error('Sync error:', error.message);
       if (error.response) console.error('API response:', JSON.stringify(error.response.data));
@@ -367,7 +409,118 @@ exports.syncWineMenu = functions
     }
   });
 
-// ─── HTTP Endpoint ────────────────────────────────────────────────────────────
+// ─── Beer Sync ────────────────────────────────────────────────────────────────
+
+exports.syncBeerMenu = functions
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub.schedule('every 30 minutes')
+  .onRun(async (context) => {
+    try {
+      console.log('Starting Beer menu sync...');
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+      const freshBeers = extractItemsFromMenu(menus, BEER_MENU_GUID, stockData);
+
+      const db = admin.database();
+      const enrichmentSnap = await db.ref('beerEnrichment').once('value');
+      const existingEnrichment = enrichmentSnap.val() || {};
+
+      await db.ref('beers').remove();
+      const beersById = {};
+      freshBeers.forEach(b => { beersById[b.id] = b; });
+      await db.ref('beers').set(beersById);
+      await db.ref('beerOrder').set(freshBeers.map(b => b.id));
+      await db.ref('beerLastUpdated').set(Date.now());
+      console.log(`Saved ${freshBeers.length} beers`);
+
+      const toEnrich = freshBeers.filter(b => !existingEnrichment[b.id]);
+      let enrichedCount = 0;
+
+      for (const beer of toEnrich) {
+        const enrichment = await enrichBeerWithClaude(beer.name);
+        if (enrichment) {
+          await db.ref(`beerEnrichment/${beer.id}`).set({
+            correctedName: enrichment.correctedName || beer.name,
+            uncertain: enrichment.uncertain || false,
+            uncertainReason: enrichment.uncertainReason || null,
+            style: enrichment.style || null,
+            brewery: enrichment.brewery || null,
+            abv: enrichment.abv || null,
+            description: enrichment.description || null,
+            imageQuery: enrichment.imageQuery || null,
+            enrichedAt: Date.now()
+          });
+          enrichedCount++;
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      console.log(`Beer enrichment complete — ${enrichedCount} beers enriched`);
+      return null;
+    } catch (error) {
+      console.error('Beer sync error:', error.message);
+      return null;
+    }
+  });
+
+// ─── Premium Pours Sync ───────────────────────────────────────────────────────
+
+exports.syncPoursMenu = functions
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub.schedule('every 30 minutes')
+  .onRun(async (context) => {
+    try {
+      console.log('Starting Premium Pours sync...');
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+      const freshPours = extractItemsFromMenu(menus, POURS_MENU_GUID, stockData);
+
+      const db = admin.database();
+      const enrichmentSnap = await db.ref('poursEnrichment').once('value');
+      const existingEnrichment = enrichmentSnap.val() || {};
+
+      await db.ref('pours').remove();
+      const poursById = {};
+      freshPours.forEach(p => { poursById[p.id] = p; });
+      await db.ref('pours').set(poursById);
+      await db.ref('poursOrder').set(freshPours.map(p => p.id));
+      await db.ref('poursLastUpdated').set(Date.now());
+      console.log(`Saved ${freshPours.length} pours`);
+
+      const toEnrich = freshPours.filter(p => !existingEnrichment[p.id]);
+      let enrichedCount = 0;
+
+      for (const pour of toEnrich) {
+        const enrichment = await enrichPourWithClaude(pour.name);
+        if (enrichment) {
+          await db.ref(`poursEnrichment/${pour.id}`).set({
+            correctedName: enrichment.correctedName || pour.name,
+            uncertain: enrichment.uncertain || false,
+            uncertainReason: enrichment.uncertainReason || null,
+            category: enrichment.category || null,
+            producer: enrichment.producer || null,
+            abv: enrichment.abv || null,
+            age: enrichment.age || null,
+            description: enrichment.description || null,
+            imageQuery: enrichment.imageQuery || null,
+            enrichedAt: Date.now()
+          });
+          enrichedCount++;
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      console.log(`Pours enrichment complete — ${enrichedCount} pours enriched`);
+      return null;
+    } catch (error) {
+      console.error('Pours sync error:', error.message);
+      return null;
+    }
+  });
+
+// ─── HTTP Endpoint — Wines ────────────────────────────────────────────────────
 
 exports.getWines = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
@@ -385,7 +538,6 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
     const enrichment = enrichmentSnap.val() || {};
     const lastUpdated = lastUpdatedSnap.val();
 
-    // Restore Toast order using wineOrder, fall back to object values order
     const orderedWines = wineOrder.length > 0
       ? wineOrder.map(id => winesById[id]).filter(Boolean)
       : Object.values(winesById);
@@ -413,7 +565,99 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
   }
 });
 
-// ─── Manual Enrichment Trigger (LIMITED TO 3 FOR TESTING) ────────────────────
+// ─── HTTP Endpoint — Beers ────────────────────────────────────────────────────
+
+exports.getBeers = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  try {
+    const db = admin.database();
+    const [beersSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
+      db.ref('beers').once('value'),
+      db.ref('beerEnrichment').once('value'),
+      db.ref('beerLastUpdated').once('value'),
+      db.ref('beerOrder').once('value')
+    ]);
+
+    const beersById = beersSnap.val() || {};
+    const beerOrder = orderSnap.val() || [];
+    const enrichment = enrichmentSnap.val() || {};
+    const lastUpdated = lastUpdatedSnap.val();
+
+    const ordered = beerOrder.length > 0
+      ? beerOrder.map(id => beersById[id]).filter(Boolean)
+      : Object.values(beersById);
+
+    const merged = ordered.map(beer => {
+      const e = enrichment[beer.id] || {};
+      // Use item price, fall back to group inherited price
+      const price = beer.price || beer.groupPrice || null;
+      return {
+        ...beer,
+        name: e.correctedName || beer.name,
+        price,
+        imageUrl: beer.toastImageUrl || null,
+        style: e.style || null,
+        brewery: e.brewery || null,
+        abv: e.abv || null,
+        description: e.description || null,
+        uncertain: e.uncertain || false,
+        uncertainReason: e.uncertainReason || null,
+      };
+    });
+
+    res.json({ beers: merged, lastUpdated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── HTTP Endpoint — Premium Pours ───────────────────────────────────────────
+
+exports.getPours = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  try {
+    const db = admin.database();
+    const [poursSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
+      db.ref('pours').once('value'),
+      db.ref('poursEnrichment').once('value'),
+      db.ref('poursLastUpdated').once('value'),
+      db.ref('poursOrder').once('value')
+    ]);
+
+    const poursById = poursSnap.val() || {};
+    const poursOrder = orderSnap.val() || [];
+    const enrichment = enrichmentSnap.val() || {};
+    const lastUpdated = lastUpdatedSnap.val();
+
+    const ordered = poursOrder.length > 0
+      ? poursOrder.map(id => poursById[id]).filter(Boolean)
+      : Object.values(poursById);
+
+    const merged = ordered.map(pour => {
+      const e = enrichment[pour.id] || {};
+      const price = pour.price || pour.groupPrice || null;
+      return {
+        ...pour,
+        name: e.correctedName || pour.name,
+        price,
+        imageUrl: pour.toastImageUrl || null,
+        category: e.category || null,
+        producer: e.producer || null,
+        abv: e.abv || null,
+        age: e.age || null,
+        description: e.description || null,
+        uncertain: e.uncertain || false,
+        uncertainReason: e.uncertainReason || null,
+      };
+    });
+
+    res.json({ pours: merged, lastUpdated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Manual Enrichment Trigger ────────────────────────────────────────────────
 
 exports.triggerEnrichment = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
@@ -438,7 +682,6 @@ exports.triggerEnrichment = functions
       for (const wine of toEnrich) {
         const vintage = parseVintage(wine.name);
         const enrichment = await enrichWineWithClaude(wine.name, vintage);
-
         if (enrichment) {
           await db.ref(`wineEnrichment/${wine.id}`).set({
             correctedName: enrichment.correctedName || wine.name,
@@ -456,7 +699,6 @@ exports.triggerEnrichment = functions
           if (enrichment.uncertain) uncertain.push({ name: wine.name, reason: enrichment.uncertainReason });
           console.log(`✓ ${wine.name} → ${enrichment.correctedName} (${enrichment.varietal})`);
         }
-
         await new Promise(r => setTimeout(r, 500));
       }
 
