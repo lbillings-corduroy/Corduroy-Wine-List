@@ -375,7 +375,12 @@ exports.syncWineMenu = functions
       await db.ref('lastUpdated').set(Date.now());
       console.log(`Saved ${freshWines.length} merged wines`);
 
-      const toEnrich = freshWines.filter(w => !existingEnrichment[w.id]);
+      const toEnrich = freshWines.filter(w => {
+        const existing = existingEnrichment[w.id];
+        if (!existing) return true;
+        if (!existing.sourceName || existing.sourceName !== w.name) return true;
+        return false;
+      });
       let enrichedCount = 0;
 
       for (const wine of toEnrich) {
@@ -383,6 +388,7 @@ exports.syncWineMenu = functions
         const enrichment = await enrichWineWithClaude(wine.name, vintage);
         if (enrichment) {
           await db.ref(`wineEnrichment/${wine.id}`).set({
+            sourceName: wine.name,
             correctedName: enrichment.correctedName || wine.name,
             uncertain: enrichment.uncertain || false,
             uncertainReason: enrichment.uncertainReason || null,
@@ -434,13 +440,19 @@ exports.syncBeerMenu = functions
       await db.ref('beerLastUpdated').set(Date.now());
       console.log(`Saved ${freshBeers.length} beers`);
 
-      const toEnrich = freshBeers.filter(b => !existingEnrichment[b.id]);
+      const toEnrich = freshBeers.filter(b => {
+        const existing = existingEnrichment[b.id];
+        if (!existing) return true;
+        if (!existing.sourceName || existing.sourceName !== b.name) return true;
+        return false;
+      });
       let enrichedCount = 0;
 
       for (const beer of toEnrich) {
         const enrichment = await enrichBeerWithClaude(beer.name);
         if (enrichment) {
           await db.ref(`beerEnrichment/${beer.id}`).set({
+            sourceName: beer.name,
             correctedName: enrichment.correctedName || beer.name,
             uncertain: enrichment.uncertain || false,
             uncertainReason: enrichment.uncertainReason || null,
@@ -489,13 +501,19 @@ exports.syncPoursMenu = functions
       await db.ref('poursLastUpdated').set(Date.now());
       console.log(`Saved ${freshPours.length} pours`);
 
-      const toEnrich = freshPours.filter(p => !existingEnrichment[p.id]);
+      const toEnrich = freshPours.filter(p => {
+        const existing = existingEnrichment[p.id];
+        if (!existing) return true;
+        if (!existing.sourceName || existing.sourceName !== p.name) return true;
+        return false;
+      });
       let enrichedCount = 0;
 
       for (const pour of toEnrich) {
         const enrichment = await enrichPourWithClaude(pour.name);
         if (enrichment) {
           await db.ref(`poursEnrichment/${pour.id}`).set({
+            sourceName: pour.name,
             correctedName: enrichment.correctedName || pour.name,
             uncertain: enrichment.uncertain || false,
             uncertainReason: enrichment.uncertainReason || null,
