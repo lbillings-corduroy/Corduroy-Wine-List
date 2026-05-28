@@ -62,10 +62,19 @@ async function getStockData(token) {
 
 // ─── Generic Item Extraction (Beer, Pours, Cocktails) ────────────────────────
 
+function findGroupByGuid(groups, guid) {
+  for (const group of groups) {
+    if (group.guid === guid) return group;
+    if (group.menuGroups && group.menuGroups.length > 0) {
+      const found = findGroupByGuid(group.menuGroups, guid);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function extractItemsFromMenu(menus, menuGuid, stockData) {
   const items = [];
-  const menu = menus.menus.find(m => m.guid === menuGuid);
-  if (!menu) { console.log(`Menu ${menuGuid} not found`); return items; }
 
   const stockMap = {};
   if (Array.isArray(stockData)) {
@@ -83,7 +92,7 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
             id: item.guid,
             name: item.name,
             price: item.price || item.pricingRules?.[0]?.price || null,
-            groupPrice: group.price || null, // capture group-level inherited price
+            groupPrice: group.price || null,
             tier: topGroup,
             subgroup: group.name,
             available: isAvailable,
@@ -98,10 +107,27 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
     }
   }
 
-  if (menu.menuGroups) {
-    menu.menuGroups.forEach(g => extractGroup(g, g.name));
+  // First try: match as a top-level menu
+  const menu = menus.menus.find(m => m.guid === menuGuid);
+  if (menu) {
+    if (menu.menuGroups) {
+      menu.menuGroups.forEach(g => extractGroup(g, g.name));
+    }
+    return items;
   }
 
+  // Fallback: search for it as a group inside any menu
+  console.log(`Menu ${menuGuid} not found at top level — searching as group...`);
+  for (const m of menus.menus) {
+    const group = findGroupByGuid(m.menuGroups || [], menuGuid);
+    if (group) {
+      console.log(`Found group "${group.name}" inside menu "${m.name}"`);
+      extractGroup(group, group.name);
+      return items;
+    }
+  }
+
+  console.log(`Menu/group ${menuGuid} not found anywhere`);
   return items;
 }
 
