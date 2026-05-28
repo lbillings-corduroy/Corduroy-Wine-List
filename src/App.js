@@ -5,6 +5,8 @@ const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getB
 const POURS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPours";
 const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
 const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getFoodItems";
+const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getCocktails";
+const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
@@ -1043,7 +1045,8 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
     { id: "wine", label: "Wine List", icon: "🍷", available: true },
     { id: "beer", label: "Beer List", icon: "🍺", available: true },
     { id: "pours", label: "Premium Pours", icon: "🥃", available: true },
-    { id: "cocktails", label: "Signature Cocktails", icon: "🍸", available: false },
+    { id: "cocktails", label: "Specialty Cocktails", icon: "🍸", available: true },
+    { id: "nab", label: "Non-Alcoholic Beverages", icon: "🥤", available: true },
     { id: "sommelier", label: "Get a Wine Pairing", icon: "✦", available: true },
   ];
 
@@ -1256,6 +1259,8 @@ export default function App() {
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
