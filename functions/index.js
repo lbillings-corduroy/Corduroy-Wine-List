@@ -759,3 +759,123 @@ exports.triggerEnrichment = functions
       res.status(500).json({ error: error.message });
     }
   });
+
+// ─── Food Menu Constants ──────────────────────────────────────────────────────
+
+const FOOD_GROUPS = [
+  { name: 'Soups & Salads', guid: 'c12bef8f-e3e0-4a50-8007-7edaddd2f4a2' },
+  { name: 'Starters',       guid: '17cc57c6-8192-42bb-82a4-7a873b2dcf67' },
+  { name: 'Entrees',        guid: '05bad67c-e484-4cca-91a9-59f11ac42628' },
+];
+
+// ─── Food Extraction ──────────────────────────────────────────────────────────
+
+function extractFoodItems(menus, stockData) {
+  const stockMap = {};
+  if (Array.isArray(stockData)) {
+    stockData.forEach(item => { if (item.menuItem?.guid) stockMap[item.menuItem.guid] = item; });
+  }
+
+  const allItems = [];
+
+  for (const { name: courseName, guid } of FOOD_GROUPS) {
+    // Search all menus for this group GUID
+    let group = null;
+    for (const menu of menus.menus) {
+      group = findGroupByGuid(menu.menuGroups || [], guid);
+      if (group) break;
+    }
+
+    if (!group) {
+      console.log(`Food group "${courseName}" (${guid}) not found`);
+      continue;
+    }
+
+    // Recursively collect all items from this group and its sub-groups
+    function collectItems(g) {
+      if (g.menuItems && g.menuItems.length > 0) {
+        g.menuItems.forEach(item => {
+          const price = item.price || null;
+          // Skip zero-price course markers
+          if (!price || price === 0) return;
+          // Skip out of stock
+          const stockInfo = stockMap[item.guid];
+          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+          // Avoid duplicates
+          if (allItems.find(i => i.id === item.guid)) return;
+
+          allItems.push({
+            id: item.guid,
+            name: item.name,
+            price,
+            course: courseName,
+            description: item.description || null,
+            available: true,
+          });
+        });
+      }
+      if (g.menuGroups && g.menuGroups.length > 0) {
+        g.menuGroups.forEach(sub => collectItems(sub));
+      }
+    }
+
+    collectItems(group);
+    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
+  }
+
+  return allItems;
+}
+
+// ─── Food Menu Sync ───────────────────────────────────────────────────────────
+
+exports.syncFoodMenu = functions
+  .runWith({ timeoutSeconds: 120, memory: '256MB' })
+  .pubsub.schedule('every 30 minutes')
+  .onRun(async (context) => {
+    try {
+      console.log('Starting Food menu sync...');
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+      const freshItems = extractFoodItems(menus, stockData);
+
+      const db = admin.database();
+      const foodById = {};
+      freshItems.forEach(item => { foodById[item.id] = item; });
+      await db.ref('foodItems').set(foodById);
+      await db.ref('foodOrder').set(freshItems.map(i => i.id));
+      await db.ref('foodLastUpdated').set(Date.now());
+
+      console.log(`Food sync complete — saved ${freshItems.length} items`);
+      return null;
+    } catch (error) {
+      console.error('Food sync error:', error.message);
+      return null;
+    }
+  });
+
+// ─── HTTP Endpoint — Food Items ───────────────────────────────────────────────
+
+exports.getFoodItems = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  try {
+    const db = admin.database();
+    const [foodSnap, orderSnap, lastUpdatedSnap] = await Promise.all([
+      db.ref('foodItems').once('value'),
+      db.ref('foodOrder').once('value'),
+      db.ref('foodLastUpdated').once('value'),
+    ]);
+
+    const foodById = foodSnap.val() || {};
+    const foodOrder = orderSnap.val() || [];
+    const lastUpdated = lastUpdatedSnap.val();
+
+    const ordered = foodOrder.length > 0
+      ? foodOrder.map(id => foodById[id]).filter(Boolean)
+      : Object.values(foodById);
+
+    res.json({ foodItems: ordered, lastUpdated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
