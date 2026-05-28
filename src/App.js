@@ -332,13 +332,14 @@ function PinScreen({ onSuccess, onCancel }) {
 
 // ─── Generic Item List Screen (Beer, Pours, Cocktails) ───────────────────────
 
-function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
+function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeGroup, setActiveGroup] = useState("All");
   const [selectedItem, setSelectedItem] = useState(null);
   const [visible, setVisible] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
 
   useEffect(() => {
     fetch(endpoint)
@@ -355,6 +356,16 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
   const groupOrder = [...new Map(available.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
   const groups = ["All", ...groupOrder];
   const filtered = activeGroup === "All" ? available : available.filter(i => i.subgroup === activeGroup || i.tier === activeGroup);
+
+  const searchFiltered = wineSearch.trim() === ""
+    ? filtered
+    : filtered.filter(w => {
+        const q = wineSearch.toLowerCase();
+        return (w.name || "").toLowerCase().includes(q)
+          || (w.varietal || "").toLowerCase().includes(q)
+          || (w.region || "").toLowerCase().includes(q)
+          || (w.description || "").toLowerCase().includes(q);
+      });
 
   const grouped = {};
   filtered.forEach(item => {
@@ -390,7 +401,13 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ color: accentColor, fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
           </div>
-          <div style={{ width: 60 }} />
+          <div style={{ width: 60, textAlign: "right" }}>
+            {favorites.length > 0 && (
+              <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                ★ {favorites.length}
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${accentColor}44, transparent)`, marginBottom: 10 }} />
@@ -406,11 +423,17 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
               fontWeight: activeGroup === g ? 600 : 400
             }}>{g === "All" ? `All ${title}` : g}</button>
           ))}
+        <div style={{ padding: "4px 0 10px", position: "relative" }}>
+          <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
+            onChange={e => setItemSearch(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+          />
+          {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
         </div>
       </div>
 
       <div style={{ background: "#120800", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {filtered.length} {filtered.length === 1 ? "item" : "items"}
+        {filtered.length} {filtered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
       <div style={{ background: "#faf8f4" }}>
@@ -444,7 +467,11 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
                       <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
                     )}
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <button onClick={e => { e.stopPropagation(); onToggleFavorite(item); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: favorites.some(f => f.id === item.id) ? accentColor : "#d0c0b0", padding: "2px 0", lineHeight: 1 }}>
+                      {favorites.some(f => f.id === item.id) ? "★" : "☆"}
+                    </button>
+                    <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
                     {item.price ? (
                       <>
                         <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
@@ -453,6 +480,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
                     ) : (
                       <span style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Ask</span>
                     )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -499,6 +527,62 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
       })()}
 
       <div style={{ height: 32 }} />
+    </div>
+  );
+}
+
+// ─── Shortlist Screen ─────────────────────────────────────────────────────────
+
+function ShortlistScreen({ favorites, onRemove, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#0a0500", zIndex: 500, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#150a00", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "3px", textTransform: "uppercase" }}>My Shortlist</div>
+          <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>{favorites.length} {favorites.length === 1 ? "item" : "items"} starred</div>
+        </div>
+        <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 18px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "0.5px" }}>
+          Close
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {favorites.length === 0 ? (
+          <div style={{ color: "#5a4030", textAlign: "center", padding: "60px 20px", fontSize: 14 }}>
+            <div style={{ fontSize: 36, marginBottom: 16 }}>☆</div>
+            <div>Tap the star on any wine, beer, or pour to add it here</div>
+          </div>
+        ) : (
+          favorites.map(item => (
+            <div key={item.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>
+                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : "🥃"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+                  {item.favoriteType === "wine"
+                    ? (item.varietal || "Wine") + (item.region ? ` · ${item.region}` : "")
+                    : item.favoriteType === "beer"
+                    ? (item.style || "Beer") + (item.brewery ? ` · ${item.brewery}` : "")
+                    : (item.category || "Pour") + (item.producer ? ` · ${item.producer}` : "")}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
+                {item.favoriteType === "wine" ? (
+                  item.glassPrice
+                    ? <><div style={{ color: "#f0e8d8", fontSize: 14 }}>{formatPrice(item.glassPrice)}</div><div style={{ color: "#5a4030", fontSize: 10 }}>glass</div></>
+                    : item.bottlePrice
+                    ? <><div style={{ color: "#f0e8d8", fontSize: 14 }}>{formatPrice(item.bottlePrice)}</div><div style={{ color: "#5a4030", fontSize: 10 }}>bottle</div></>
+                    : null
+                ) : item.price ? (
+                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>${Math.round(item.price)}</div>
+                ) : null}
+              </div>
+              <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: "#5a4030", cursor: "pointer", fontSize: 22, padding: "4px", lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -604,6 +688,10 @@ export default function App() {
   const [showPin, setShowPin] = useState(false);
   const [showManager, setShowManager] = useState(false);
   const logoTapTimer = useRef(null);
+  const idleTimer = useRef(null);
+  const [wineSearch, setWineSearch] = useState("");
+  const [favorites, setFavorites] = useState([]);
+  const [showShortlist, setShowShortlist] = useState(false);
 
   useEffect(() => {
     fetchWines();
@@ -612,6 +700,41 @@ export default function App() {
   }, []);
 
   useEffect(() => { if (!loading) setTimeout(() => setVisible(true), 50); }, [loading]);
+
+  useEffect(() => {
+    function resetApp() {
+      setScreen("home");
+      setFavorites([]);
+      setShowShortlist(false);
+      setWineSearch("");
+      setActiveTier("All");
+      setActiveSubgroup("All");
+      setActiveVarietal("All");
+      setSelectedWine(null);
+    }
+    function handleVisibility() { if (!document.hidden) resetApp(); }
+    function resetIdle() {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(resetApp, 15 * 60 * 1000);
+    }
+    const events = ["touchstart", "touchmove", "click", "scroll"];
+    document.addEventListener("visibilitychange", handleVisibility);
+    events.forEach(e => document.addEventListener(e, resetIdle, { passive: true }));
+    resetIdle();
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      events.forEach(e => document.removeEventListener(e, resetIdle));
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  function toggleFavorite(item, itemType) {
+    setFavorites(prev => {
+      const exists = prev.find(f => f.id === item.id);
+      if (exists) return prev.filter(f => f.id !== item.id);
+      return [...prev, { ...item, favoriteType: itemType }];
+    });
+  }
 
   async function fetchWines() {
     try {
@@ -650,18 +773,36 @@ export default function App() {
   const varietals = ["All", ...Array.from(varietalSet).sort()];
   const filtered = activeVarietal === "All" ? filteredBySubgroup : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
 
+  const searchFiltered = wineSearch.trim() === ""
+    ? filtered
+    : filtered.filter(w => {
+        const q = wineSearch.toLowerCase();
+        return (w.name || "").toLowerCase().includes(q)
+          || (w.varietal || "").toLowerCase().includes(q)
+          || (w.region || "").toLowerCase().includes(q)
+          || (w.description || "").toLowerCase().includes(q);
+      });
+
   const grouped = {};
-  filtered.forEach(wine => {
+  searchFiltered.forEach(wine => {
     const key = wine.subgroup || wine.tier || "Wine";
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(wine);
   });
   // Preserve Toast order for group headers
-  const groupOrder = [...new Map(filtered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
+  const groupOrder = [...new Map(searchFiltered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
-  if (screen === "home") return <HomeScreen onNavigate={setScreen} />;
-  if (screen === "beer") return <ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} />;
-  if (screen === "pours") return <ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} />;
+  const shortlistOverlay = showShortlist ? (
+    <ShortlistScreen
+      favorites={favorites}
+      onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))}
+      onClose={() => setShowShortlist(false)}
+    />
+  ) : null;
+
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} /></>;
+  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
   if (loading) return (
     <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
@@ -682,6 +823,7 @@ export default function App() {
 
   return (
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
       {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
       {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
 
@@ -709,11 +851,20 @@ export default function App() {
             <div style={{ color: "#f0e8d8", fontSize: 19 }}>Appalachia Kitchen</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf7d" }} />
-              <span style={{ color: "#4caf7d", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Live</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+              {favorites.length > 0 && (
+                <button onClick={() => setShowShortlist(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                  ★ {favorites.length}
+                </button>
+              )}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf7d" }} />
+                  <span style={{ color: "#4caf7d", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Live</span>
+                </div>
+                <div style={{ color: "#5a4030", fontSize: 10, marginTop: 2 }}>{timeAgo(lastUpdated)}</div>
+              </div>
             </div>
-            <div style={{ color: "#5a4030", fontSize: 10, marginTop: 2 }}>{timeAgo(lastUpdated)}</div>
           </div>
         </div>
 
@@ -752,8 +903,8 @@ export default function App() {
       </div>{/* end sticky wrapper */}
 
       <div style={{ background: "#120800", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {filtered.length} {filtered.length === 1 ? "wine" : "wines"}
-        {activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
+        {searchFiltered.length} {searchFiltered.length === 1 ? "wine" : "wines"}
+        {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
       </div>
 
       <div style={{ background: "#faf8f4" }}>
@@ -834,7 +985,7 @@ export default function App() {
   );
 }
 
-function WineCard({ wine, selected, onSelect }) {
+function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
@@ -860,7 +1011,11 @@ function WineCard({ wine, selected, onSelect }) {
           <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
         )}
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0, minWidth: 52 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <button onClick={e => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(wine); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: isFavorited ? "#c9a96e" : "#d0c0b0", padding: "2px 0", lineHeight: 1, flexShrink: 0 }}>
+          {isFavorited ? "★" : "☆"}
+        </button>
+        <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
         {wine.available === false ? (
           <div style={{ background: "#f0ebe0", color: "#c0b0a0", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0d8c8" }}>86'd</div>
         ) : wine.glassPrice ? (
@@ -876,6 +1031,7 @@ function WineCard({ wine, selected, onSelect }) {
         ) : (
           <span style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Ask</span>
         )}
+        </div>
       </div>
     </div>
   );
