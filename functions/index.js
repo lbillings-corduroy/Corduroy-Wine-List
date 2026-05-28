@@ -122,6 +122,12 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
     const group = findGroupByGuid(m.menuGroups || [], menuGuid);
     if (group) {
       console.log(`Found group "${group.name}" inside menu "${m.name}"`);
+      console.log(`Group has ${(group.menuItems||[]).length} direct items, ${(group.menuGroups||[]).length} sub-groups`);
+      if (group.menuGroups) {
+        group.menuGroups.forEach(sg => {
+          console.log(`  Sub-group "${sg.name}" — ${(sg.menuItems||[]).length} items, ${(sg.menuGroups||[]).length} nested groups`);
+        });
+      }
       extractGroup(group, group.name);
       return items;
     }
