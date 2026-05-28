@@ -873,9 +873,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
       const data = await res.json();
       const pairings = data.pairings || [];
       // Detect repeats before updating state
-      const repeats = {};
-      pairings.forEach(p => { if (p.id && shownWineIds[p.level] === p.id) repeats[p.level] = true; });
-      setPairingResult(pairings.map(p => ({ ...p, isRepeat: repeats[p.level] || false })));
+      // Count how many items exist per level in the new results
+      const countByLevel = {};
+      pairings.forEach(p => { countByLevel[p.level] = (countByLevel[p.level] || 0) + 1; });
+      // Only flag as repeat if it's the same wine AND it's the only option at that tier
+      setPairingResult(pairings.map(p => ({
+        ...p,
+        isRepeat: !!(p.id && shownWineIds[p.level] === p.id && countByLevel[p.level] === 1)
+      })));
       const newIds = { ...shownWineIds };
       pairings.forEach(p => { if (p.id && !repeats[p.level]) newIds[p.level] = p.id; });
       setShownWineIds(newIds);
