@@ -911,12 +911,17 @@ exports.getPairing = functions
           .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
           .join('\n');
 
+        const excludeDishes = req.body.excludeDishes || [];
+        const excludeNote = excludeDishes.length > 0
+          ? `\n\nIMPORTANT: Do NOT suggest these dishes — the guest has already seen them: ${excludeDishes.join(', ')}. Choose different dishes if at all possible.`
+          : '';
+
         const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is considering this wine:
 
 Wine: ${wineName}${enrich.varietal ? `\nVarietal: ${enrich.varietal}` : ''}${enrich.region ? `\nRegion: ${enrich.region}` : ''}${enrich.description ? `\nTasting notes: ${enrich.description}` : ''}
 
 From our current menu, suggest exactly 2-3 dishes that pair beautifully with this wine. Choose ONLY from this list:
-${foodList}
+${foodList}${excludeNote}
 
 Respond in JSON only (no other text):
 {"pairings":[{"name":"exact dish name","course":"course name","reason":"one evocative sentence why this pairing works"}]}`;
@@ -953,13 +958,25 @@ Respond in JSON only (no other text):
             return `- ID:${w.id} | ${e.correctedName || w.name}${e.varietal ? ` (${e.varietal})` : ''}${e.region ? `, ${e.region}` : ''} | ${prices.join(', ')}`;
           });
 
+        const excludeWineIds = req.body.excludeWineIds || {};
+        // excludeWineIds is { "Value": "id1", "Mid-Range": "id2", "Premium": "id3" }
+        const excludeLines = Object.entries(excludeWineIds)
+          .map(([level, id]) => {
+            const w = wines.find(line => line.includes(`ID:${id}`));
+            const name = w ? w.split('|')[1].trim() : id;
+            return `${level}: ${name}`;
+          });
+        const excludeNote = excludeLines.length > 0
+          ? `\n\nIMPORTANT: The guest has already seen these suggestions — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
+          : '';
+
         const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is ordering:
 
 Dish: ${food.name}${food.description ? `\nDescription: ${food.description}` : ''}
 Course: ${food.course}
 
 From our wine list, suggest exactly three wines — one value, one mid-range, one premium — that pair beautifully with this dish. Choose ONLY from this list:
-${wines.join('\n')}
+${wines.join('\n')}${excludeNote}
 
 Respond in JSON only (no other text):
 {"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
@@ -967,6 +984,40 @@ Respond in JSON only (no other text):
         const response = await axios.post(
           'https://api.anthropic.com/v1/messages',
           { model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: prompt }] },
+          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
+        );
+        const text = response.data.content[0].text;
+        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+        return res.json(result);
+      }
+
+
+      // ── Drink → Food (Beer & Pours) ──────────────────────────────────────
+      if (type === 'drink_to_food') {
+        const { itemName, itemDescription, itemStyle, itemCategory, itemABV, excludeDishes = [] } = req.body;
+        const foodSnap = await db.ref('foodItems').once('value');
+        const foodItems = Object.values(foodSnap.val() || {}).filter(f => !f.excluded);
+        const foodList = foodItems
+          .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
+          .join('\n');
+        const drinkDesc = [itemStyle || itemCategory, itemABV ? `${itemABV} ABV` : null, itemDescription].filter(Boolean).join(' · ');
+        const excludeNote = excludeDishes.length > 0
+          ? `\n\nIMPORTANT: Do NOT suggest these dishes — the guest has already seen them: ${excludeDishes.join(', ')}. Choose different dishes if at all possible.`
+          : '';
+
+        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is considering:
+
+Drink: ${itemName}${drinkDesc ? `\nDetails: ${drinkDesc}` : ''}
+
+From our current menu, suggest exactly 2-3 dishes that pair beautifully with this drink. Choose ONLY from this list:
+${foodList}${excludeNote}
+
+Respond in JSON only (no other text):
+{"pairings":[{"name":"exact dish name","course":"course name","reason":"one evocative sentence why this pairing works"}]}`;
+
+        const response = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
           { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
         );
         const text = response.data.content[0].text;
