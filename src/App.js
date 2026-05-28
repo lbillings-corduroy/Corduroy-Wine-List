@@ -4,6 +4,8 @@ const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/
 const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getBeers";
 const POURS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPours";
 const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
+const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getFoodItems";
+const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -519,10 +521,11 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
               </div>
             </div>
             {item.description && (
-              <div style={{ color: "#5a4030", fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10 }}>
+              <div style={{ color: "#5a4030", fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10, marginBottom: 12 }}>
                 {item.description}
               </div>
             )}
+            <ItemPairingButton itemId={item.id} itemName={item.name} />
           </div>
         );
       })()}
@@ -588,6 +591,290 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   );
 }
 
+// ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
+
+function ItemPairingButton({ itemId, itemName }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function handlePairing() {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "wine_to_food", itemId })
+      });
+      const data = await res.json();
+      setResult(data.pairings || []);
+    } catch (e) { setResult([]); }
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      <button onClick={handlePairing} disabled={loading}
+        style={{ width: "100%", background: loading ? "#f0ebe0" : "#120800", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
+        {loading ? "Finding pairings…" : "Suggested Food Pairing"}
+      </button>
+      {result && result.length > 0 && (
+        <div style={{ marginTop: 2 }}>
+          <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
+          {result.map((p, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+              <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
+              <div>
+                <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
+                <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {result && result.length === 0 && (
+        <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Wine Detail Panel ────────────────────────────────────────────────────────
+
+function WineDetailPanel({ wine, onClose }) {
+  const [pairingLoading, setPairingLoading] = useState(false);
+  const [pairingResult, setPairingResult] = useState(null);
+
+  async function handlePairing() {
+    setPairingLoading(true);
+    setPairingResult(null);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id })
+      });
+      const data = await res.json();
+      setPairingResult(data.pairings || []);
+    } catch (e) { setPairingResult([]); }
+    setPairingLoading(false);
+  }
+
+  return (
+    <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
+      <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+          {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "#1a0a00", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+            {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#b0a090", fontSize: 22, cursor: "pointer", padding: "0 4px", alignSelf: "flex-start", lineHeight: 1 }}>×</button>
+      </div>
+
+      {wine.description ? (
+        <div style={{ color: "#5a4a3a", fontSize: 13, lineHeight: 1.8, marginBottom: 12 }}>{wine.description}</div>
+      ) : (
+        <div style={{ color: "#c0b0a0", fontSize: 12, fontStyle: "italic", marginBottom: 12 }}>Ask your server for tasting notes</div>
+      )}
+
+      {wine.reviews && wine.reviews !== "null" && (
+        <div style={{ background: "#faf8f4", border: "0.5px solid #e8e0d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+          <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
+          <div style={{ color: "#5a4a3a", fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 24, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid #e8e0d0" }}>
+        {wine.glassPrice && (
+          <div>
+            <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
+            <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+          </div>
+        )}
+        {wine.bottlePrice && (
+          <div>
+            <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
+            <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+          </div>
+        )}
+        {!wine.glassPrice && !wine.bottlePrice && (
+          <div style={{ color: "#c0b0a0", fontSize: 13, fontStyle: "italic", alignSelf: "center" }}>Ask your server for pricing</div>
+        )}
+      </div>
+
+      <button onClick={handlePairing} disabled={pairingLoading}
+        style={{ width: "100%", background: pairingLoading ? "#f0ebe0" : "#120800", color: pairingLoading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: pairingLoading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
+        {pairingLoading ? "Finding pairings…" : "Suggested Food Pairing"}
+      </button>
+
+      {pairingResult && pairingResult.length > 0 && (
+        <div>
+          <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Pairs beautifully with</div>
+          {pairingResult.map((p, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+              <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
+              <div>
+                <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
+                <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {pairingResult && pairingResult.length === 0 && (
+        <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sommelier Screen ─────────────────────────────────────────────────────────
+
+function SommelierScreen({ onBack }) {
+  const [foodItems, setFoodItems] = useState([]);
+  const [loadingFood, setLoadingFood] = useState(true);
+  const [activeCourse, setActiveCourse] = useState("All");
+  const [selectedFood, setSelectedFood] = useState(null);
+  const [pairingResult, setPairingResult] = useState(null);
+  const [pairingLoading, setPairingLoading] = useState(false);
+  const [view, setView] = useState("pick");
+
+  useEffect(() => {
+    fetch(FOOD_URL).then(r => r.json())
+      .then(data => { setFoodItems(data.foodItems || []); setLoadingFood(false); })
+      .catch(() => setLoadingFood(false));
+  }, []);
+
+  async function handleFoodSelect(food) {
+    setSelectedFood(food);
+    setPairingLoading(true);
+    setPairingResult(null);
+    setView("result");
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "food_to_wine", itemId: food.id })
+      });
+      const data = await res.json();
+      setPairingResult(data.pairings || []);
+    } catch (e) { setPairingResult([]); }
+    setPairingLoading(false);
+  }
+
+  const courses = ["All", ...new Set(foodItems.map(f => f.course))];
+  const filtered = activeCourse === "All" ? foodItems : foodItems.filter(f => f.course === activeCourse);
+
+  return (
+    <div style={{ background: "#0a0500", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={view === "result" ? () => setView("pick") : onBack}
+            style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>{view === "result" ? "Back" : "Main Menu"}</span>
+          </button>
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
+          </div>
+          <div style={{ width: 80 }} />
+        </div>
+        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
+        {view === "pick" && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {courses.map(c => (
+              <button key={c} onClick={() => setActiveCourse(c)} style={{
+                background: activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.07)",
+                border: `0.5px solid ${activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.15)"}`,
+                color: activeCourse === c ? "#0d0800" : "#c8a878",
+                fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
+                fontFamily: "Georgia, serif", whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
+              }}>{c}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {view === "pick" && (
+        <div>
+          <div style={{ background: "#120800", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+            Select a dish to find the perfect wine
+          </div>
+          <div style={{ background: "#faf8f4" }}>
+            {loadingFood ? (
+              <div style={{ color: "#b0a090", textAlign: "center", padding: 40 }}>Loading menu…</div>
+            ) : (
+              filtered.map(food => (
+                <div key={food.id} onClick={() => handleFoodSelect(food)}
+                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: "0.5px solid #e8e0d0", cursor: "pointer", background: "#faf8f4" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f0ebe0"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#faf8f4"}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
+                    <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: food.description ? 4 : 0 }}>{food.course}</div>
+                    {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ color: "#1a0a00", fontSize: 14 }}>{formatPrice(food.price)}</div>
+                    <span style={{ color: "#c9a96e", fontSize: 18 }}>›</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === "result" && (
+        <div style={{ padding: "20px 20px" }}>
+          {selectedFood && (
+            <div style={{ background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.25)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>Your selection</div>
+              <div style={{ color: "#f0e8d8", fontSize: 15 }}>{selectedFood.name}</div>
+              {selectedFood.description && <div style={{ color: "#6a5040", fontSize: 12, marginTop: 4, fontStyle: "italic", lineHeight: 1.4 }}>{selectedFood.description}</div>}
+            </div>
+          )}
+
+          {pairingLoading && (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase" }}>Finding perfect pairings…</div>
+            </div>
+          )}
+
+          {pairingResult && pairingResult.map((p, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
+                  <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  {p.glassPrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>glass</span></div>}
+                  {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>bottle</span></div>}
+                </div>
+              </div>
+              <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+              {(p.varietal || p.region) && (
+                <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
+                  {[p.varietal, p.region].filter(Boolean).join(" · ")}
+                </div>
+              )}
+              <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+            </div>
+          ))}
+
+          {pairingResult && pairingResult.length === 0 && (
+            <div style={{ color: "#6a5040", textAlign: "center", padding: "40px 0", fontSize: 14 }}>
+              Unable to find pairings — please ask your server.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Home Screen ─────────────────────────────────────────────────────────────
 
 function HomeScreen({ onNavigate }) {
@@ -599,6 +886,7 @@ function HomeScreen({ onNavigate }) {
     { id: "beer", label: "Craft Beers", icon: "🍺", available: true },
     { id: "pours", label: "Premium Pours", icon: "🥃", available: true },
     { id: "cocktails", label: "Signature Cocktails", icon: "🍸", available: false },
+    { id: "sommelier", label: "Get a Wine Pairing", icon: "✦", available: true },
   ];
 
   return (
@@ -802,6 +1090,7 @@ export default function App() {
   ) : null;
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} /></>;
+  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
@@ -936,59 +1225,7 @@ export default function App() {
         )}
       </div>
 
-      {selectedWine && (() => {
-        const wine = wines.find(w => w.id === selectedWine);
-        if (!wine) return null;
-        return (
-          <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)" }}>
-            <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-              <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
-                {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#1a0a00", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
-                <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
-                  {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-              <button onClick={() => setSelectedWine(null)} style={{ background: "transparent", border: "none", color: "#b0a090", fontSize: 22, cursor: "pointer", padding: "0 4px", alignSelf: "flex-start", lineHeight: 1 }}>×</button>
-            </div>
-
-            {wine.description ? (
-              <div style={{ color: "#5a4a3a", fontSize: 13, lineHeight: 1.8, marginBottom: 12 }}>{wine.description}</div>
-            ) : (
-              <div style={{ color: "#c0b0a0", fontSize: 12, fontStyle: "italic", marginBottom: 12 }}>Ask your server for tasting notes</div>
-            )}
-
-            {wine.reviews && wine.reviews !== "null" && (
-              <div style={{ background: "#faf8f4", border: "0.5px solid #e8e0d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
-                <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
-                <div style={{ color: "#5a4a3a", fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 24, marginBottom: 16, paddingBottom: 14, borderBottom: "0.5px solid #e8e0d0" }}>
-              {wine.glassPrice && (
-                <div>
-                  <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
-                  <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
-                </div>
-              )}
-              {wine.bottlePrice && (
-                <div>
-                  <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
-                  <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
-                </div>
-              )}
-              {!wine.glassPrice && !wine.bottlePrice && (
-                <div style={{ color: "#c0b0a0", fontSize: 13, fontStyle: "italic", alignSelf: "center" }}>Ask your server for pricing</div>
-              )}
-            </div>
-
-
-          </div>
-        );
-      })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} /> : null; })()}
 
       <div style={{ height: 32 }} />
     </div>
