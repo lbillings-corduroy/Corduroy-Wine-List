@@ -948,26 +948,50 @@ Respond in JSON only (no other text):
 
         const winesById = winesSnap.val() || {};
         const enrichment = enrichSnap.val() || {};
-        const wines = Object.values(winesById)
+
+        // Sort wines by price and split into thirds so tiers reflect actual prices
+        const wineObjects = Object.values(winesById)
           .filter(w => w.bottlePrice || w.glassPrice)
           .map(w => {
             const e = enrichment[w.id] || {};
-            const prices = [];
-            if (w.glassPrice) prices.push(`glass $${Math.round(w.glassPrice)}`);
-            if (w.bottlePrice) prices.push(`bottle $${Math.round(w.bottlePrice)}`);
-            return `- ID:${w.id} | ${e.correctedName || w.name}${e.varietal ? ` (${e.varietal})` : ''}${e.region ? `, ${e.region}` : ''} | ${prices.join(', ')}`;
-          });
+            return {
+              id: w.id,
+              name: e.correctedName || w.name,
+              varietal: e.varietal || null,
+              region: e.region || null,
+              glassPrice: w.glassPrice || null,
+              bottlePrice: w.bottlePrice || null,
+              sortPrice: w.bottlePrice || w.glassPrice || 0
+            };
+          })
+          .sort((a, b) => a.sortPrice - b.sortPrice);
+
+        const third = Math.ceil(wineObjects.length / 3);
+        const tierGroups = {
+          'Value': wineObjects.slice(0, third),
+          'Mid-Range': wineObjects.slice(third, third * 2),
+          'Premium': wineObjects.slice(third * 2)
+        };
+
+        const formatWine = w => {
+          const prices = [];
+          if (w.glassPrice) prices.push(`glass $${Math.round(w.glassPrice)}`);
+          if (w.bottlePrice) prices.push(`bottle $${Math.round(w.bottlePrice)}`);
+          return `- ID:${w.id} | ${w.name}${w.varietal ? ` (${w.varietal})` : ''}${w.region ? `, ${w.region}` : ''} | ${prices.join(', ')}`;
+        };
+
+        const wineListByTier = Object.entries(tierGroups)
+          .map(([tier, ws]) => `${tier.toUpperCase()} WINES (pick one from this section for the ${tier} recommendation):\n${ws.map(formatWine).join('\n')}`)
+          .join('\n\n');
 
         const excludeWineIds = req.body.excludeWineIds || {};
-        // excludeWineIds is { "Value": "id1", "Mid-Range": "id2", "Premium": "id3" }
         const excludeLines = Object.entries(excludeWineIds)
           .map(([level, id]) => {
-            const w = wines.find(line => line.includes(`ID:${id}`));
-            const name = w ? w.split('|')[1].trim() : id;
-            return `${level}: ${name}`;
-          });
+            const w = wineObjects.find(w => w.id === id);
+            return w ? `${level}: ${w.name}` : null;
+          }).filter(Boolean);
         const excludeNote = excludeLines.length > 0
-          ? `\n\nIMPORTANT: The guest has already seen these suggestions — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
+          ? `\n\nIMPORTANT: The guest has already seen these — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
           : '';
 
         const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is ordering:
@@ -975,8 +999,8 @@ Respond in JSON only (no other text):
 Dish: ${food.name}${food.description ? `\nDescription: ${food.description}` : ''}
 Course: ${food.course}
 
-From our wine list, suggest exactly three wines — one value, one mid-range, one premium — that pair beautifully with this dish. Choose ONLY from this list:
-${wines.join('\n')}${excludeNote}
+Suggest exactly three wines that pair beautifully with this dish — one from each price tier below. You MUST pick from the correct section for each tier.
+${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
 {"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
