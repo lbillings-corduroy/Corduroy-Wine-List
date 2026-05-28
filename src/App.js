@@ -380,7 +380,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
   );
 
   return (
-    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: "#0d0800", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Header */}
       <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
@@ -682,22 +682,24 @@ export default function App() {
 
   return (
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
-      {/* Back to home */}
-      <div style={{ background: "#0d0800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
-        <button onClick={() => setScreen("home")} style={{
-          background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
-          fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
-          display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
-        }}>
-          ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
-        </button>
-      </div>
-
       {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
       {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
 
+      {/* Sticky wrapper — keeps back button + filter header together */}
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        {/* Back to home */}
+        <div style={{ background: "#0d0800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
+          <button onClick={() => setScreen("home")} style={{
+            background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
+            fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
+            display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
+          }}>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
+          </button>
+        </div>
+
       {/* Header */}
-      <div style={{ background: "#120800", padding: "20px 20px 12px", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid #2a1400" }}>
+      <div style={{ background: "#120800", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div onClick={handleLogoTap} style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", userSelect: "none" }}>
             <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
@@ -747,6 +749,7 @@ export default function App() {
           </div>
         )}
       </div>
+      </div>{/* end sticky wrapper */}
 
       <div style={{ background: "#120800", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {filtered.length} {filtered.length === 1 ? "wine" : "wines"}
