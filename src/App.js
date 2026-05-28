@@ -594,7 +594,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
                 {item.description}
               </div>
             )}
-            <ItemPairingButton itemId={item.id} itemName={item.name} />
+            <ItemPairingButton item={item} />
           </div>
         );
       })()}
@@ -662,20 +662,31 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
-function ItemPairingButton({ itemId, itemName }) {
+function ItemPairingButton({ item }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [shownDishes, setShownDishes] = useState([]);
 
   async function handlePairing() {
     setLoading(true);
-    setResult(null);
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "wine_to_food", itemId })
+        body: JSON.stringify({
+          type: "drink_to_food",
+          itemId: item.id,
+          itemName: item.name,
+          itemDescription: item.description || null,
+          itemStyle: item.style || null,
+          itemCategory: item.category || null,
+          itemABV: item.abv || null,
+          excludeDishes: shownDishes
+        })
       });
       const data = await res.json();
-      setResult(data.pairings || []);
+      const pairings = data.pairings || [];
+      setResult(pairings);
+      setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
     } catch (e) { setResult([]); }
     setLoading(false);
   }
@@ -684,21 +695,25 @@ function ItemPairingButton({ itemId, itemName }) {
     <div>
       <button onClick={handlePairing} disabled={loading}
         style={{ width: "100%", background: loading ? "#f0ebe0" : "#120800", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
-        {loading ? "Virtual Sommelier is finding your perfect pairing…" : "Suggested Food Pairing"}
+        {loading ? "Virtual Sommelier is finding your perfect pairing…" : result ? "Give Me Different Options" : "Suggested Food Pairing"}
       </button>
       {result && result.length > 0 && (
         <div style={{ marginTop: 2 }}>
           <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
-          {result.map((p, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
-              <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
-              <div>
-                <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
-                <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
-                <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+          {result.map((p, i) => {
+            const isRepeat = shownDishes.filter(d => d === p.name).length > 1;
+            return (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+                <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
+                <div>
+                  <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
+                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+                  {isRepeat && <div style={{ color: "#c0704a", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>This is the best pairing we can suggest — our current menu has limited alternatives for this selection.</div>}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {result && result.length === 0 && (
@@ -714,16 +729,19 @@ function WineDetailPanel({ wine, onClose }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
+  const [shownDishes, setShownDishes] = useState([]);
+
   async function handlePairing() {
     setPairingLoading(true);
-    setPairingResult(null);
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id })
+        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id, excludeDishes: shownDishes })
       });
       const data = await res.json();
-      setPairingResult(data.pairings || []);
+      const pairings = data.pairings || [];
+      setPairingResult(pairings);
+      setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
     } catch (e) { setPairingResult([]); }
     setPairingLoading(false);
   }
@@ -789,6 +807,9 @@ function WineDetailPanel({ wine, onClose }) {
                 <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
                 <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
                 <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+              {shownDishes.filter(d => d === p.name).length > 1 && (
+                <div style={{ color: "#c0704a", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>This is the best pairing we can suggest — our current menu has limited alternatives for this selection.</div>
+              )}
               </div>
             </div>
           ))}
@@ -818,10 +839,13 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
       .catch(() => setLoadingFood(false));
   }, []);
 
+  const [shownWineIds, setShownWineIds] = useState({});
+
   async function handleFoodSelect(food) {
     setSelectedFood(food);
     setPairingLoading(true);
     setPairingResult(null);
+    setShownWineIds({});
     setView("result");
     try {
       const res = await fetch(PAIRING_URL, {
@@ -829,8 +853,33 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
         body: JSON.stringify({ type: "food_to_wine", itemId: food.id })
       });
       const data = await res.json();
-      setPairingResult(data.pairings || []);
+      const pairings = data.pairings || [];
+      setPairingResult(pairings);
+      const ids = {};
+      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
+      setShownWineIds(ids);
     } catch (e) { setPairingResult([]); }
+    setPairingLoading(false);
+  }
+
+  async function handleDifferentOptions() {
+    if (!selectedFood) return;
+    setPairingLoading(true);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "food_to_wine", itemId: selectedFood.id, excludeWineIds: shownWineIds })
+      });
+      const data = await res.json();
+      const pairings = data.pairings || [];
+      // Detect repeats before updating state
+      const repeats = {};
+      pairings.forEach(p => { if (p.id && shownWineIds[p.level] === p.id) repeats[p.level] = true; });
+      setPairingResult(pairings.map(p => ({ ...p, isRepeat: repeats[p.level] || false })));
+      const newIds = { ...shownWineIds };
+      pairings.forEach(p => { if (p.id && !repeats[p.level]) newIds[p.level] = p.id; });
+      setShownWineIds(newIds);
+    } catch (e) {}
     setPairingLoading(false);
   }
 
@@ -922,8 +971,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
             </div>
           )}
 
+          {!pairingLoading && pairingResult && pairingResult.length > 0 && (
+            <button onClick={handleDifferentOptions}
+              style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 16 }}>
+              Give Me Different Options
+            </button>
+          )}
           {pairingResult && pairingResult.map((p, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: `0.5px solid ${p.isRepeat ? "rgba(192,112,74,0.4)" : "#2a1400"}`, borderRadius: 10, padding: "16px", marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                 <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
                   <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
@@ -940,6 +995,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
                 </div>
               )}
               <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+              {p.isRepeat && <div style={{ color: "#c0704a", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Unfortunately, this is the only {p.level.toLowerCase()} wine we can recommend for this dish from our current selection.</div>}
               {p.id && (() => {
                 const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
                 const isStarred = favorites.some(f => f.id === p.id);
