@@ -879,3 +879,104 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ─── Sommelier Pairing Endpoint ───────────────────────────────────────────────
+
+exports.getPairing = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+
+    try {
+      const { type, itemId } = req.body;
+      const db = admin.database();
+
+      // ── Wine → Food ───────────────────────────────────────────────────────
+      if (type === 'wine_to_food') {
+        const [wineSnap, enrichSnap, foodSnap] = await Promise.all([
+          db.ref(`wines/${itemId}`).once('value'),
+          db.ref(`wineEnrichment/${itemId}`).once('value'),
+          db.ref('foodItems').once('value'),
+        ]);
+        const wine = wineSnap.val();
+        if (!wine) return res.status(404).json({ error: 'Wine not found' });
+        const enrich = enrichSnap.val() || {};
+        const foodItems = Object.values(foodSnap.val() || {});
+
+        const wineName = enrich.correctedName || wine.name;
+        const foodList = foodItems
+          .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
+          .join('\n');
+
+        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is considering this wine:
+
+Wine: ${wineName}${enrich.varietal ? `\nVarietal: ${enrich.varietal}` : ''}${enrich.region ? `\nRegion: ${enrich.region}` : ''}${enrich.description ? `\nTasting notes: ${enrich.description}` : ''}
+
+From our current menu, suggest exactly 2-3 dishes that pair beautifully with this wine. Choose ONLY from this list:
+${foodList}
+
+Respond in JSON only (no other text):
+{"pairings":[{"name":"exact dish name","course":"course name","reason":"one evocative sentence why this pairing works"}]}`;
+
+        const response = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
+          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
+        );
+        const text = response.data.content[0].text;
+        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+        return res.json(result);
+      }
+
+      // ── Food → Wine ───────────────────────────────────────────────────────
+      if (type === 'food_to_wine') {
+        const [foodSnap, winesSnap, enrichSnap] = await Promise.all([
+          db.ref(`foodItems/${itemId}`).once('value'),
+          db.ref('wines').once('value'),
+          db.ref('wineEnrichment').once('value'),
+        ]);
+        const food = foodSnap.val();
+        if (!food) return res.status(404).json({ error: 'Food item not found' });
+
+        const winesById = winesSnap.val() || {};
+        const enrichment = enrichSnap.val() || {};
+        const wines = Object.values(winesById)
+          .filter(w => w.bottlePrice || w.glassPrice)
+          .map(w => {
+            const e = enrichment[w.id] || {};
+            const prices = [];
+            if (w.glassPrice) prices.push(`glass $${Math.round(w.glassPrice)}`);
+            if (w.bottlePrice) prices.push(`bottle $${Math.round(w.bottlePrice)}`);
+            return `- ID:${w.id} | ${e.correctedName || w.name}${e.varietal ? ` (${e.varietal})` : ''}${e.region ? `, ${e.region}` : ''} | ${prices.join(', ')}`;
+          });
+
+        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is ordering:
+
+Dish: ${food.name}${food.description ? `\nDescription: ${food.description}` : ''}
+Course: ${food.course}
+
+From our wine list, suggest exactly three wines — one value, one mid-range, one premium — that pair beautifully with this dish. Choose ONLY from this list:
+${wines.join('\n')}
+
+Respond in JSON only (no other text):
+{"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
+
+        const response = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          { model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: prompt }] },
+          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
+        );
+        const text = response.data.content[0].text;
+        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+        return res.json(result);
+      }
+
+      return res.status(400).json({ error: 'Invalid type' });
+    } catch (error) {
+      console.error('Pairing error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  });
