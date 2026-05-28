@@ -385,7 +385,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack }) {
       <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: accentColor, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
           </button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ color: accentColor, fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
@@ -694,7 +694,7 @@ export default function App() {
             fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
             display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
           }}>
-            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Menu</span>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
           </button>
         </div>
 
@@ -824,9 +824,7 @@ export default function App() {
               )}
             </div>
 
-            <button style={{ background: "#120800", color: "#c9a96e", border: "none", padding: "13px 24px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", width: "100%" }}>
-              Ask your server about this wine
-            </button>
+
           </div>
         );
       })()}
