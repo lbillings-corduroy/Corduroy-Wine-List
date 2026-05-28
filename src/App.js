@@ -398,7 +398,7 @@ function PinScreen({ onSuccess, onCancel }) {
 
 // ─── Generic Item List Screen (Beer, Pours, Cocktails) ───────────────────────
 
-function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
+function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -492,7 +492,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
               fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
               fontFamily: "Georgia, serif", whiteSpace: "nowrap",
               fontWeight: activeGroup === g ? 600 : 400
-            }}>{g === "All" ? `All ${title}` : g}</button>
+            }}>{g === "All" ? (allLabel || `All ${title}`) : g}</button>
           ))}
         </div>
         <div style={{ padding: "4px 0 10px", position: "relative" }}>
@@ -1026,7 +1026,7 @@ function HomeScreen({ onNavigate }) {
 
   const buttons = [
     { id: "wine", label: "Wine List", icon: "🍷", available: true },
-    { id: "beer", label: "Craft Beers", icon: "🍺", available: true },
+    { id: "beer", label: "Beer List", icon: "🍺", available: true },
     { id: "pours", label: "Premium Pours", icon: "🥃", available: true },
     { id: "cocktails", label: "Signature Cocktails", icon: "🍸", available: false },
     { id: "sommelier", label: "Get a Wine Pairing", icon: "✦", available: true },
@@ -1234,7 +1234,7 @@ export default function App() {
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} /></>;
-  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
   if (loading) return (
