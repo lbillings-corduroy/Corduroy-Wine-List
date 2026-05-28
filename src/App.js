@@ -423,6 +423,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
               fontWeight: activeGroup === g ? 600 : 400
             }}>{g === "All" ? `All ${title}` : g}</button>
           ))}
+        </div>
         <div style={{ padding: "4px 0 10px", position: "relative" }}>
           <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
             onChange={e => setItemSearch(e.target.value)}
