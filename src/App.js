@@ -839,6 +839,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
       .catch(() => setLoadingFood(false));
   }, []);
 
+  // Track full history of shown wine IDs per tier as arrays
   const [shownWineIds, setShownWineIds] = useState({});
 
   async function handleFoodSelect(food) {
@@ -856,7 +857,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
       const pairings = data.pairings || [];
       setPairingResult(pairings);
       const ids = {};
-      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
+      pairings.forEach(p => { if (p.id) ids[p.level] = [p.id]; });
       setShownWineIds(ids);
     } catch (e) { setPairingResult([]); }
     setPairingLoading(false);
@@ -866,24 +867,36 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
     if (!selectedFood) return;
     setPairingLoading(true);
     try {
+      // Pass most recently shown ID per tier to API
+      const mostRecent = {};
+      Object.entries(shownWineIds).forEach(([level, ids]) => {
+        if (ids.length > 0) mostRecent[level] = ids[ids.length - 1];
+      });
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", itemId: selectedFood.id, excludeWineIds: shownWineIds })
+        body: JSON.stringify({ type: "food_to_wine", itemId: selectedFood.id, excludeWineIds: mostRecent })
       });
       const data = await res.json();
       const pairings = data.pairings || [];
-      // Detect repeats before updating state
-      // Count how many items exist per level in the new results
       const countByLevel = {};
       pairings.forEach(p => { countByLevel[p.level] = (countByLevel[p.level] || 0) + 1; });
-      // Only flag as repeat if it's the same wine AND it's the only option at that tier
+      // Repeat = ID appears anywhere in history for that tier AND it's the only option at that tier
       setPairingResult(pairings.map(p => ({
         ...p,
-        isRepeat: !!(p.id && shownWineIds[p.level] === p.id && countByLevel[p.level] === 1)
+        isRepeat: !!(p.id
+          && shownWineIds[p.level]
+          && shownWineIds[p.level].includes(p.id)
+          && countByLevel[p.level] === 1)
       })));
-      const newIds = { ...shownWineIds };
-      pairings.forEach(p => { if (p.id && !repeats[p.level]) newIds[p.level] = p.id; });
-      setShownWineIds(newIds);
+      // Add all new IDs to history
+      const newShown = { ...shownWineIds };
+      pairings.forEach(p => {
+        if (p.id) {
+          if (!newShown[p.level]) newShown[p.level] = [];
+          if (!newShown[p.level].includes(p.id)) newShown[p.level].push(p.id);
+        }
+      });
+      setShownWineIds(newShown);
     } catch (e) {}
     setPairingLoading(false);
   }
