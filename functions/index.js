@@ -961,6 +961,7 @@ Respond in JSON only (no other text):
               region: e.region || null,
               glassPrice: w.glassPrice || null,
               bottlePrice: w.bottlePrice || null,
+              toastImageUrl: w.toastImageUrl || null,
               sortPrice: w.bottlePrice || w.glassPrice || 0
             };
           })
@@ -1012,7 +1013,17 @@ Respond in JSON only (no other text):
         );
         const text = response.data.content[0].text;
         const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        return res.json(result);
+        // Enrich pairings with image URLs and verified prices from our data
+        const enrichedPairings = (result.pairings || []).map(p => {
+          const w = wineObjects.find(wo => wo.id === p.id);
+          return {
+            ...p,
+            imageUrl: w ? (w.toastImageUrl || null) : null,
+            glassPrice: w ? w.glassPrice : p.glassPrice,
+            bottlePrice: w ? w.bottlePrice : p.bottlePrice,
+          };
+        });
+        return res.json({ pairings: enrichedPairings });
       }
 
 
