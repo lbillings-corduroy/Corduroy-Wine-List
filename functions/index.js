@@ -980,3 +980,21 @@ Respond in JSON only (no other text):
       return res.status(500).json({ error: error.message });
     }
   });
+
+// ─── Food Item Exclusion ──────────────────────────────────────────────────────
+
+exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const { itemId, excluded } = req.body;
+    if (!itemId) return res.status(400).json({ error: 'itemId required' });
+    const db = admin.database();
+    await db.ref(`foodItems/${itemId}/excluded`).set(excluded === true);
+    res.json({ ok: true, itemId, excluded });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
