@@ -323,7 +323,7 @@ function ManagerScreen({ wines, onClose }) {
               </div>
             </div>
           ))
-        ) : null}
+        )}
       </div>
 
       {/* Footer */}
