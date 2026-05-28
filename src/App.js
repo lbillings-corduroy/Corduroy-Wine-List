@@ -978,7 +978,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
           )}
           {pairingResult && pairingResult.map((p, i) => (
             <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
                   <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
                 </div>
@@ -987,12 +987,21 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
                   {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>bottle</span></div>}
                 </div>
               </div>
-              <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
-              {(p.varietal || p.region) && (
-                <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
-                  {[p.varietal, p.region].filter(Boolean).join(" · ")}
+              <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                {p.imageUrl && (
+                  <div style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #2a1400" }}>
+                    <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+                  {(p.varietal || p.region) && (
+                    <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
+                      {[p.varietal, p.region].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
               <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
 
               {p.id && (() => {
