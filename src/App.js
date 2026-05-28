@@ -821,7 +821,7 @@ function WineDetailPanel({ wine, onClose }) {
 
 // ─── Sommelier Screen ─────────────────────────────────────────────────────────
 
-function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }) {
+function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
   const [activeCourse, setActiveCourse] = useState("All");
@@ -892,7 +892,13 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
           </div>
-          <div style={{ width: 80 }} />
+          <div style={{ width: 80, textAlign: "right" }}>
+            {favorites.length > 0 && (
+              <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                ★ {favorites.length}
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
         {view === "pick" && (
@@ -1029,7 +1035,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
 
 // ─── Home Screen ─────────────────────────────────────────────────────────────
 
-function HomeScreen({ onNavigate }) {
+function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
 
@@ -1104,8 +1110,15 @@ function HomeScreen({ onNavigate }) {
         ))}
       </div>
 
+      {/* Shortlist button */}
+      {favorites.length > 0 && (
+        <button onClick={onShowShortlist} style={{ marginTop: 24, background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "10px 28px", borderRadius: 24, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 8 }}>
+          ★ My Shortlist <span style={{ background: "rgba(201,169,110,0.25)", borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
+        </button>
+      )}
+
       {/* Footer */}
-      <div style={{ marginTop: 56, color: "#4e3e24", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+      <div style={{ marginTop: 32, color: "#4e3e24", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
         Corduroy Inn & Lodge · Snowshoe Mountain
       </div>
     </div>
@@ -1241,8 +1254,8 @@ export default function App() {
     />
   ) : null;
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} /></>;
-  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} /></>;
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
