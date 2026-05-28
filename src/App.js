@@ -1054,7 +1054,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
     <div style={{
       background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif",
       display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "center", padding: "40px 32px",
+      justifyContent: "flex-start", padding: "48px 32px 40px",
       opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
       maxWidth: 680, margin: "0 auto"
     }}>
@@ -1066,7 +1066,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
       }} />
 
       {/* Logo */}
-      <div style={{ marginBottom: 56, textAlign: "center" }}>
+      <div style={{ marginBottom: 40, textAlign: "center" }}>
         <img
           src="/Appalachia Kitchen Logo colour (1).png"
           alt="Appalachia Kitchen"
@@ -1081,25 +1081,28 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
             key={btn.id}
             onClick={() => btn.available && onNavigate(btn.id)}
             style={{
-              background: btn.available
-                ? "rgba(201,169,110,0.08)"
-                : "rgba(255,255,255,0.02)",
-              border: `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : "rgba(255,255,255,0.08)"}`,
+              background: btn.id === "sommelier"
+                ? "rgba(180,120,60,0.18)"
+                : btn.available ? "rgba(201,169,110,0.08)" : "rgba(255,255,255,0.02)",
+              border: btn.id === "sommelier"
+                ? "1px solid rgba(201,169,110,0.8)"
+                : `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : "rgba(255,255,255,0.08)"}`,
               borderRadius: 8, padding: "18px 24px",
               display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: btn.available ? "pointer" : "default",
               transition: "all 0.2s", width: "100%",
               opacity: btn.available ? 1 : 0.35,
             }}
-            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = "rgba(201,169,110,0.14)"; }}
-            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = "rgba(201,169,110,0.08)"; }}
+            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.28)" : "rgba(201,169,110,0.14)"; }}
+            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.18)" : "rgba(201,169,110,0.08)"; }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <span style={{ fontSize: 20 }}>{btn.icon}</span>
               <span style={{
-                color: btn.available ? "#e8d9b8" : "#5a4a30",
-                fontSize: 15, letterSpacing: "2px", textTransform: "uppercase",
-                fontFamily: "Georgia, serif"
+                color: btn.id === "sommelier" ? "#c9a96e" : btn.available ? "#e8d9b8" : "#5a4a30",
+                fontSize: btn.id === "sommelier" ? 14 : 15,
+                letterSpacing: btn.id === "sommelier" ? "1.5px" : "2px",
+                textTransform: "uppercase", fontFamily: "Georgia, serif"
               }}>
                 {btn.label}
               </span>
