@@ -147,7 +147,7 @@ function FoodManagerTab() {
         <div key={course} style={{ marginBottom: 16 }}>
           <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8, paddingBottom: 6, borderBottom: "0.5px solid #2a1400" }}>{course}</div>
           {byCourse[course].map(item => (
-            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : "#2a1400"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : "#3c2200"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: item.excluded ? "#6a5040" : "#f0e8d8", fontSize: 13, marginBottom: 1 }}>{item.name}</div>
                 {item.description && <div style={{ color: "#5a4030", fontSize: 11, fontStyle: "italic" }}>{item.description}</div>}
@@ -189,9 +189,9 @@ function ManagerScreen({ wines, onClose }) {
   const current = lists[activeTab] || [];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#0a0500", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#1e1100", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
       {/* Header */}
-      <div style={{ background: "#150a00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
@@ -207,7 +207,7 @@ function ManagerScreen({ wines, onClose }) {
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
               flex: 1, background: activeTab === t.id ? "rgba(201,169,110,0.15)" : "rgba(255,255,255,0.04)",
-              border: `0.5px solid ${activeTab === t.id ? "#c9a96e" : "#2a1400"}`,
+              border: `0.5px solid ${activeTab === t.id ? "#c9a96e" : "#3c2200"}`,
               borderRadius: 8, padding: "10px 6px", cursor: "pointer", textAlign: "center"
             }}>
               <div style={{ color: t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.count === null ? "—" : t.count}</div>
@@ -233,13 +233,13 @@ function ManagerScreen({ wines, onClose }) {
               return group.some(w2 => (w2.glassPrice || w2.bottlePrice) !== price);
             });
             return (
-              <div key={gi} style={{ background: "rgba(255,255,255,0.04)", border: `0.5px solid ${hasPriceDiff ? "rgba(232,80,80,0.4)" : "#2a1400"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+              <div key={gi} style={{ background: "rgba(255,255,255,0.04)", border: `0.5px solid ${hasPriceDiff ? "rgba(232,80,80,0.4)" : "#3c2200"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                 <div style={{ color: hasPriceDiff ? "#e85050" : "#e8a050", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
                   {hasPriceDiff ? "⚠️ Price conflict" : "Duplicate entry"} · {group.length} entries in Toast
                 </div>
                 {group.map((wine, i) => (
                   <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? "0.5px solid #1a0f00" : "none" }}>
-                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#1a0a00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
+                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#301700", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
                       {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -269,7 +269,7 @@ function ManagerScreen({ wines, onClose }) {
             <div key={wine.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 {/* Image or placeholder */}
-                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#1a0a00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
+                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#301700", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
                   {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -327,8 +327,8 @@ function ManagerScreen({ wines, onClose }) {
       </div>
 
       {/* Footer */}
-      <div style={{ background: "#150a00", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
-        <div style={{ color: "#3a2010", fontSize: 10, letterSpacing: "1px" }}>
+      <div style={{ background: "#2b1800", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
+        <div style={{ color: "#4e3020", fontSize: 10, letterSpacing: "1px" }}>
           {wines.length} total wines · Tap AK logo 5× to access this screen
         </div>
       </div>
@@ -360,7 +360,7 @@ function PinScreen({ onSuccess, onCancel }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
-      <div style={{ background: "#150a00", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
+      <div style={{ background: "#2b1800", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
         <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Manager Access</div>
         <div style={{ color: "#f0e8d8", fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
 
@@ -370,7 +370,7 @@ function PinScreen({ onSuccess, onCancel }) {
             <div key={i} style={{
               width: 14, height: 14, borderRadius: "50%",
               background: i < pin.length ? (error ? "#e85050" : "#c9a96e") : "transparent",
-              border: `2px solid ${error ? "#e85050" : i < pin.length ? "#c9a96e" : "#3a2010"}`,
+              border: `2px solid ${error ? "#e85050" : i < pin.length ? "#c9a96e" : "#4e3020"}`,
               transition: "all 0.15s"
             }} />
           ))}
@@ -442,13 +442,13 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
   const filteredGroupOrder = [...new Map(searchFiltered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
 
   if (loading) return (
-    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+    <div style={{ background: "#231500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading {title}...</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: "#231500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
       <div style={{ textAlign: "center", maxWidth: 400 }}>
         <div style={{ color: accentColor, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Unable to load {title}</div>
         <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
@@ -456,15 +456,15 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
           <div style={{ color: "#9a5040", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
           <div style={{ color: "#c0a090", fontSize: 12, fontFamily: "monospace", wordBreak: "break-all" }}>{error}</div>
         </div>
-        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#0d0800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#231500", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
 
   return (
-    <div style={{ background: "#0d0800", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: "#231500", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Header */}
-      <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+      <div style={{ background: "#231500", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: accentColor, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
@@ -488,7 +488,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
             <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
               background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
               border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
-              color: activeGroup === g ? "#0d0800" : "#c8a878",
+              color: activeGroup === g ? "#231500" : "#c8a878",
               fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
               fontFamily: "Georgia, serif", whiteSpace: "nowrap",
               fontWeight: activeGroup === g ? 600 : 400
@@ -504,7 +504,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
         </div>
       </div>
 
-      <div style={{ background: "#120800", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+      <div style={{ background: "#271500", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
@@ -527,7 +527,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    <div style={{ color: "#301700", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                     {(item.style || item.category) && (
                       <div style={{ color: accentColor, fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
                         {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
@@ -546,7 +546,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
                     <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
                     {item.price ? (
                       <>
-                        <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
                         <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>each</div>
                       </>
                     ) : (
@@ -577,7 +577,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#1a0a00", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                <div style={{ color: "#301700", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
                 {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
                 {(item.brewery || item.producer) && <div style={{ color: "#8a7060", fontSize: 11 }}>{item.brewery || item.producer}</div>}
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
@@ -586,7 +586,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                {item.price && <div style={{ color: "#1a0a00", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+                {item.price && <div style={{ color: "#301700", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
               </div>
             </div>
             {item.description && (
@@ -608,8 +608,8 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
 
 function ShortlistScreen({ favorites, onRemove, onClose }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#0a0500", zIndex: 500, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
-      <div style={{ background: "#150a00", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+    <div style={{ position: "fixed", inset: 0, background: "#1e1100", zIndex: 500, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "3px", textTransform: "uppercase" }}>My Shortlist</div>
           <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>{favorites.length} {favorites.length === 1 ? "item" : "items"} starred</div>
@@ -694,7 +694,7 @@ function ItemPairingButton({ item }) {
   return (
     <div>
       <button onClick={handlePairing} disabled={loading}
-        style={{ width: "100%", background: loading ? "#f0ebe0" : "#120800", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
+        style={{ width: "100%", background: loading ? "#f0ebe0" : "#271500", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
         {loading ? "Virtual Sommelier is finding your perfect pairing…" : result ? "Give Me Different Options" : "Suggested Food Pairing"}
       </button>
       {result && result.length > 0 && (
@@ -705,7 +705,7 @@ function ItemPairingButton({ item }) {
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
                 <div>
-                  <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: "#301700", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
                   <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
                   <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
 
@@ -752,7 +752,7 @@ function WineDetailPanel({ wine, onClose }) {
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#1a0a00", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: "#301700", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
           <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
             {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
           </div>
@@ -777,13 +777,13 @@ function WineDetailPanel({ wine, onClose }) {
         {wine.glassPrice && (
           <div>
             <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
-            <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: "#301700", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
           </div>
         )}
         {wine.bottlePrice && (
           <div>
             <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
-            <div style={{ color: "#1a0a00", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: "#301700", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
           </div>
         )}
         {!wine.glassPrice && !wine.bottlePrice && (
@@ -792,7 +792,7 @@ function WineDetailPanel({ wine, onClose }) {
       </div>
 
       <button onClick={handlePairing} disabled={pairingLoading}
-        style={{ width: "100%", background: pairingLoading ? "#f0ebe0" : "#120800", color: pairingLoading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: pairingLoading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
+        style={{ width: "100%", background: pairingLoading ? "#f0ebe0" : "#271500", color: pairingLoading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: pairingLoading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
         {pairingLoading ? "Virtual Sommelier is finding your perfect pairing…" : "Suggested Food Pairing"}
       </button>
 
@@ -803,7 +803,7 @@ function WineDetailPanel({ wine, onClose }) {
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
               <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
               <div>
-                <div style={{ color: "#1a0a00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                <div style={{ color: "#301700", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
                 <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
                 <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
 
@@ -882,8 +882,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
-    <div style={{ background: "#0a0500", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
-      <div style={{ background: "#0d0800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+    <div style={{ background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ background: "#231500", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={view === "result" ? () => setView("pick") : onBack}
             style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
@@ -901,7 +901,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
               <button key={c} onClick={() => setActiveCourse(c)} style={{
                 background: activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.07)",
                 border: `0.5px solid ${activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.15)"}`,
-                color: activeCourse === c ? "#0d0800" : "#c8a878",
+                color: activeCourse === c ? "#231500" : "#c8a878",
                 fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
                 fontFamily: "Georgia, serif", whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
               }}>{c}</button>
@@ -912,7 +912,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
 
       {view === "pick" && (
         <div>
-          <div style={{ background: "#120800", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+          <div style={{ background: "#271500", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
             Select a dish to find the perfect wine
           </div>
           <div style={{ background: "#faf8f4" }}>
@@ -933,11 +933,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
                       onMouseEnter={e => e.currentTarget.style.background = "#f0ebe0"}
                       onMouseLeave={e => e.currentTarget.style.background = "#faf8f4"}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
+                        <div style={{ color: "#301700", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
                         {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
                       </div>
                       <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ color: "#1a0a00", fontSize: 14 }}>{formatPrice(food.price)}</div>
+                        <div style={{ color: "#301700", fontSize: 14 }}>{formatPrice(food.price)}</div>
                         <span style={{ color: "#c9a96e", fontSize: 18 }}>›</span>
                       </div>
                     </div>
@@ -971,7 +971,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }
                 style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
                 Give Me Different Options
               </button>
-              <div style={{ color: "#4a3020", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+              <div style={{ color: "#6a5545", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
                 If suggestions repeat, it reflects the limits of our current wine selection for this dish.
               </div>
             </div>
@@ -1034,7 +1034,7 @@ function HomeScreen({ onNavigate }) {
 
   return (
     <div style={{
-      background: "#0a0500", minHeight: "100vh", fontFamily: "Georgia, serif",
+      background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif",
       display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", padding: "40px 32px",
       opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
@@ -1089,14 +1089,14 @@ function HomeScreen({ onNavigate }) {
             {btn.available ? (
               <span style={{ color: "#c9a96e", fontSize: 18, lineHeight: 1 }}>›</span>
             ) : (
-              <span style={{ color: "#3a2a10", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
+              <span style={{ color: "#4e3e24", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
             )}
           </button>
         ))}
       </div>
 
       {/* Footer */}
-      <div style={{ marginTop: 56, color: "#3a2a10", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+      <div style={{ marginTop: 56, color: "#4e3e24", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
         Corduroy Inn & Lodge · Snowshoe Mountain
       </div>
     </div>
@@ -1238,18 +1238,18 @@ export default function App() {
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
   if (loading) return (
-    <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+    <div style={{ background: "#271500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ fontSize: 32 }}>🍷</div>
       <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading Wine List</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#120800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "#271500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#c9a96e", fontFamily: "Georgia, serif", textAlign: "center" }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🍷</div>
         <div>{error}</div>
-        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#120800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#271500", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
@@ -1263,7 +1263,7 @@ export default function App() {
       {/* Sticky wrapper — keeps back button + filter header together */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         {/* Back to home */}
-        <div style={{ background: "#0d0800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
+        <div style={{ background: "#231500", padding: "8px 16px", display: "flex", alignItems: "center" }}>
           <button onClick={() => setScreen("home")} style={{
             background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
             fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
@@ -1274,7 +1274,7 @@ export default function App() {
         </div>
 
       {/* Header */}
-      <div style={{ background: "#120800", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
+      <div style={{ background: "#271500", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div onClick={handleLogoTap} style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", userSelect: "none" }}>
             <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
@@ -1342,7 +1342,7 @@ export default function App() {
       </div>
       </div>{/* end sticky wrapper */}
 
-      <div style={{ background: "#120800", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+      <div style={{ background: "#271500", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {searchFiltered.length} {searchFiltered.length === 1 ? "wine" : "wines"}
         {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
       </div>
@@ -1389,7 +1389,7 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        <div style={{ color: "#301700", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
           <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
@@ -1410,12 +1410,12 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
           <div style={{ background: "#f0ebe0", color: "#c0b0a0", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0d8c8" }}>86'd</div>
         ) : wine.glassPrice ? (
           <>
-            <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>glass</div>
           </>
         ) : wine.bottlePrice ? (
           <>
-            <div style={{ color: "#1a0a00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>bottle</div>
           </>
         ) : (
