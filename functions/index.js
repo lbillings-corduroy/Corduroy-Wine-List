@@ -96,6 +96,7 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
             tier: topGroup,
             subgroup: group.name,
             available: isAvailable,
+            description: item.description || null,
             toastImageUrl: item.image || item.images?.[0] || item.imageUrl || null,
             masterId: item.masterId
           });
@@ -1080,6 +1081,99 @@ exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
     const db = admin.database();
     await db.ref(`foodItems/${itemId}/excluded`).set(excluded === true);
     res.json({ ok: true, itemId, excluded });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Specialty Cocktails Sync ─────────────────────────────────────────────────
+
+const COCKTAILS_MENU_GUID = '5c973234-da58-48e7-8f12-86888abd0563';
+const NAB_MENU_GUID = 'fa091def-5bc2-434e-a436-64b29ce7932f';
+
+exports.syncCocktailsMenu = functions
+  .runWith({ timeoutSeconds: 120, memory: '256MB' })
+  .pubsub.schedule('every 30 minutes')
+  .onRun(async (context) => {
+    try {
+      console.log('Starting Specialty Cocktails sync...');
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+      const freshItems = extractItemsFromMenu(menus, COCKTAILS_MENU_GUID, stockData);
+
+      const db = admin.database();
+      const itemsById = {};
+      freshItems.forEach(i => { itemsById[i.id] = i; });
+      await db.ref('cocktails').set(itemsById);
+      await db.ref('cocktailsOrder').set(freshItems.map(i => i.id));
+      await db.ref('cocktailsLastUpdated').set(Date.now());
+      console.log(`Cocktails sync complete — saved ${freshItems.length} items`);
+      return null;
+    } catch (error) {
+      console.error('Cocktails sync error:', error.message);
+      return null;
+    }
+  });
+
+exports.getCocktails = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  try {
+    const db = admin.database();
+    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
+      db.ref('cocktails').once('value'),
+      db.ref('cocktailsOrder').once('value'),
+      db.ref('cocktailsLastUpdated').once('value'),
+    ]);
+    const byId = snap.val() || {};
+    const order = orderSnap.val() || [];
+    const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
+    res.json({ cocktails: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Non-Alcoholic Beverages Sync ────────────────────────────────────────────
+
+exports.syncNABMenu = functions
+  .runWith({ timeoutSeconds: 120, memory: '256MB' })
+  .pubsub.schedule('every 30 minutes')
+  .onRun(async (context) => {
+    try {
+      console.log('Starting Non-Alcoholic Beverages sync...');
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+      const freshItems = extractItemsFromMenu(menus, NAB_MENU_GUID, stockData);
+
+      const db = admin.database();
+      const itemsById = {};
+      freshItems.forEach(i => { itemsById[i.id] = i; });
+      await db.ref('nab').set(itemsById);
+      await db.ref('nabOrder').set(freshItems.map(i => i.id));
+      await db.ref('nabLastUpdated').set(Date.now());
+      console.log(`NAB sync complete — saved ${freshItems.length} items`);
+      return null;
+    } catch (error) {
+      console.error('NAB sync error:', error.message);
+      return null;
+    }
+  });
+
+exports.getNAB = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  try {
+    const db = admin.database();
+    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
+      db.ref('nab').once('value'),
+      db.ref('nabOrder').once('value'),
+      db.ref('nabLastUpdated').once('value'),
+    ]);
+    const byId = snap.val() || {};
+    const order = orderSnap.val() || [];
+    const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
+    res.json({ nab: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
