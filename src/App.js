@@ -899,6 +899,13 @@ export default function App() {
             ))}
           </div>
         )}
+        <div style={{ padding: "4px 0 10px", position: "relative" }}>
+          <input type="text" placeholder="Search wines, grapes, regions…" value={wineSearch}
+            onChange={e => setWineSearch(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+          />
+          {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+        </div>
       </div>
       </div>{/* end sticky wrapper */}
 
@@ -916,13 +923,15 @@ export default function App() {
             <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
               {grouped[group].map((wine, i) => (
                 <WineCard key={wine.id} wine={wine} selected={selectedWine === wine.id}
-                  onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)} index={i} />
+                  onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)}
+                  isFavorited={favorites.some(f => f.id === wine.id)}
+                  onToggleFavorite={(w) => toggleFavorite(w, "wine")} />
               ))}
             </div>
           </div>
         ))}
-        {filtered.length === 0 && (
-          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>No wines in this selection</div>
+        {searchFiltered.length === 0 && (
+          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>{wineSearch ? `No wines matching "${wineSearch}"` : "No wines in this selection"}</div>
         )}
       </div>
 
