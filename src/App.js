@@ -106,6 +106,67 @@ function findDuplicates(wines) {
   });
 }
 
+// ─── Food Manager Tab ─────────────────────────────────────────────────────────
+
+function FoodManagerTab() {
+  const [foodItems, setFoodItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState({});
+
+  useEffect(() => {
+    fetch(FOOD_URL).then(r => r.json())
+      .then(data => { setFoodItems(data.foodItems || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function toggleExclusion(item) {
+    setSaving(prev => ({ ...prev, [item.id]: true }));
+    const newExcluded = !item.excluded;
+    try {
+      await fetch("https://us-central1-corduroy-wine-list.cloudfunctions.net/setFoodExclusion", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, excluded: newExcluded })
+      });
+      setFoodItems(prev => prev.map(f => f.id === item.id ? { ...f, excluded: newExcluded } : f));
+    } catch (e) { console.error(e); }
+    setSaving(prev => ({ ...prev, [item.id]: false }));
+  }
+
+  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading food menu…</div>;
+
+  const courseOrder = [...new Map(foodItems.map(f => [f.course, true])).keys()];
+  const byCourse = {};
+  foodItems.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
+
+  return (
+    <div>
+      <div style={{ color: "#6a5040", fontSize: 11, marginBottom: 12, lineHeight: 1.5 }}>
+        Toggle items off to exclude them from guest food pairings. Items shown to guests are pulled from Toast — use this to hide course markers, add-ons, or anything that shouldn't appear in pairings.
+      </div>
+      {courseOrder.map(course => (
+        <div key={course} style={{ marginBottom: 16 }}>
+          <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8, paddingBottom: 6, borderBottom: "0.5px solid #2a1400" }}>{course}</div>
+          {byCourse[course].map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : "#2a1400"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: item.excluded ? "#6a5040" : "#f0e8d8", fontSize: 13, marginBottom: 1 }}>{item.name}</div>
+                {item.description && <div style={{ color: "#5a4030", fontSize: 11, fontStyle: "italic" }}>{item.description}</div>}
+                <div style={{ color: "#4a3020", fontSize: 10, marginTop: 2 }}>{formatPrice(item.price)}</div>
+              </div>
+              <button
+                onClick={() => toggleExclusion(item)}
+                disabled={saving[item.id]}
+                style={{ background: item.excluded ? "rgba(232,80,80,0.15)" : "rgba(76,175,125,0.15)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.5)" : "#4caf7d"}`, color: item.excluded ? "#e85050" : "#4caf7d", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {saving[item.id] ? "…" : item.excluded ? "Excluded" : "Included"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ManagerScreen({ wines, onClose }) {
   const [activeTab, setActiveTab] = useState("uncertain");
 
@@ -121,6 +182,7 @@ function ManagerScreen({ wines, onClose }) {
     { id: "noprice", label: "$ No Price", count: noPrice.length },
     { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
     { id: "duplicates", label: "♊ Dupes", count: duplicateGroups.length },
+    { id: "food", label: "🍽 Food Menu", count: null },
   ];
 
   const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
@@ -148,7 +210,7 @@ function ManagerScreen({ wines, onClose }) {
               border: `0.5px solid ${activeTab === t.id ? "#c9a96e" : "#2a1400"}`,
               borderRadius: 8, padding: "10px 6px", cursor: "pointer", textAlign: "center"
             }}>
-              <div style={{ color: t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: 20, fontWeight: 600, marginBottom: 2 }}>{t.count}</div>
+              <div style={{ color: t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.count === null ? "—" : t.count}</div>
               <div style={{ color: "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
             </button>
           ))}
@@ -157,7 +219,9 @@ function ManagerScreen({ wines, onClose }) {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {activeTab === "duplicates" ? (
+        {activeTab === "food" ? (
+          <FoodManagerTab />
+        ) : activeTab === "duplicates" ? (
           duplicateGroups.length === 0 ? (
             <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
@@ -259,7 +323,7 @@ function ManagerScreen({ wines, onClose }) {
               </div>
             </div>
           ))
-        )}
+        ) : null}
       </div>
 
       {/* Footer */}
@@ -351,7 +415,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
         setLoading(false);
         setTimeout(() => setVisible(true), 50);
       })
-      .catch(() => { setError("Unable to load menu"); setLoading(false); });
+      .catch(e => { setError(e.message || "Unable to load menu"); setLoading(false); });
   }, [endpoint, dataKey]);
 
   const available = items.filter(i => i.available !== false);
@@ -359,23 +423,23 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
   const groups = ["All", ...groupOrder];
   const filtered = activeGroup === "All" ? available : available.filter(i => i.subgroup === activeGroup || i.tier === activeGroup);
 
-  const searchFiltered = wineSearch.trim() === ""
+  const searchFiltered = itemSearch.trim() === ""
     ? filtered
-    : filtered.filter(w => {
-        const q = wineSearch.toLowerCase();
-        return (w.name || "").toLowerCase().includes(q)
-          || (w.varietal || "").toLowerCase().includes(q)
-          || (w.region || "").toLowerCase().includes(q)
-          || (w.description || "").toLowerCase().includes(q);
+    : filtered.filter(i => {
+        const q = itemSearch.toLowerCase();
+        return (i.name || "").toLowerCase().includes(q)
+          || (i.description || "").toLowerCase().includes(q)
+          || (i.style || "").toLowerCase().includes(q)
+          || (i.category || "").toLowerCase().includes(q);
       });
 
   const grouped = {};
-  filtered.forEach(item => {
+  searchFiltered.forEach(item => {
     const key = item.subgroup || item.tier || "Menu";
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(item);
   });
-  const filteredGroupOrder = [...new Map(filtered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
+  const filteredGroupOrder = [...new Map(searchFiltered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
 
   if (loading) return (
     <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
@@ -384,10 +448,15 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
   );
 
   if (error) return (
-    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: accentColor, fontFamily: "Georgia, serif", textAlign: "center" }}>
-        <div>{error}</div>
-        <button onClick={() => window.location.reload()} style={{ marginTop: 16, background: accentColor, color: "#0d0800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+    <div style={{ background: "#0d0800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+      <div style={{ textAlign: "center", maxWidth: 400 }}>
+        <div style={{ color: accentColor, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Unable to load {title}</div>
+        <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
+        <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 6, padding: "10px 14px", marginBottom: 16, textAlign: "left" }}>
+          <div style={{ color: "#9a5040", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
+          <div style={{ color: "#c0a090", fontSize: 12, fontFamily: "monospace", wordBreak: "break-all" }}>{error}</div>
+        </div>
+        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#0d0800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
@@ -436,7 +505,7 @@ function ItemListScreen({ title, endpoint, dataKey, accentColor, onBack, favorit
       </div>
 
       <div style={{ background: "#120800", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {filtered.length} {filtered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
+        {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
       <div style={{ background: "#faf8f4" }}>
@@ -615,7 +684,7 @@ function ItemPairingButton({ itemId, itemName }) {
     <div>
       <button onClick={handlePairing} disabled={loading}
         style={{ width: "100%", background: loading ? "#f0ebe0" : "#120800", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
-        {loading ? "Finding pairings…" : "Suggested Food Pairing"}
+        {loading ? "Virtual Sommelier is finding your perfect pairing…" : "Suggested Food Pairing"}
       </button>
       {result && result.length > 0 && (
         <div style={{ marginTop: 2 }}>
@@ -707,7 +776,7 @@ function WineDetailPanel({ wine, onClose }) {
 
       <button onClick={handlePairing} disabled={pairingLoading}
         style={{ width: "100%", background: pairingLoading ? "#f0ebe0" : "#120800", color: pairingLoading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: pairingLoading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
-        {pairingLoading ? "Finding pairings…" : "Suggested Food Pairing"}
+        {pairingLoading ? "Virtual Sommelier is finding your perfect pairing…" : "Suggested Food Pairing"}
       </button>
 
       {pairingResult && pairingResult.length > 0 && (
@@ -734,7 +803,7 @@ function WineDetailPanel({ wine, onClose }) {
 
 // ─── Sommelier Screen ─────────────────────────────────────────────────────────
 
-function SommelierScreen({ onBack }) {
+function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {} }) {
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
   const [activeCourse, setActiveCourse] = useState("All");
@@ -765,8 +834,9 @@ function SommelierScreen({ onBack }) {
     setPairingLoading(false);
   }
 
-  const courses = ["All", ...new Set(foodItems.map(f => f.course))];
-  const filtered = activeCourse === "All" ? foodItems : foodItems.filter(f => f.course === activeCourse);
+  const availableFood = foodItems.filter(f => !f.excluded);
+  const courses = ["All", ...new Set(availableFood.map(f => f.course))];
+  const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
     <div style={{ background: "#0a0500", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
@@ -805,24 +875,33 @@ function SommelierScreen({ onBack }) {
           <div style={{ background: "#faf8f4" }}>
             {loadingFood ? (
               <div style={{ color: "#b0a090", textAlign: "center", padding: 40 }}>Loading menu…</div>
-            ) : (
-              filtered.map(food => (
-                <div key={food.id} onClick={() => handleFoodSelect(food)}
-                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: "0.5px solid #e8e0d0", cursor: "pointer", background: "#faf8f4" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#f0ebe0"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#faf8f4"}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
-                    <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: food.description ? 4 : 0 }}>{food.course}</div>
-                    {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
+            ) : (() => {
+              const courseOrder = [...new Map(filtered.map(f => [f.course, true])).keys()];
+              const byCourse = {};
+              filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
+              return courseOrder.map(course => (
+                <div key={course}>
+                  <div style={{ padding: "12px 20px 6px", background: "#f5f0e8", borderBottom: "0.5px solid #e8e0d0", borderTop: "0.5px solid #e8e0d0" }}>
+                    <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{course}</div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ color: "#1a0a00", fontSize: 14 }}>{formatPrice(food.price)}</div>
-                    <span style={{ color: "#c9a96e", fontSize: 18 }}>›</span>
-                  </div>
+                  {byCourse[course].map(food => (
+                    <div key={food.id} onClick={() => handleFoodSelect(food)}
+                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: "0.5px solid #e8e0d0", cursor: "pointer", background: "#faf8f4" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#f0ebe0"}
+                      onMouseLeave={e => e.currentTarget.style.background = "#faf8f4"}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#1a0a00", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
+                        {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ color: "#1a0a00", fontSize: 14 }}>{formatPrice(food.price)}</div>
+                        <span style={{ color: "#c9a96e", fontSize: 18 }}>›</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -861,6 +940,15 @@ function SommelierScreen({ onBack }) {
                 </div>
               )}
               <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+              {p.id && (() => {
+                const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
+                const isStarred = favorites.some(f => f.id === p.id);
+                return (
+                  <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>
+                    {isStarred ? "★ Added to Shortlist" : "☆ Add to Shortlist"}
+                  </button>
+                );
+              })()}
             </div>
           ))}
 
@@ -1090,7 +1178,7 @@ export default function App() {
   ) : null;
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} /></>;
-  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} /></>;
+  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Craft Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
