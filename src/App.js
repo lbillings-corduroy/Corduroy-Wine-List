@@ -1504,7 +1504,7 @@ export default function App() {
     </>
   );
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={handleLogoTap} /></>;
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
@@ -1529,6 +1529,8 @@ export default function App() {
   );
 
   return (
+    <>
+    {shortlistOverlay}
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
 
 
@@ -1645,6 +1647,7 @@ export default function App() {
 
       <div style={{ height: 32 }} />
     </div>
+    </>
   );
 }
 
