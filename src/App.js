@@ -714,6 +714,14 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         setTimeout(() => setVisible(true), 50);
       })
       .catch(e => { setError(e.message || "Unable to load menu"); setLoading(false); });
+
+    // Silent background poll every 2 minutes
+    const poll = setInterval(() => {
+      fetch(endpoint).then(r => r.json())
+        .then(data => { setItems(data[dataKey] || []); })
+        .catch(() => {});
+    }, 2 * 60 * 1000);
+    return () => clearInterval(poll);
   }, [endpoint, dataKey]);
 
   const available = items.filter(i => i.available !== false);
@@ -1466,7 +1474,8 @@ export default function App() {
 
   useEffect(() => {
     fetchWines();
-    const interval = setInterval(fetchWines, 15 * 60 * 1000);
+    // Poll every 2 minutes silently — no spinner on background refreshes
+    const interval = setInterval(() => fetchWines(true), 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
