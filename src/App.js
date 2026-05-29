@@ -8,6 +8,7 @@ const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getF
 const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getCocktails";
 const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
+const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -108,6 +109,187 @@ function findDuplicates(wines) {
   });
 }
 
+// ─── All Items Tab ────────────────────────────────────────────────────────────
+
+function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
+  const [beers, setBeers] = useState([]);
+  const [pours, setPours] = useState([]);
+  const [food, setFood] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState("wines");
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFields, setEditFields] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(BEER_URL).then(r => r.json()),
+      fetch(POURS_URL).then(r => r.json()),
+      fetch(FOOD_URL).then(r => r.json()),
+    ]).then(([bData, pData, fData]) => {
+      setBeers(bData.beers || []);
+      setPours(pData.pours || []);
+      setFood(fData.foodItems || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  function openEdit(item, type) {
+    setEditingItem({ ...item, _type: type });
+    if (type === "wine") setEditFields({ correctedName: item.name || "", varietal: item.varietal || "", region: item.region || "", description: item.description || "", reviews: item.reviews || "" });
+    else if (type === "beer") setEditFields({ correctedName: item.name || "", style: item.style || "", brewery: item.brewery || "", abv: item.abv || "", description: item.description || "" });
+    else if (type === "pour") setEditFields({ correctedName: item.name || "", category: item.category || "", producer: item.producer || "", abv: item.abv || "", description: item.description || "" });
+    else if (type === "food") setEditFields({ description: item.description || "", excluded: item.excluded || false });
+  }
+
+  async function handleSave() {
+    if (!editingItem) return;
+    setSaving(true);
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, updates: editFields })
+      });
+      const t = editingItem._type;
+      if (t === "wine") onWineUpdate(editingItem.id, { ...editFields, name: editFields.correctedName });
+      else if (t === "beer") setBeers(prev => prev.map(b => b.id === editingItem.id ? { ...b, ...editFields, name: editFields.correctedName } : b));
+      else if (t === "pour") setPours(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...editFields, name: editFields.correctedName } : p));
+      else if (t === "food") setFood(prev => prev.map(f => f.id === editingItem.id ? { ...f, ...editFields } : f));
+      setEditingItem(null);
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  }
+
+  const q = managerSearch.toLowerCase();
+  const filterList = list => q ? list.filter(i => (i.name || "").toLowerCase().includes(q)) : list;
+
+  const categories = [
+    { id: "wines", label: "Wines", list: filterList(wines) },
+    { id: "beer", label: "Beer", list: filterList(beers) },
+    { id: "pours", label: "Pours", list: filterList(pours) },
+    { id: "food", label: "Food", list: filterList(food) },
+  ];
+  const activeList = categories.find(c => c.id === category)?.list || [];
+
+  const inputStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200", color: "#f0e8d8", padding: "8px 10px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", marginBottom: 8 };
+  const labelStyle = { color: "#6a5040", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+
+  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading…</div>;
+
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      {/* Category pills */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {categories.map(c => (
+          <button key={c.id} onClick={() => { setCategory(c.id); setEditingItem(null); }} style={{
+            background: category === c.id ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
+            border: `0.5px solid ${category === c.id ? "#c9a96e" : "#3c2200"}`,
+            color: category === c.id ? "#c9a96e" : "#6a5040",
+            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11
+          }}>{c.label} <span style={{ opacity: 0.7 }}>({c.list.length})</span></button>
+        ))}
+      </div>
+
+      {/* Item list */}
+      {activeList.length === 0 ? (
+        <div style={{ color: "#5a4030", textAlign: "center", padding: 32 }}>{q ? `No results for "${managerSearch}"` : "No items"}</div>
+      ) : activeList.map(item => (
+        <div key={item.id} onClick={() => openEdit(item, category === "beer" ? "beer" : category === "pours" ? "pour" : category === "food" ? "food" : "wine")}
+          style={{ background: editingItem?.id === item.id ? "rgba(201,169,110,0.08)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${editingItem?.id === item.id ? "rgba(201,169,110,0.4)" : "#3c2200"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+          {item.imageUrl && <div style={{ width: 32, height: 44, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+            <div style={{ color: "#6a5040", fontSize: 10 }}>
+              {category === "wines" && [item.varietal, item.region].filter(Boolean).join(" · ")}
+              {category === "beer" && [item.style, item.brewery].filter(Boolean).join(" · ")}
+              {category === "pours" && [item.category, item.producer].filter(Boolean).join(" · ")}
+              {category === "food" && item.course}
+              {item.manuallyEdited && <span style={{ color: "#4caf7d", marginLeft: 6 }}>✎ edited</span>}
+              {item.excluded && <span style={{ color: "#e85050", marginLeft: 6 }}>hidden</span>}
+            </div>
+          </div>
+          <div style={{ color: "#4a3020", fontSize: 18 }}>›</div>
+        </div>
+      ))}
+
+      {/* Edit panel */}
+      {editingItem && (
+        <div style={{ position: "sticky", bottom: 0, background: "#2b1800", border: "0.5px solid #3c2200", borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "1px", textTransform: "uppercase" }}>Edit · {editingItem.name}</div>
+            <button onClick={() => setEditingItem(null)} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0 }}>×</button>
+          </div>
+
+          {editingItem._type !== "food" && (
+            <>
+              <label style={labelStyle}>Name</label>
+              <input style={inputStyle} value={editFields.correctedName || ""} onChange={e => setEditFields(p => ({ ...p, correctedName: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "wine" && (
+            <>
+              <label style={labelStyle}>Varietal</label>
+              <input style={inputStyle} value={editFields.varietal || ""} onChange={e => setEditFields(p => ({ ...p, varietal: e.target.value }))} />
+              <label style={labelStyle}>Region</label>
+              <input style={inputStyle} value={editFields.region || ""} onChange={e => setEditFields(p => ({ ...p, region: e.target.value }))} />
+              <label style={labelStyle}>Reviews & Ratings</label>
+              <input style={inputStyle} value={editFields.reviews || ""} onChange={e => setEditFields(p => ({ ...p, reviews: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "beer" && (
+            <>
+              <label style={labelStyle}>Style</label>
+              <input style={inputStyle} value={editFields.style || ""} onChange={e => setEditFields(p => ({ ...p, style: e.target.value }))} />
+              <label style={labelStyle}>Brewery</label>
+              <input style={inputStyle} value={editFields.brewery || ""} onChange={e => setEditFields(p => ({ ...p, brewery: e.target.value }))} />
+              <label style={labelStyle}>ABV</label>
+              <input style={inputStyle} value={editFields.abv || ""} onChange={e => setEditFields(p => ({ ...p, abv: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "pour" && (
+            <>
+              <label style={labelStyle}>Category</label>
+              <input style={inputStyle} value={editFields.category || ""} onChange={e => setEditFields(p => ({ ...p, category: e.target.value }))} />
+              <label style={labelStyle}>Producer</label>
+              <input style={inputStyle} value={editFields.producer || ""} onChange={e => setEditFields(p => ({ ...p, producer: e.target.value }))} />
+              <label style={labelStyle}>ABV</label>
+              <input style={inputStyle} value={editFields.abv || ""} onChange={e => setEditFields(p => ({ ...p, abv: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type !== "food" && (
+            <>
+              <label style={labelStyle}>Tasting Notes</label>
+              <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "food" && (
+            <>
+              <label style={labelStyle}>Description</label>
+              <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <button onClick={() => setEditFields(p => ({ ...p, excluded: !p.excluded }))}
+                  style={{ background: editFields.excluded ? "rgba(232,80,80,0.15)" : "rgba(76,175,125,0.15)", border: `0.5px solid ${editFields.excluded ? "rgba(232,80,80,0.5)" : "#4caf7d"}`, color: editFields.excluded ? "#e85050" : "#4caf7d", padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                  {editFields.excluded ? "Hidden from guests" : "Visible to guests"}
+                </button>
+                <span style={{ color: "#5a4030", fontSize: 11 }}>Toggle to hide/show in pairings</span>
+              </div>
+            </>
+          )}
+          {editingItem._type !== "food" && (
+            <div style={{ color: "#4a3020", fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? "rgba(201,169,110,0.1)" : "#c9a96e", color: saving ? "#6a5040" : "#0d0800", border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+            <button onClick={() => setEditingItem(null)} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Food Manager Tab ─────────────────────────────────────────────────────────
 
 function FoodManagerTab() {
@@ -171,12 +353,31 @@ function FoodManagerTab() {
 
 function ManagerScreen({ wines, onClose }) {
   const [activeTab, setActiveTab] = useState("uncertain");
+  const [search, setSearch] = useState("");
+  const [localWines, setLocalWines] = useState(wines);
 
-  const uncertain = wines.filter(w => w.uncertain);
-  const noImage = wines.filter(w => !w.imageUrl);
-  const noPrice = wines.filter(w => !w.glassPrice && !w.bottlePrice);
-  const unenriched = wines.filter(w => !w.description && !w.varietal);
-  const duplicateGroups = findDuplicates(wines);
+  function handleWineUpdate(id, fields) {
+    setLocalWines(prev => prev.map(w => w.id === id ? { ...w, ...fields } : w));
+  }
+
+  async function handleApprove(wine) {
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: wine.id, itemType: "wine", updates: { uncertain: false, approved: true } })
+      });
+      setLocalWines(prev => prev.map(w => w.id === wine.id ? { ...w, uncertain: false, approved: true } : w));
+    } catch (e) { console.error(e); }
+  }
+
+  const q = search.toLowerCase();
+  const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
+
+  const uncertain = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
+  const noImage = filterBySearch(localWines.filter(w => !w.imageUrl));
+  const noPrice = filterBySearch(localWines.filter(w => !w.glassPrice && !w.bottlePrice));
+  const unenriched = filterBySearch(localWines.filter(w => !w.description && !w.varietal));
+  const duplicateGroups = findDuplicates(q ? localWines.filter(w => (w.name || "").toLowerCase().includes(q)) : localWines);
 
   const tabs = [
     { id: "uncertain", label: "⚠️ Review", count: uncertain.length },
@@ -185,6 +386,7 @@ function ManagerScreen({ wines, onClose }) {
     { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
     { id: "duplicates", label: "♊ Dupes", count: duplicateGroups.length },
     { id: "food", label: "🍽 Food Menu", count: null },
+    { id: "all", label: "✎ All Items", count: null },
   ];
 
   const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
@@ -219,9 +421,22 @@ function ManagerScreen({ wines, onClose }) {
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ padding: "8px 20px 4px", background: "#2b1800" }}>
+        <div style={{ position: "relative" }}>
+          <input type="text" placeholder="Search by wine name…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200", color: "#f0e8d8", padding: "7px 30px 7px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none" }}
+          />
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 16, padding: 0 }}>×</button>}
+        </div>
+      </div>
+
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {activeTab === "food" ? (
+        {activeTab === "all" ? (
+          <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
+        ) : activeTab === "food" ? (
           <FoodManagerTab />
         ) : activeTab === "duplicates" ? (
           duplicateGroups.length === 0 ? (
@@ -287,7 +502,7 @@ function ManagerScreen({ wines, onClose }) {
                         </div>
                       )}
                       {wine.correctedName && wine.correctedName !== wine.name ? (
-                        <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px" }}>
+                        <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
                           <div style={{ color: "#9a8060", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
                           <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8 }}>{wine.correctedName}</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -296,10 +511,14 @@ function ManagerScreen({ wines, onClose }) {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>
+                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>
                           Fix the name in Toast — it will update on next sync
                         </div>
                       )}
+                      <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                        style={{ background: "rgba(76,175,125,0.15)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                        Looks Good ✓ — Remove from Review
+                      </button>
                     </div>
                   )}
                   {activeTab === "noprice" && (
