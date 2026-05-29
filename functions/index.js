@@ -789,6 +789,7 @@ const FOOD_GROUPS = [
   { name: 'Soups & Salads', guid: 'c12bef8f-e3e0-4a50-8007-7edaddd2f4a2' },
   { name: 'Starters',       guid: '17cc57c6-8192-42bb-82a4-7a873b2dcf67' },
   { name: 'Entrees',        guid: '05bad67c-e484-4cca-91a9-59f11ac42628' },
+  { name: 'Dessert',        guid: '3c87ad2b-a3e8-44c4-9fd1-da741d9b0501' },
 ];
 
 // ─── Food Extraction ──────────────────────────────────────────────────────────
