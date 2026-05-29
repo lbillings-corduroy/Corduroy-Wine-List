@@ -970,7 +970,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     borderRadius: 8, padding: "11px 8px", cursor: "pointer", transition: "all 0.15s"
                   }}>
                   <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
-                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
+                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#301700", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
@@ -1020,7 +1020,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
           <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)" }}>
             <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
               <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
-                {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : "🥃")}
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: "#301700", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
@@ -1074,7 +1074,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           favorites.map(item => (
             <div key={item.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>
-                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : "🥃"}
+                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
