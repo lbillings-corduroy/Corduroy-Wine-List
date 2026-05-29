@@ -1441,8 +1441,8 @@ export default function App() {
     }
   }
 
+  // Filter pills use available wines only (don't show OOS-only varietals in filters)
   const availableWines = wines.filter(w => w.available !== false);
-  // Build tiers and subgroups in Toast arrival order (no hardcoded lists needed)
   const tierOrder = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
   const tiers = ["All", ...tierOrder];
   const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
@@ -1453,9 +1453,17 @@ export default function App() {
   const varietals = ["All", ...Array.from(varietalSet).sort()];
   const filtered = activeVarietal === "All" ? filteredBySubgroup : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
 
+  // For rendering, include OOS wines that match the same tier/subgroup/varietal filters
+  const allMatchingWines = wines.filter(w => {
+    if (activeTier !== "All" && w.tier !== activeTier) return false;
+    if (activeSubgroup !== "All" && w.subgroup !== activeSubgroup) return false;
+    if (activeVarietal !== "All" && consolidateVarietal(w.varietal) !== activeVarietal) return false;
+    return true;
+  });
+
   const searchFiltered = wineSearch.trim() === ""
-    ? filtered
-    : filtered.filter(w => {
+    ? allMatchingWines
+    : allMatchingWines.filter(w => {
         const q = wineSearch.toLowerCase();
         return (w.name || "").toLowerCase().includes(q)
           || (w.varietal || "").toLowerCase().includes(q)
@@ -1463,14 +1471,18 @@ export default function App() {
           || (w.description || "").toLowerCase().includes(q);
       });
 
+  // Sort: available wines first, OOS wines at bottom of each group
   const grouped = {};
-  searchFiltered.forEach(wine => {
+  const sortedForGrouping = [
+    ...searchFiltered.filter(w => w.available !== false),
+    ...searchFiltered.filter(w => w.available === false)
+  ];
+  sortedForGrouping.forEach(wine => {
     const key = wine.subgroup || wine.tier || "Wine";
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(wine);
   });
-  // Preserve Toast order for group headers
-  const groupOrder = [...new Map(searchFiltered.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
+  const groupOrder = [...new Map(sortedForGrouping.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
   const shortlistOverlay = showShortlist ? (
     <ShortlistScreen
@@ -1593,7 +1605,8 @@ export default function App() {
       </div>{/* end sticky wrapper */}
 
       <div style={{ background: "#271500", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {searchFiltered.length} {searchFiltered.length === 1 ? "wine" : "wines"}
+        {searchFiltered.filter(w => w.available !== false).length} {searchFiltered.filter(w => w.available !== false).length === 1 ? "wine" : "wines"}
+        {searchFiltered.filter(w => w.available === false).length > 0 && <span style={{ color: "#c0706a", marginLeft: 6 }}>· {searchFiltered.filter(w => w.available === false).length} out of stock</span>}
         {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
       </div>
 
@@ -1657,7 +1670,7 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
         </button>
         <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
         {wine.available === false ? (
-          <div style={{ background: "#f0ebe0", color: "#c0b0a0", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0d8c8" }}>86'd</div>
+          <div style={{ background: "#f0ebe0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
         ) : wine.glassPrice ? (
           <>
             <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
