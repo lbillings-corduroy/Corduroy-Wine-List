@@ -1256,9 +1256,23 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
 // ─── Home Screen ─────────────────────────────────────────────────────────────
 
-function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) {
+function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {} }) {
   const [visible, setVisible] = useState(false);
-  useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimer = useRef(null);
+
+  function handleLogoTap() {
+    const next = tapCount + 1;
+    setTapCount(next);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (next >= 5) { setTapCount(0); onAdminTap(); }
+    else { tapTimer.current = setTimeout(() => setTapCount(0), 2000); }
+  }
+
+  useEffect(() => {
+    setTimeout(() => setVisible(true), 50);
+    return () => { if (tapTimer.current) clearTimeout(tapTimer.current); };
+  }, []);
 
   const buttons = [
     { id: "wine", label: "Wine List", icon: "🍷", available: true },
@@ -1284,8 +1298,8 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
         background: "radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.08) 0%, transparent 70%)"
       }} />
 
-      {/* Logo */}
-      <div style={{ marginBottom: 40, textAlign: "center" }}>
+      {/* Logo — tap 5x for manager access */}
+      <div onClick={handleLogoTap} style={{ marginBottom: 40, textAlign: "center", cursor: "default", userSelect: "none" }}>
         <img
           src="/Appalachia Kitchen Logo colour (1).png"
           alt="Appalachia Kitchen"
@@ -1484,15 +1498,13 @@ export default function App() {
   });
   const groupOrder = [...new Map(sortedForGrouping.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
 
-  const shortlistOverlay = showShortlist ? (
-    <ShortlistScreen
-      favorites={favorites}
-      onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))}
-      onClose={() => setShowShortlist(false)}
-    />
-  ) : null;
+  const shortlistOverlay = (
+    <>
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} /></>;
+    </>
+  );
+
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={handleLogoTap} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
@@ -1518,9 +1530,7 @@ export default function App() {
 
   return (
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
-      {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
-      {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
-      {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
+
 
       {/* Sticky wrapper — keeps back button + filter header together */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
