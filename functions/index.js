@@ -146,7 +146,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
       // DEBUG: log visibility for wines that are NOT showing as hidden (to catch different OOS formats)
       if (item.name && item.name.toLowerCase().includes('chevalier')) {
-        console.log(`OOS DEBUG "${item.name}": visibility=${JSON.stringify(item.visibility)} outOfStock=${item.outOfStock} isHidden=${isHiddenByVisibility} isAvailable=${isAvailable} allKeys=${Object.keys(item).join(',')}`);
+        console.log(`OOS DEBUG "${item.name}": GUID=${item.guid} visibility=${JSON.stringify(item.visibility)} outOfStock=${item.outOfStock} isDeferred=${item.isDeferred} isHidden=${isHiddenByVisibility} isAvailable=${isAvailable}`);
       }
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
