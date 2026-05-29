@@ -600,12 +600,12 @@ function ManagerScreen({ wines, onClose }) {
         <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              flex: 1, background: activeTab === t.id ? "rgba(201,169,110,0.15)" : "rgba(255,255,255,0.04)",
-              border: `0.5px solid ${activeTab === t.id ? "#c9a96e" : "#3c2200"}`,
+              flex: 1, background: activeTab === t.id ? (t.id === "sync" ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.15)") : t.id === "sync" ? "rgba(76,175,125,0.06)" : "rgba(255,255,255,0.04)",
+              border: `0.5px solid ${activeTab === t.id ? (t.id === "sync" ? "#4caf7d" : "#c9a96e") : t.id === "sync" ? "rgba(76,175,125,0.3)" : "#3c2200"}`,
               borderRadius: 8, padding: "10px 6px", cursor: "pointer", textAlign: "center"
             }}>
-              <div style={{ color: t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.count === null ? "—" : t.count}</div>
-              <div style={{ color: "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
+              <div style={{ color: t.id === "sync" ? "#4caf7d" : t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.id === "sync" ? 16 : t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.id === "sync" ? "⟳" : t.count === null ? "" : t.count}</div>
+              <div style={{ color: t.id === "sync" ? "#4caf7d" : "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
             </button>
           ))}
         </div>
