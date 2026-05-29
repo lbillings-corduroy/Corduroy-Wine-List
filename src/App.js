@@ -1070,7 +1070,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
         <img
           src="/Appalachia Kitchen Logo colour (1).png"
           alt="Appalachia Kitchen"
-          style={{ width: "min(340px, 80vw)", opacity: 0.95 }}
+          style={{ width: "min(340px, 80vw)", opacity: 0.95, filter: "brightness(1.5) contrast(1.05)" }}
         />
       </div>
 
@@ -1100,9 +1100,10 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {} }) 
               <span style={{ fontSize: 20 }}>{btn.icon}</span>
               <span style={{
                 color: btn.id === "sommelier" ? "#c9a96e" : btn.available ? "#e8d9b8" : "#5a4a30",
-                fontSize: btn.id === "sommelier" ? 14 : 15,
-                letterSpacing: btn.id === "sommelier" ? "1.5px" : "2px",
-                textTransform: "uppercase", fontFamily: "Georgia, serif"
+                fontSize: btn.id === "sommelier" ? 14 : btn.id === "nab" ? 13 : 15,
+                letterSpacing: btn.id === "sommelier" ? "1.5px" : btn.id === "nab" ? "1px" : "2px",
+                textTransform: "uppercase", fontFamily: "Georgia, serif",
+                textAlign: "left", lineHeight: 1.3
               }}>
                 {btn.label}
               </span>
