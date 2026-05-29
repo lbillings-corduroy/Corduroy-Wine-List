@@ -1500,7 +1500,9 @@ export default function App() {
 
   const shortlistOverlay = (
     <>
-
+      {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
+      {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
+      {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
     </>
   );
 
