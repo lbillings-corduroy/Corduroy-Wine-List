@@ -54,15 +54,7 @@ async function getStockData(token) {
       headers: { 'Authorization': `Bearer ${token}`, 'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID }
     });
     const data = response.data;
-    const items = Array.isArray(data) ? data : (data.stockData || data.items || data.inventory || Object.values(data));
-    console.log(`Stock API: ${items.length} items returned. Response type: ${Array.isArray(data) ? 'array' : typeof data}. Keys: ${Object.keys(data || {}).join(',')}`);
-    if (items.length > 0) {
-      console.log(`Stock sample item: ${JSON.stringify(items[0])}`);
-    }
-    // Check for Chevalier specifically
-    const chevalierGuid = '26c80ad9-becb-43ee-83c1-f2ea9f734b27';
-    const found = items.find(i => JSON.stringify(i).includes(chevalierGuid));
-    console.log(`Chevalier in stock API: ${found ? JSON.stringify(found) : 'NOT FOUND'}`);
+    console.log(`Stock API: ${Array.isArray(data) ? data.length : '?'} items`);
     return data;
   } catch (e) {
     console.log('Stock unavailable:', e.message, 'Status:', e.response?.status, 'Data:', JSON.stringify(e.response?.data));
@@ -88,7 +80,7 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
 
   const stockMap = {};
   if (Array.isArray(stockData)) {
-    stockData.forEach(item => { if (item.menuItem?.guid) stockMap[item.menuItem.guid] = item; });
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
   }
 
   function extractGroup(group, topGroup) {
@@ -154,10 +146,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       // Toast marks items out of stock by clearing the visibility array to []
       const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
       const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
-      // DEBUG: log visibility for wines that are NOT showing as hidden (to catch different OOS formats)
-      if (item.name && item.name.toLowerCase().includes('chevalier')) {
-        console.log(`OOS DEBUG "${item.name}": GUID=${item.guid} visibility=${JSON.stringify(item.visibility)} outOfStock=${item.outOfStock} isDeferred=${item.isDeferred} isHidden=${isHiddenByVisibility} isAvailable=${isAvailable}`);
-      }
+
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
@@ -183,7 +172,7 @@ function extractWines(menus, stockData) {
   if (!wineMenu) { console.log('Wine menu not found'); return wines; }
   const stockMap = {};
   if (Array.isArray(stockData)) {
-    stockData.forEach(item => { if (item.menuItem?.guid) stockMap[item.menuItem.guid] = item; });
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
   }
   if (wineMenu.menuGroups) {
     wineMenu.menuGroups.forEach(g => extractItemsFromGroup(g, stockMap, g.name, wines));
@@ -807,7 +796,7 @@ const FOOD_GROUPS = [
 function extractFoodItems(menus, stockData) {
   const stockMap = {};
   if (Array.isArray(stockData)) {
-    stockData.forEach(item => { if (item.menuItem?.guid) stockMap[item.menuItem.guid] = item; });
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
   }
 
   const allItems = [];
