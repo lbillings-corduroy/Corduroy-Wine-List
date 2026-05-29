@@ -9,6 +9,7 @@ const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net
 const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
+const FORCE_SYNC_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/forceSync";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -107,6 +108,79 @@ function findDuplicates(wines) {
     }
     return true;
   });
+}
+
+// ─── Sync Tab ─────────────────────────────────────────────────────────────────
+
+function SyncTab() {
+  const categories = [
+    { id: "wine", label: "Wine List" },
+    { id: "beer", label: "Beer List" },
+    { id: "pours", label: "Premium Pours" },
+    { id: "food", label: "Food Menu" },
+    { id: "cocktails", label: "Specialty Cocktails" },
+    { id: "nab", label: "Non-Alcoholic Beverages" },
+  ];
+  const [selected, setSelected] = useState(categories.map(c => c.id));
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState(null);
+
+  function toggleCat(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+  }
+
+  async function handleSync() {
+    if (selected.length === 0) return;
+    setSyncing(true);
+    setResult(null);
+    try {
+      const res = await fetch(FORCE_SYNC_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: selected })
+      });
+      const data = await res.json();
+      setResult({ ok: data.ok, message: data.message || data.error });
+    } catch (e) {
+      setResult({ ok: false, message: e.message });
+    }
+    setSyncing(false);
+  }
+
+  return (
+    <div>
+      <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+        Select the menus to sync from Toast, then tap Run Sync. Syncs run in the background — allow ~60 seconds for changes to appear in the app.
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        {categories.map(c => (
+          <div key={c.id} onClick={() => toggleCat(c.id)}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, background: selected.includes(c.id) ? "rgba(201,169,110,0.1)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${selected.includes(c.id) ? "rgba(201,169,110,0.4)" : "#3c2200"}`, borderRadius: 8, cursor: "pointer" }}>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: selected.includes(c.id) ? "#c9a96e" : "transparent", border: `1.5px solid ${selected.includes(c.id) ? "#c9a96e" : "#6a5040"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {selected.includes(c.id) && <span style={{ color: "#0d0800", fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+            </div>
+            <span style={{ color: selected.includes(c.id) ? "#f0e8d8" : "#6a5040", fontSize: 13, fontFamily: "Georgia, serif" }}>{c.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button onClick={() => setSelected(categories.map(c => c.id))} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>Select All</button>
+        <button onClick={() => setSelected([])} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>Clear</button>
+      </div>
+
+      <button onClick={handleSync} disabled={syncing || selected.length === 0}
+        style={{ width: "100%", background: syncing || selected.length === 0 ? "rgba(201,169,110,0.1)" : "#c9a96e", color: syncing || selected.length === 0 ? "#6a5040" : "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: syncing || selected.length === 0 ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+        {syncing ? "Triggering sync…" : `⟳ Sync ${selected.length} Menu${selected.length !== 1 ? "s" : ""} Now`}
+      </button>
+
+      {result && (
+        <div style={{ marginTop: 14, background: result.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${result.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "12px 14px" }}>
+          <div style={{ color: result.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{result.message}</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── All Items Tab ────────────────────────────────────────────────────────────
@@ -387,6 +461,7 @@ function ManagerScreen({ wines, onClose }) {
     { id: "duplicates", label: "♊ Dupes", count: duplicateGroups.length },
     { id: "food", label: "🍽 Food Menu", count: null },
     { id: "all", label: "✎ All Items", count: null },
+    { id: "sync", label: "⟳ Sync", count: null },
   ];
 
   const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
@@ -434,7 +509,9 @@ function ManagerScreen({ wines, onClose }) {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {activeTab === "all" ? (
+        {activeTab === "sync" ? (
+          <SyncTab />
+        ) : activeTab === "all" ? (
           <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
         ) : activeTab === "food" ? (
           <FoodManagerTab />
