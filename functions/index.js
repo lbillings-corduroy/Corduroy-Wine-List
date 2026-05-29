@@ -86,7 +86,7 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
       group.menuItems.forEach(item => {
         if (shouldExclude(item.name)) return;
         const stockInfo = stockMap[item.guid];
-        const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+        const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && item.outOfStock !== true;
         if (!items.find(i => i.id === item.guid)) {
           items.push({
             id: item.guid,
@@ -140,7 +140,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
     group.menuItems.forEach(item => {
       if (shouldExclude(item.name)) return;
       const stockInfo = stockMap[item.guid];
-      const isAvailable = !stockInfo || stockInfo.status !== 'OUT_OF_STOCK';
+      const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && item.outOfStock !== true;
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
@@ -799,9 +799,10 @@ function extractFoodItems(menus, stockData) {
           const price = item.price || null;
           // Skip zero-price course markers
           if (!price || price === 0) return;
-          // Skip out of stock
+          // Skip out of stock — check both stock inventory API and item's own outOfStock flag
           const stockInfo = stockMap[item.guid];
           if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+          if (item.outOfStock === true) return;
           // Avoid duplicates
           if (allItems.find(i => i.id === item.guid)) return;
 
