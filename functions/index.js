@@ -398,7 +398,7 @@ Respond in JSON only (no other text):
 
 exports.syncWineMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('0,30 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Toast API sync...');
@@ -467,7 +467,7 @@ exports.syncWineMenu = functions
 
 exports.syncBeerMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('3,33 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Beer menu sync...');
@@ -529,7 +529,7 @@ exports.syncBeerMenu = functions
 
 exports.syncPoursMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('6,36 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Premium Pours sync...');
@@ -855,7 +855,7 @@ function extractFoodItems(menus, stockData) {
 
 exports.syncFoodMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('9,39 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Food menu sync...');
@@ -1112,12 +1112,12 @@ exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
 
 // ─── Specialty Cocktails Sync ─────────────────────────────────────────────────
 
-const COCKTAILS_MENU_GUID = '5c973234-da58-48e7-8f12-86888abd0563';
+const COCKTAILS_MENU_GUID = '618dd517-3de7-456c-b38e-0cd0739947a6';
 const NAB_MENU_GUID = 'fa091def-5bc2-434e-a436-64b29ce7932f';
 
 exports.syncCocktailsMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('12,42 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Specialty Cocktails sync...');
@@ -1129,16 +1129,6 @@ exports.syncCocktailsMenu = functions
       const db = admin.database();
       const itemsById = {};
       freshItems.forEach(i => { itemsById[i.id] = i; });
-      // DEBUG: log every item and its subgroup so we can find the extras
-      const bySubgroup = {};
-      freshItems.forEach(i => {
-        const key = i.subgroup || i.tier || 'NO GROUP';
-        if (!bySubgroup[key]) bySubgroup[key] = [];
-        bySubgroup[key].push(i.name);
-      });
-      Object.entries(bySubgroup).forEach(([group, names]) => {
-        console.log(`COCKTAIL GROUP "${group}": ${names.length} items — ${names.join(', ')}`);
-      });
       await db.ref('cocktails').set(itemsById);
       await db.ref('cocktailsOrder').set(freshItems.map(i => i.id));
       await db.ref('cocktailsLastUpdated').set(Date.now());
@@ -1172,7 +1162,7 @@ exports.getCocktails = functions.https.onRequest(async (req, res) => {
 
 exports.syncNABMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('every 30 minutes')
+  .pubsub.schedule('15,45 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Non-Alcoholic Beverages sync...');
