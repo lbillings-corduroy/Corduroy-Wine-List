@@ -86,7 +86,8 @@ function extractItemsFromMenu(menus, menuGuid, stockData) {
       group.menuItems.forEach(item => {
         if (shouldExclude(item.name)) return;
         const stockInfo = stockMap[item.guid];
-        const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && item.outOfStock !== true;
+        const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
+        const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
         if (!items.find(i => i.id === item.guid)) {
           items.push({
             id: item.guid,
@@ -140,9 +141,9 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
     group.menuItems.forEach(item => {
       if (shouldExclude(item.name)) return;
       const stockInfo = stockMap[item.guid];
-      // DEBUG: log all availability-related fields for every item
-      console.log(`ITEM DEBUG: "${item.name}" | outOfStock=${item.outOfStock} | visibility=${JSON.stringify(item.visibility)} | stockStatus=${stockInfo ? stockInfo.status : 'not-in-inventory'} | keys=${Object.keys(item).join(',')}`);
-      const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && item.outOfStock !== true;
+      // Toast marks items out of stock by clearing the visibility array to []
+      const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
+      const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
@@ -809,7 +810,8 @@ function extractFoodItems(menus, stockData) {
           // Skip out of stock — check both stock inventory API and item's own outOfStock flag
           const stockInfo = stockMap[item.guid];
           if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-          if (item.outOfStock === true) return;
+          // Toast marks out of stock by clearing visibility to []
+          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
           // Avoid duplicates
           if (allItems.find(i => i.id === item.guid)) return;
 
@@ -960,7 +962,7 @@ Respond in JSON only (no other text):
 
         // Sort wines by price and split into thirds so tiers reflect actual prices
         const wineObjects = Object.values(winesById)
-          .filter(w => w.bottlePrice || w.glassPrice)
+          .filter(w => (w.bottlePrice || w.glassPrice) && w.available !== false)
           .map(w => {
             const e = enrichment[w.id] || {};
             return {
