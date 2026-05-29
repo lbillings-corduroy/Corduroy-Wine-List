@@ -1129,6 +1129,16 @@ exports.syncCocktailsMenu = functions
       const db = admin.database();
       const itemsById = {};
       freshItems.forEach(i => { itemsById[i.id] = i; });
+      // DEBUG: log every item and its subgroup so we can find the extras
+      const bySubgroup = {};
+      freshItems.forEach(i => {
+        const key = i.subgroup || i.tier || 'NO GROUP';
+        if (!bySubgroup[key]) bySubgroup[key] = [];
+        bySubgroup[key].push(i.name);
+      });
+      Object.entries(bySubgroup).forEach(([group, names]) => {
+        console.log(`COCKTAIL GROUP "${group}": ${names.length} items — ${names.join(', ')}`);
+      });
       await db.ref('cocktails').set(itemsById);
       await db.ref('cocktailsOrder').set(freshItems.map(i => i.id));
       await db.ref('cocktailsLastUpdated').set(Date.now());
