@@ -144,6 +144,10 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
       // Toast marks items out of stock by clearing the visibility array to []
       const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
       const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
+      // DEBUG: log visibility for wines that are NOT showing as hidden (to catch different OOS formats)
+      if (item.name && item.name.toLowerCase().includes('chevalier')) {
+        console.log(`OOS DEBUG "${item.name}": visibility=${JSON.stringify(item.visibility)} outOfStock=${item.outOfStock} isHidden=${isHiddenByVisibility} isAvailable=${isAvailable} allKeys=${Object.keys(item).join(',')}`);
+      }
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
           id: item.guid,
@@ -200,20 +204,31 @@ function mergeGlassBottle(wines) {
       let glassPrice = null;
       let bottlePrice = null;
       let primaryId = wine.id;
+      // If either glass or bottle is OOS, the merged wine is OOS
+      let mergedAvailable = wine.available;
 
       if (isGlass) {
         glassPrice = wine.price;
-        if (pair) { bottlePrice = pair.price; processed.add(pair.id); primaryId = pair.id; }
+        if (pair) {
+          bottlePrice = pair.price;
+          processed.add(pair.id);
+          primaryId = pair.id;
+          mergedAvailable = wine.available !== false && pair.available !== false;
+        }
       } else {
         bottlePrice = wine.price;
         primaryId = wine.id;
-        if (pair) { glassPrice = pair.price; processed.add(pair.id); }
+        if (pair) {
+          glassPrice = pair.price;
+          processed.add(pair.id);
+          mergedAvailable = wine.available !== false && pair.available !== false;
+        }
       }
 
       processed.add(wine.id);
       merged.push({
         id: primaryId, name: baseName, glassPrice, bottlePrice,
-        tier: wine.tier, subgroup: wine.subgroup, available: wine.available,
+        tier: wine.tier, subgroup: wine.subgroup, available: mergedAvailable,
         toastImageUrl: wine.toastImageUrl || null, masterId: wine.masterId
       });
     } else {
