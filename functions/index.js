@@ -885,19 +885,22 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [foodSnap, orderSnap, lastUpdatedSnap] = await Promise.all([
+    const [foodSnap, orderSnap, lastUpdatedSnap, exclusionsSnap] = await Promise.all([
       db.ref('foodItems').once('value'),
       db.ref('foodOrder').once('value'),
       db.ref('foodLastUpdated').once('value'),
+      db.ref('foodExclusions').once('value'),
     ]);
 
     const foodById = foodSnap.val() || {};
     const foodOrder = orderSnap.val() || [];
     const lastUpdated = lastUpdatedSnap.val();
+    const exclusions = exclusionsSnap.val() || {};
 
-    const ordered = foodOrder.length > 0
+    const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
-      : Object.values(foodById);
+      : Object.values(foodById)
+    ).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
@@ -1055,8 +1058,12 @@ Respond in JSON only (no other text):
       // ── Drink → Food (Beer & Pours) ──────────────────────────────────────
       if (type === 'drink_to_food') {
         const { itemName, itemDescription, itemStyle, itemCategory, itemABV, excludeDishes = [] } = req.body;
-        const foodSnap = await db.ref('foodItems').once('value');
-        const foodItems = Object.values(foodSnap.val() || {}).filter(f => !f.excluded);
+        const [foodSnap, exclusionsSnap] = await Promise.all([
+          db.ref('foodItems').once('value'),
+          db.ref('foodExclusions').once('value'),
+        ]);
+        const exclusions = exclusionsSnap.val() || {};
+        const foodItems = Object.values(foodSnap.val() || {}).filter(f => !exclusions[f.id]);
         const foodList = foodItems
           .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
           .join('\n');
@@ -1103,7 +1110,8 @@ exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
     const { itemId, excluded } = req.body;
     if (!itemId) return res.status(400).json({ error: 'itemId required' });
     const db = admin.database();
-    await db.ref(`foodItems/${itemId}/excluded`).set(excluded === true);
+    // Store in separate node so syncFoodMenu never overwrites it
+    await db.ref(`foodExclusions/${itemId}`).set(excluded === true ? true : null);
     res.json({ ok: true, itemId, excluded });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1218,7 +1226,14 @@ exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => 
     if (itemType === 'food') {
       const snap = await db.ref(`foodItems/${itemId}`).once('value');
       const existing = snap.val() || {};
-      await db.ref(`foodItems/${itemId}`).set({ ...existing, ...updates, lastEditedAt: Date.now() });
+      const { excluded, ...otherUpdates } = updates;
+      // excluded flag lives in foodExclusions/ so it survives syncs
+      if (excluded !== undefined) {
+        await db.ref(`foodExclusions/${itemId}`).set(excluded === true ? true : null);
+      }
+      if (Object.keys(otherUpdates).length > 0) {
+        await db.ref(`foodItems/${itemId}`).set({ ...existing, ...otherUpdates, lastEditedAt: Date.now() });
+      }
     } else {
       const enrichPath = itemType === 'wine' ? 'wineEnrichment' : itemType === 'beer' ? 'beerEnrichment' : 'poursEnrichment';
       const snap = await db.ref(`${enrichPath}/${itemId}`).once('value');
