@@ -406,7 +406,10 @@ exports.syncWineMenu = functions
       const toEnrich = freshWines.filter(w => {
         const existing = existingEnrichment[w.id];
         if (!existing) return true;
+        // Re-enrich if name changed (clears approved/manuallyEdited via full .set())
         if (!existing.sourceName || existing.sourceName !== w.name) return true;
+        // Skip if manager has manually edited this wine
+        if (existing.manuallyEdited) return false;
         return false;
       });
       let enrichedCount = 0;
@@ -472,6 +475,7 @@ exports.syncBeerMenu = functions
         const existing = existingEnrichment[b.id];
         if (!existing) return true;
         if (!existing.sourceName || existing.sourceName !== b.name) return true;
+        if (existing.manuallyEdited) return false;
         return false;
       });
       let enrichedCount = 0;
@@ -533,6 +537,7 @@ exports.syncPoursMenu = functions
         const existing = existingEnrichment[p.id];
         if (!existing) return true;
         if (!existing.sourceName || existing.sourceName !== p.name) return true;
+        if (existing.manuallyEdited) return false;
         return false;
       });
       let enrichedCount = 0;
@@ -1175,6 +1180,39 @@ exports.getNAB = functions.https.onRequest(async (req, res) => {
     const order = orderSnap.val() || [];
     const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
     res.json({ nab: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Manager Update Enrichment ────────────────────────────────────────────────
+
+exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const { itemId, itemType, updates } = req.body;
+    if (!itemId || !itemType) return res.status(400).json({ error: 'itemId and itemType required' });
+    const db = admin.database();
+
+    if (itemType === 'food') {
+      const snap = await db.ref(`foodItems/${itemId}`).once('value');
+      const existing = snap.val() || {};
+      await db.ref(`foodItems/${itemId}`).set({ ...existing, ...updates, lastEditedAt: Date.now() });
+    } else {
+      const enrichPath = itemType === 'wine' ? 'wineEnrichment' : itemType === 'beer' ? 'beerEnrichment' : 'poursEnrichment';
+      const snap = await db.ref(`${enrichPath}/${itemId}`).once('value');
+      const existing = snap.val() || {};
+      await db.ref(`${enrichPath}/${itemId}`).set({
+        ...existing,
+        ...updates,
+        manuallyEdited: true,
+        lastEditedAt: Date.now()
+      });
+    }
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
