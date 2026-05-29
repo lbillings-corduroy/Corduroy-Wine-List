@@ -210,15 +210,15 @@ function LoadingMessages({ messages, onAllShown }) {
           shownRef.current = 0; // reset so it loops if needed
           callbackRef.current?.();
         }
-      }, 380);
-    }, 2000);
+      }, 450);
+    }, 2500);
     return () => clearInterval(timer);
   }, [messages.length]);
 
   return (
     <div style={{ textAlign: "center", padding: "32px 16px" }}>
       <div style={{ fontSize: 28, marginBottom: 16 }}>✦</div>
-      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.38s ease", color: "#c9a96e", fontSize: 13, fontStyle: "italic", fontFamily: "Georgia, serif", letterSpacing: "0.5px", lineHeight: 1.6 }}>
+      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.45s ease", color: "#c9a96e", fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif", letterSpacing: "0.5px", lineHeight: 1.6 }}>
         {messages[displayIdx]}
       </div>
     </div>
