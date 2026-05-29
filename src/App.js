@@ -110,6 +110,121 @@ function findDuplicates(wines) {
   });
 }
 
+// ─── Smart Polling Schedule ───────────────────────────────────────────────────
+// Returns the appropriate polling interval in ms based on Snowshoe season & time
+function getPollingInterval() {
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const month = now.getMonth() + 1; // 1–12
+  const day   = now.getDate();
+  const dow   = now.getDay();        // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  const hour  = now.getHours();
+
+  const ACTIVE = 2  * 60 * 1000;    // 2 min  — active service hours
+  const SLOW   = 60 * 60 * 1000;    // 60 min — off-hours on an open day
+  const CLOSED = 6  * 60 * 60 * 1000; // 6 hrs  — fully closed season
+
+  function nthWeekday(y, m, n, wd) { // nth occurrence of weekday wd in month m
+    let count = 0;
+    for (let d = 1; d <= 31; d++) {
+      const dt = new Date(y, m - 1, d);
+      if (dt.getMonth() !== m - 1) break;
+      if (dt.getDay() === wd) { count++; if (count === n) return dt; }
+    }
+  }
+  function lastWeekday(y, m, wd) { // last occurrence of weekday wd in month m
+    let last = null;
+    for (let d = 1; d <= 31; d++) {
+      const dt = new Date(y, m - 1, d);
+      if (dt.getMonth() !== m - 1) break;
+      if (dt.getDay() === wd) last = dt;
+    }
+    return last;
+  }
+
+  const thanksgiving    = nthWeekday(year, 11, 4, 4);         // 4th Thu of Nov
+  const dayBeforeThanks = new Date(thanksgiving.getTime() - 86400000);   // Wed before
+  const tueBeforeThanks = new Date(thanksgiving.getTime() - 172800000);  // Tue before
+  const memorialDay     = lastWeekday(year, 5, 1);             // last Mon of May
+  const thurBeforeMD    = new Date(memorialDay.getTime() - 345600000);   // Thu before MD
+
+  const today = new Date(year, month - 1, day);
+
+  // ── Spring closure: April 1 → Thursday before Memorial Day ─────────────────
+  if (today >= new Date(year, 3, 1) && today <= thurBeforeMD) return CLOSED;
+
+  // ── Fall closure: Nov 1 → Tuesday before Thanksgiving ──────────────────────
+  if (today >= new Date(year, 10, 1) && today <= tueBeforeThanks) return CLOSED;
+
+  // ── Summer season: Memorial Day → Oct 31 ───────────────────────────────────
+  if (today >= memorialDay && today <= new Date(year, 9, 31)) {
+    if (dow === 1 || dow === 2) return CLOSED; // Mon/Tue fully closed
+    const openHour = (dow === 3 || dow === 4) ? 16 : 11; // Wed/Thu open 4 PM; Fri/Sat/Sun 11 AM
+    if (hour >= openHour || hour < 1) return ACTIVE; // active until 1 AM
+    return SLOW;
+  }
+
+  // ── Winter season: day before Thanksgiving → March 31 ──────────────────────
+  // (Catches Jan–Mar automatically, and day-before-Thanksgiving through Dec 31)
+  if (hour >= 11 || hour < 1) return ACTIVE; // 11 AM – 1 AM
+  return SLOW;
+}
+
+// ─── Pairing Loading Messages ─────────────────────────────────────────────────
+
+const SOMMELIER_MESSAGES = [
+  "Your Virtual Sommelier is consulting the cellar…",
+  "Swirling, sniffing, and considering your options…",
+  "Evaluating every bottle on the list…",
+  "Checking tannins, acidity, and flavor bridges…",
+  "Conferring with the cellar master…",
+  "Nose: promising. Palate: almost there…",
+  "Decanting the perfect recommendation…",
+];
+
+const KITCHEN_MESSAGES = [
+  "Stepping into the kitchen…",
+  "Consulting with Chef on the perfect match…",
+  "Weighing flavors, textures, and bridges…",
+  "Almost plated and ready…",
+  "Matching the terroir to your table…",
+];
+
+function LoadingMessages({ messages, onAllShown }) {
+  const [displayIdx, setDisplayIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const idxRef = useRef(0);
+  const shownRef = useRef(0);
+  const callbackRef = useRef(onAllShown);
+  useEffect(() => { callbackRef.current = onAllShown; }, [onAllShown]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        idxRef.current = (idxRef.current + 1) % messages.length;
+        shownRef.current++;
+        setDisplayIdx(idxRef.current);
+        setVisible(true);
+        if (shownRef.current >= messages.length) {
+          shownRef.current = 0; // reset so it loops if needed
+          callbackRef.current?.();
+        }
+      }, 380);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [messages.length]);
+
+  return (
+    <div style={{ textAlign: "center", padding: "32px 16px" }}>
+      <div style={{ fontSize: 28, marginBottom: 16 }}>✦</div>
+      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.38s ease", color: "#c9a96e", fontSize: 13, fontStyle: "italic", fontFamily: "Georgia, serif", letterSpacing: "0.5px", lineHeight: 1.6 }}>
+        {messages[displayIdx]}
+      </div>
+    </div>
+  );
+}
+
 // ─── Sync Tab ─────────────────────────────────────────────────────────────────
 
 function SyncTab() {
@@ -715,13 +830,18 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
       })
       .catch(e => { setError(e.message || "Unable to load menu"); setLoading(false); });
 
-    // Silent background poll every 2 minutes
-    const poll = setInterval(() => {
-      fetch(endpoint).then(r => r.json())
-        .then(data => { setItems(data[dataKey] || []); })
-        .catch(() => {});
-    }, 2 * 60 * 1000);
-    return () => clearInterval(poll);
+    // Silent background poll — interval adjusts to season/time
+    let pollTimer;
+    function scheduleNext() {
+      pollTimer = setTimeout(() => {
+        fetch(endpoint).then(r => r.json())
+          .then(data => { setItems(data[dataKey] || []); })
+          .catch(() => {});
+        scheduleNext();
+      }, getPollingInterval());
+    }
+    scheduleNext();
+    return () => clearTimeout(pollTimer);
   }, [endpoint, dataKey]);
 
   const available = items.filter(i => i.available !== false);
@@ -972,8 +1092,21 @@ function ItemPairingButton({ item }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [shownDishes, setShownDishes] = useState([]);
+  const pendingResult = useRef(null);
+  const [msgReady, setMsgReady] = useState(false);
+
+  function handleMsgComplete() {
+    if (pendingResult.current !== null) {
+      setResult(pendingResult.current);
+      setLoading(false);
+      pendingResult.current = null;
+    }
+    setMsgReady(true);
+  }
 
   async function handlePairing() {
+    pendingResult.current = null;
+    setMsgReady(false);
     setLoading(true);
     try {
       const res = await fetch(PAIRING_URL, {
@@ -991,18 +1124,24 @@ function ItemPairingButton({ item }) {
       });
       const data = await res.json();
       const pairings = data.pairings || [];
-      setResult(pairings);
       setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
-    } catch (e) { setResult([]); }
-    setLoading(false);
+      pendingResult.current = pairings;
+      if (msgReady) { setResult(pairings); setLoading(false); pendingResult.current = null; }
+    } catch (e) {
+      pendingResult.current = [];
+      if (msgReady) { setResult([]); setLoading(false); pendingResult.current = null; }
+    }
   }
 
   return (
     <div>
-      <button onClick={handlePairing} disabled={loading}
-        style={{ width: "100%", background: loading ? "#f0ebe0" : "#271500", color: loading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
-        {loading ? "Virtual Sommelier is finding your perfect pairing…" : result ? "Give Me Different Options" : "Suggested Food Pairing"}
-      </button>
+      {!loading && (
+        <button onClick={handlePairing}
+          style={{ width: "100%", background: "#271500", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
+          {result ? "Give Me Different Options" : "Suggested Food Pairing"}
+        </button>
+      )}
+      {loading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleMsgComplete} />}
       {result && result.length > 0 && (
         <div style={{ marginTop: 2 }}>
           <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
@@ -1035,8 +1174,21 @@ function WineDetailPanel({ wine, onClose }) {
   const [pairingResult, setPairingResult] = useState(null);
 
   const [shownDishes, setShownDishes] = useState([]);
+  const pendingDishes = useRef(null);
+  const [dishMessagesReady, setDishMessagesReady] = useState(false);
+
+  function handleDishMessagesComplete() {
+    if (pendingDishes.current !== null) {
+      setPairingResult(pendingDishes.current);
+      setPairingLoading(false);
+      pendingDishes.current = null;
+    }
+    setDishMessagesReady(true);
+  }
 
   async function handlePairing() {
+    pendingDishes.current = null;
+    setDishMessagesReady(false);
     setPairingLoading(true);
     try {
       const res = await fetch(PAIRING_URL, {
@@ -1045,10 +1197,13 @@ function WineDetailPanel({ wine, onClose }) {
       });
       const data = await res.json();
       const pairings = data.pairings || [];
-      setPairingResult(pairings);
       setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
-    } catch (e) { setPairingResult([]); }
-    setPairingLoading(false);
+      pendingDishes.current = pairings;
+      if (dishMessagesReady) { setPairingResult(pairings); setPairingLoading(false); pendingDishes.current = null; }
+    } catch (e) {
+      pendingDishes.current = [];
+      if (dishMessagesReady) { setPairingResult([]); setPairingLoading(false); pendingDishes.current = null; }
+    }
   }
 
   return (
@@ -1097,10 +1252,13 @@ function WineDetailPanel({ wine, onClose }) {
         )}
       </div>
 
-      <button onClick={handlePairing} disabled={pairingLoading}
-        style={{ width: "100%", background: pairingLoading ? "#f0ebe0" : "#271500", color: pairingLoading ? "#b0a090" : "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: pairingLoading ? "default" : "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
-        {pairingLoading ? "Virtual Sommelier is finding your perfect pairing…" : "Suggested Food Pairing"}
-      </button>
+      {!pairingLoading && (
+        <button onClick={handlePairing}
+          style={{ width: "100%", background: "#271500", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
+          Suggested Food Pairing
+        </button>
+      )}
+      {pairingLoading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleDishMessagesComplete} />}
 
       {pairingResult && pairingResult.length > 0 && (
         <div>
@@ -1143,11 +1301,23 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   }, []);
 
   const [lastShownIds, setLastShownIds] = useState({});
+  const pendingPairing = useRef(null);
+  const [messagesReady, setMessagesReady] = useState(false);
+
+  function handleMessagesComplete() {
+    if (pendingPairing.current !== null) {
+      setPairingResult(pendingPairing.current);
+      setPairingLoading(false);
+      pendingPairing.current = null;
+    }
+    setMessagesReady(true);
+  }
 
   async function handleFoodSelect(food) {
     setSelectedFood(food);
     setPairingLoading(true);
     setPairingResult(null);
+    pendingPairing.current = null;
     setLastShownIds({});
     setView("result");
     try {
@@ -1157,17 +1327,21 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       });
       const data = await res.json();
       const pairings = data.pairings || [];
-      setPairingResult(pairings);
       const ids = {};
       pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
       setLastShownIds(ids);
-    } catch (e) { setPairingResult([]); }
-    setPairingLoading(false);
+      pendingPairing.current = pairings;
+      // If messages finished before API responded, show now
+      if (pendingPairing.current !== null) {} // handled by handleMessagesComplete
+    } catch (e) { pendingPairing.current = []; }
+    // Don't clear loading here — LoadingMessages does it via handleMessagesComplete
   }
 
   async function handleDifferentOptions() {
     if (!selectedFood) return;
     setPairingLoading(true);
+    setPairingResult(null);
+    pendingPairing.current = null;
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1175,12 +1349,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       });
       const data = await res.json();
       const pairings = data.pairings || [];
-      setPairingResult(pairings);
       const ids = {};
       pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
       setLastShownIds(ids);
-    } catch (e) {}
-    setPairingLoading(false);
+      pendingPairing.current = pairings;
+    } catch (e) { pendingPairing.current = []; }
   }
 
   const availableFood = foodItems.filter(f => !f.excluded);
@@ -1272,9 +1445,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           )}
 
           {pairingLoading && (
-            <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase" }}>Finding perfect pairings…</div>
-            </div>
+            <LoadingMessages messages={SOMMELIER_MESSAGES} onAllShown={handleMessagesComplete} />
           )}
 
           {!pairingLoading && pairingResult && pairingResult.length > 0 && (
@@ -1474,9 +1645,12 @@ export default function App() {
 
   useEffect(() => {
     fetchWines();
-    // Poll every 2 minutes silently — no spinner on background refreshes
-    const interval = setInterval(() => fetchWines(true), 2 * 60 * 1000);
-    return () => clearInterval(interval);
+    let pollTimer;
+    function scheduleNext() {
+      pollTimer = setTimeout(() => { fetchWines(true); scheduleNext(); }, getPollingInterval());
+    }
+    scheduleNext();
+    return () => clearTimeout(pollTimer);
   }, []);
 
   useEffect(() => { if (!loading) setTimeout(() => setVisible(true), 50); }, [loading]);
