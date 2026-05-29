@@ -1235,3 +1235,54 @@ exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => 
     res.status(500).json({ error: error.message });
   }
 });
+
+// ─── Force Sync Endpoint ──────────────────────────────────────────────────────
+
+exports.forceSync = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+
+    try {
+      const { categories } = req.body;
+      const toRun = Array.isArray(categories) ? categories : ['wine', 'beer', 'pours', 'food', 'cocktails', 'nab'];
+
+      const funcMap = {
+        wine:      'syncWineMenu',
+        beer:      'syncBeerMenu',
+        pours:     'syncPoursMenu',
+        food:      'syncFoodMenu',
+        cocktails: 'syncCocktailsMenu',
+        nab:       'syncNABMenu',
+      };
+
+      // Get GCP access token from metadata server (available in all Cloud Functions)
+      const tokenRes = await axios.get(
+        'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+        { headers: { 'Metadata-Flavor': 'Google' } }
+      );
+      const accessToken = tokenRes.data.access_token;
+      const projectId = 'corduroy-wine-list';
+
+      const triggered = [];
+      for (const cat of toRun) {
+        const funcName = funcMap[cat];
+        if (!funcName) continue;
+        const topicName = `firebase-schedule-${funcName}-us-central1`;
+        await axios.post(
+          `https://pubsub.googleapis.com/v1/projects/${projectId}/topics/${topicName}:publish`,
+          { messages: [{ data: Buffer.from('{}').toString('base64') }] },
+          { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+        );
+        triggered.push(cat);
+      }
+
+      res.json({ ok: true, triggered, message: `Triggered: ${triggered.join(', ')}. Syncs run in background — check again in ~60 seconds.` });
+    } catch (error) {
+      console.error('forceSync error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
