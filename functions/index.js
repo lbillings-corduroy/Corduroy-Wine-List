@@ -140,6 +140,8 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
     group.menuItems.forEach(item => {
       if (shouldExclude(item.name)) return;
       const stockInfo = stockMap[item.guid];
+      // DEBUG: log all availability-related fields for every item
+      console.log(`ITEM DEBUG: "${item.name}" | outOfStock=${item.outOfStock} | visibility=${JSON.stringify(item.visibility)} | stockStatus=${stockInfo ? stockInfo.status : 'not-in-inventory'} | keys=${Object.keys(item).join(',')}`);
       const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && item.outOfStock !== true;
       if (!wines.find(w => w.id === item.guid)) {
         wines.push({
