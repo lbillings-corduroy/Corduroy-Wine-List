@@ -544,6 +544,18 @@ function ManagerScreen({ wines, onClose }) {
   const [activeTab, setActiveTab] = useState("uncertain");
   const [search, setSearch] = useState("");
   const [localWines, setLocalWines] = useState(wines);
+  const [allItems, setAllItems] = useState([]); // beers + pours for no-image tab
+
+  useEffect(() => {
+    Promise.all([
+      fetch(BEER_URL).then(r => r.json()),
+      fetch(POURS_URL).then(r => r.json()),
+    ]).then(([bData, pData]) => {
+      const beers = (bData.beers || []).map(i => ({ ...i, _type: "beer" }));
+      const pours = (pData.pours || []).map(i => ({ ...i, _type: "pour" }));
+      setAllItems([...beers, ...pours]);
+    }).catch(() => {});
+  }, []);
 
   function handleWineUpdate(id, fields) {
     setLocalWines(prev => prev.map(w => w.id === id ? { ...w, ...fields } : w));
@@ -563,7 +575,9 @@ function ManagerScreen({ wines, onClose }) {
   const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
 
   const uncertain = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
-  const noImage = filterBySearch(localWines.filter(w => !w.imageUrl));
+  const noImageWines = filterBySearch(localWines.filter(w => !w.imageUrl));
+  const noImageOther = q ? allItems.filter(i => !i.imageUrl && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => !i.imageUrl);
+  const noImage = [...noImageWines, ...noImageOther];
   const noPrice = filterBySearch(localWines.filter(w => !w.glassPrice && !w.bottlePrice));
   const unenriched = filterBySearch(localWines.filter(w => !w.description && !w.varietal));
   const duplicateGroups = findDuplicates(q ? localWines.filter(w => (w.name || "").toLowerCase().includes(q)) : localWines);
@@ -653,7 +667,11 @@ function ManagerScreen({ wines, onClose }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: "#f0e8d8", fontSize: 13 }}>{wine.name}</div>
-                      <div style={{ color: "#6a5040", fontSize: 10 }}>{wine.subgroup} · {wine.tier}</div>
+                      <div style={{ color: "#6a5040", fontSize: 10 }}>
+                        {wine._type === "beer" ? ["Beer", wine.style, wine.brewery].filter(Boolean).join(" · ")
+                          : wine._type === "pour" ? ["Pour", wine.category, wine.producer].filter(Boolean).join(" · ")
+                          : [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
+                      </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
                       {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
@@ -720,7 +738,9 @@ function ManagerScreen({ wines, onClose }) {
                   )}
                   {activeTab === "noimage" && (
                     <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>
-                      Upload label image in Toast to display here
+                      {wine._type === "beer" || wine._type === "pour"
+                        ? "Upload image in Toast → item → Image to display here"
+                        : "Upload label image in Toast to display here"}
                     </div>
                   )}
                   {activeTab === "unenriched" && (
