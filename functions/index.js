@@ -53,9 +53,19 @@ async function getStockData(token) {
     const response = await axios.get(`${TOAST_API_URL}/stock/v1/inventory`, {
       headers: { 'Authorization': `Bearer ${token}`, 'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID }
     });
-    return response.data;
+    const data = response.data;
+    const items = Array.isArray(data) ? data : (data.stockData || data.items || data.inventory || Object.values(data));
+    console.log(`Stock API: ${items.length} items returned. Response type: ${Array.isArray(data) ? 'array' : typeof data}. Keys: ${Object.keys(data || {}).join(',')}`);
+    if (items.length > 0) {
+      console.log(`Stock sample item: ${JSON.stringify(items[0])}`);
+    }
+    // Check for Chevalier specifically
+    const chevalierGuid = '26c80ad9-becb-43ee-83c1-f2ea9f734b27';
+    const found = items.find(i => JSON.stringify(i).includes(chevalierGuid));
+    console.log(`Chevalier in stock API: ${found ? JSON.stringify(found) : 'NOT FOUND'}`);
+    return data;
   } catch (e) {
-    console.log('Stock unavailable:', e.message);
+    console.log('Stock unavailable:', e.message, 'Status:', e.response?.status, 'Data:', JSON.stringify(e.response?.data));
     return [];
   }
 }
