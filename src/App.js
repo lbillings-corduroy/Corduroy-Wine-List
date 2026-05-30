@@ -1453,9 +1453,9 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         <div>
           <div style={{ background: "#271500", padding: "8px 16px 10px 20px", display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
-            <div style={{ display: "flex", gap: 4 }}>
+            <div style={{ display: "flex", gap: 8 }}>
               {["1st", "Main", "Dessert"].map(h => (
-                <div key={h} style={{ width: 38, textAlign: "center", color: "#5a4030", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{h}</div>
+                <div key={h} style={{ width: 22, textAlign: "center", color: "#5a4030", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{h}</div>
               ))}
             </div>
           </div>
@@ -1469,7 +1469,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               return courseOrder.map(course => (
                 <div key={course}>
                   <div style={{ padding: "12px 20px 6px", background: "#f5f0e8", borderBottom: "0.5px solid #e8e0d0", borderTop: "0.5px solid #e8e0d0" }}>
-                    <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{course}</div>
+                    <div style={{ color: "#6a4020", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                   </div>
                   {byCourse[course].map(food => {
                     const isEntree = food.course === "Entrees";
