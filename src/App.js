@@ -611,12 +611,13 @@ function ManagerScreen({ wines, onClose }) {
         </div>
 
         {/* Summary row */}
-        <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              flex: 1, background: activeTab === t.id ? (t.id === "sync" ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.15)") : t.id === "sync" ? "rgba(76,175,125,0.06)" : "rgba(255,255,255,0.04)",
+              width: "calc(25% - 6px)", boxSizing: "border-box", flexShrink: 0,
+              background: activeTab === t.id ? (t.id === "sync" ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.15)") : t.id === "sync" ? "rgba(76,175,125,0.06)" : "rgba(255,255,255,0.04)",
               border: `0.5px solid ${activeTab === t.id ? (t.id === "sync" ? "#4caf7d" : "#c9a96e") : t.id === "sync" ? "rgba(76,175,125,0.3)" : "#3c2200"}`,
-              borderRadius: 8, padding: "10px 6px", cursor: "pointer", textAlign: "center"
+              borderRadius: 8, padding: "10px 4px", cursor: "pointer", textAlign: "center"
             }}>
               <div style={{ color: t.id === "sync" ? "#4caf7d" : t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.id === "sync" ? 16 : t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.id === "sync" ? "⟳" : t.count === null ? "" : t.count}</div>
               <div style={{ color: t.id === "sync" ? "#4caf7d" : "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
@@ -1074,7 +1075,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           favorites.map(item => (
             <div key={item.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ fontSize: 20, flexShrink: 0 }}>
-                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
+                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : item.favoriteType === "food" ? "🍽️" : "🥃"}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
@@ -1083,6 +1084,8 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                     ? (item.varietal || "Wine") + (item.region ? ` · ${item.region}` : "")
                     : item.favoriteType === "beer"
                     ? (item.style || "Beer") + (item.brewery ? ` · ${item.brewery}` : "")
+                    : item.favoriteType === "food"
+                    ? (item.course || "Food")
                     : (item.category || "Pour") + (item.producer ? ` · ${item.producer}` : "")}
                 </div>
               </div>
@@ -1309,7 +1312,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
   const [activeCourse, setActiveCourse] = useState("All");
-  const [selectedFood, setSelectedFood] = useState(null);
+  const [selectedFoods, setSelectedFoods] = useState([]);
   const [pairingResult, setPairingResult] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [view, setView] = useState("pick");
@@ -1333,17 +1336,29 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     setMessagesReady(true);
   }
 
-  async function handleFoodSelect(food) {
-    setSelectedFood(food);
+  function handleFoodToggle(food) {
+    const isAdding = !selectedFoods.find(f => f.id === food.id);
+    setSelectedFoods(prev =>
+      isAdding ? [...prev, food] : prev.filter(f => f.id !== food.id)
+    );
+    // Selecting a dish adds it to the shortlist automatically
+    const isFav = favorites.some(f => f.id === food.id);
+    if (isAdding && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
+    if (!isAdding && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
+  }
+
+  async function handleGetPairings() {
+    if (selectedFoods.length === 0) return;
     setPairingLoading(true);
     setPairingResult(null);
     pendingPairing.current = null;
+    setMessagesReady(false);
     setLastShownIds({});
     setView("result");
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", itemId: food.id })
+        body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id) })
       });
       const data = await res.json();
       const pairings = data.pairings || [];
@@ -1351,21 +1366,18 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
       setLastShownIds(ids);
       pendingPairing.current = pairings;
-      // If messages finished before API responded, show now
-      if (pendingPairing.current !== null) {} // handled by handleMessagesComplete
     } catch (e) { pendingPairing.current = []; }
-    // Don't clear loading here — LoadingMessages does it via handleMessagesComplete
   }
 
   async function handleDifferentOptions() {
-    if (!selectedFood) return;
+    if (selectedFoods.length === 0) return;
     setPairingLoading(true);
     setPairingResult(null);
     pendingPairing.current = null;
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", itemId: selectedFood.id, excludeWineIds: lastShownIds })
+        body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id), excludeWineIds: lastShownIds })
       });
       const data = await res.json();
       const pairings = data.pairings || [];
@@ -1384,7 +1396,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     <div style={{ background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
       <div style={{ background: "#231500", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={view === "result" ? () => setView("pick") : onBack}
+          <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
             style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>{view === "result" ? "Back" : "Main Menu"}</span>
           </button>
@@ -1418,7 +1430,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       {view === "pick" && (
         <div>
           <div style={{ background: "#271500", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-            Select a dish to find the perfect wine
+            Tap dishes to add them, then find your perfect wine
           </div>
           <div style={{ background: "#faf8f4" }}>
             {loadingFood ? (
@@ -1432,35 +1444,60 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   <div style={{ padding: "12px 20px 6px", background: "#f5f0e8", borderBottom: "0.5px solid #e8e0d0", borderTop: "0.5px solid #e8e0d0" }}>
                     <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{course}</div>
                   </div>
-                  {byCourse[course].map(food => (
-                    <div key={food.id} onClick={() => handleFoodSelect(food)}
-                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: "0.5px solid #e8e0d0", cursor: "pointer", background: "#faf8f4" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#f0ebe0"}
-                      onMouseLeave={e => e.currentTarget.style.background = "#faf8f4"}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: "#301700", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
-                        {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
+                  {byCourse[course].map(food => {
+                    const isSelected = selectedFoods.some(f => f.id === food.id);
+                    return (
+                      <div key={food.id}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px 13px 20px", borderBottom: "0.5px solid #e8e0d0", background: isSelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
+                        <div onClick={() => handleFoodToggle(food)} style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${isSelected ? "#c9a96e" : "#d0c0b0"}`, background: isSelected ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s", cursor: "pointer" }}>
+                          {isSelected && <span style={{ color: "#0d0800", fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                        </div>
+                        <div onClick={() => handleFoodToggle(food)} style={{ flex: 1, cursor: "pointer" }}>
+                          <div style={{ color: "#301700", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
+                          {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
+                        </div>
+                        <div style={{ color: "#301700", fontSize: 13, flexShrink: 0 }}>{formatPrice(food.price)}</div>
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ color: "#301700", fontSize: 14 }}>{formatPrice(food.price)}</div>
-                        <span style={{ color: "#c9a96e", fontSize: 18 }}>›</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ));
             })()}
           </div>
         </div>
+
+        {/* Sticky Find Pairings button */}
+        {selectedFoods.length > 0 && (
+          <div style={{ position: "sticky", bottom: 0, background: "#1e1100", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {selectedFoods.map(f => (
+                <div key={f.id} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: "#f0e8d8", fontSize: 11 }}>{f.name}</span>
+                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f); }} style={{ color: "#6a5040", fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={handleGetPairings}
+              style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+              Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"} →
+            </button>
+          </div>
+        )}
       )}
 
       {view === "result" && (
         <div style={{ padding: "20px 20px" }}>
-          {selectedFood && (
+          {selectedFoods.length > 0 && (
             <div style={{ background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.25)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>Your selection</div>
-              <div style={{ color: "#f0e8d8", fontSize: 15 }}>{selectedFood.name}</div>
-              {selectedFood.description && <div style={{ color: "#6a5040", fontSize: 12, marginTop: 4, fontStyle: "italic", lineHeight: 1.4 }}>{selectedFood.description}</div>}
+              <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>
+                {selectedFoods.length === 1 ? "Your selection" : `Your table's selections (${selectedFoods.length} dishes)`}
+              </div>
+              {selectedFoods.map((f, i) => (
+                <div key={f.id} style={{ marginBottom: i < selectedFoods.length - 1 ? 8 : 0, paddingBottom: i < selectedFoods.length - 1 ? 8 : 0, borderBottom: i < selectedFoods.length - 1 ? "0.5px solid rgba(201,169,110,0.15)" : "none" }}>
+                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>{f.name}</div>
+                  {f.description && <div style={{ color: "#6a5040", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>{f.description}</div>}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1787,7 +1824,7 @@ export default function App() {
   );
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
-  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "wine")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
