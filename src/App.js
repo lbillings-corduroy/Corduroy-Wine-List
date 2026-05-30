@@ -1544,12 +1544,17 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       {view === "pick" && (
         <>
         <div>
-          <div style={{ background: "#271500", padding: "8px 16px 10px 20px", display: "flex", alignItems: "center" }}>
-            <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
+          <div style={{ background: "#271500", padding: "8px 16px 10px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
             <div style={{ display: "flex", alignItems: "center", marginRight: 2 }}>
               <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 6 }}>1ST</div>
               <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 12 }}>MAIN</div>
               <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>DES</div>
+            </div>
+            </div>
+            <div style={{ color: "#5a4030", fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+              For larger parties, run the sommelier a second time to capture additional guests' selections.
             </div>
           </div>
           <div style={{ background: "#faf8f4" }}>
@@ -1567,10 +1572,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   {byCourse[course].map(food => {
                     const isEntree = food.course === "Entrees";
                     const isDessert = food.course === "Dessert";
-                    const chkFirst  = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
-                    const chkMain   = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
+                    const chkFirst   = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
+                    const chkMain    = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
                     const chkDessert = selectedFoods.some(f => f.id === food.id && f.courseRole === "dessert");
                     const anySelected = chkFirst || chkMain || chkDessert;
+                    // Enforce max 4 per course
+                    const firstCount   = selectedFoods.filter(f => f.courseRole === "first").length;
+                    const mainCount    = selectedFoods.filter(f => f.courseRole === "main").length;
+                    const dessertCount = selectedFoods.filter(f => f.courseRole === "dessert").length;
 
                     const Chk = ({ checked, role, disabled }) => (
                       <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
@@ -1587,9 +1596,9 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                             </div>
                             <div style={{ color: "#8a7060", fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
                             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                              <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert} />
-                              <Chk checked={chkMain}    role="main"    disabled={isDessert} />
-                              <Chk checked={chkDessert} role="dessert" disabled={!isDessert} />
+                              <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert || (!chkFirst && firstCount >= 4)} />
+                              <Chk checked={chkMain}    role="main"    disabled={isDessert || (!chkMain && mainCount >= 4)} />
+                              <Chk checked={chkDessert} role="dessert" disabled={!isDessert || (!chkDessert && dessertCount >= 4)} />
                             </div>
                           </div>
                     );
