@@ -1104,15 +1104,6 @@ function GuestMenuScreen({ favorites }) {
     } else { standaloneWines.push(w); }
   });
 
-  const [showQR, setShowQR] = useState(false);
-
-  function getQRUrl() {
-    const encoded = encodeFavorites(favorites);
-    if (!encoded) return null;
-    const menuUrl = `${window.location.origin}/?menu=${encoded}`;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=M&data=${encodeURIComponent(menuUrl)}`;
-  }
-
   const SectionHeader = ({ label }) => (
     <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
       <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
@@ -1230,6 +1221,15 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   });
 
   const hasCourses = foodCourses.length > 0;
+
+  const [showQR, setShowQR] = useState(false);
+
+  function getQRUrl() {
+    const encoded = encodeFavorites(favorites);
+    if (!encoded) return null;
+    const menuUrl = `${window.location.origin}/?menu=${encoded}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=M&data=${encodeURIComponent(menuUrl)}`;
+  }
 
   const SectionHeader = ({ label }) => (
     <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
