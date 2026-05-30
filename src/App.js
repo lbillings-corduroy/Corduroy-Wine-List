@@ -1452,11 +1452,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         <>
         <div>
           <div style={{ background: "#271500", padding: "8px 16px 10px 20px", display: "flex", alignItems: "center" }}>
-            <div style={{ flex: 1, color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {["1st", "Main", "Des."].map(h => (
-                <div key={h} style={{ width: 22, textAlign: "center", color: "#5a4030", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{h}</div>
-              ))}
+            <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
+            <div style={{ display: "flex", alignItems: "center", marginRight: 2 }}>
+              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 6 }}>1ST</div>
+              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 12 }}>MAIN</div>
+              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>DES</div>
             </div>
           </div>
           <div style={{ background: "#faf8f4" }}>
