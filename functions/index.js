@@ -1090,7 +1090,7 @@ ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
 {"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
-          maxTokens = 800;
+          maxTokens = 1600;
         }
 
         const response = await axios.post(
