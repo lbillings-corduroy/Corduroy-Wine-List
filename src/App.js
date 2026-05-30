@@ -10,6 +10,9 @@ const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNA
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
 const FORCE_SYNC_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/forceSync";
+const SAVE_MENU_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveMenu";
+const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getMenu";
+const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -1081,6 +1084,53 @@ function decodeFavorites(encoded) {
   }));
 }
 
+// ─── Guest Menu Loader (fetches saved menu from DB by short code) ─────────────
+
+function GuestMenuLoader({ menuCode }) {
+  const [state, setState] = useState("loading"); // loading | ready | expired | error
+  const [favorites, setFavorites] = useState([]);
+
+  useEffect(() => {
+    fetch(`${GET_MENU_URL}?id=${menuCode}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.favorites) { setFavorites(data.favorites); setState("ready"); }
+        else if (data.error === "expired") setState("expired");
+        else setState("error");
+      })
+      .catch(() => setState("error"));
+  }, [menuCode]);
+
+  if (state === "loading") return (
+    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ color: "#c9a96e", fontSize: 22, marginBottom: 12 }}>✦</div>
+        <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>Loading your menu…</div>
+      </div>
+    </div>
+  );
+
+  if (state === "expired") return (
+    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
+      <div style={{ textAlign: "center", maxWidth: 360 }}>
+        <div style={{ color: "#c9a96e", fontSize: 28, marginBottom: 16 }}>✦</div>
+        <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 12 }}>Appalachia Kitchen</div>
+        <div style={{ color: "#f0e8d8", fontSize: 18, marginBottom: 12 }}>This menu link has expired</div>
+        <div style={{ color: "#6a5040", fontSize: 13, lineHeight: 1.6 }}>Menu QR codes are valid for 24 hours. We hope your evening was wonderful — we'd love to welcome you back soon.</div>
+        <div style={{ color: "#4a3020", fontSize: 11, marginTop: 24, letterSpacing: "1px" }}>CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV</div>
+      </div>
+    </div>
+  );
+
+  if (state === "error") return (
+    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
+      <div style={{ textAlign: "center", color: "#6a5040", fontSize: 14 }}>Menu not found. Please ask your server for assistance.</div>
+    </div>
+  );
+
+  return <GuestMenuScreen favorites={favorites} />;
+}
+
 // ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
 
 function GuestMenuScreen({ favorites }) {
@@ -1222,13 +1272,44 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 
   const hasCourses = foodCourses.length > 0;
 
-  const [showQR, setShowQR] = useState(false);
+  const [showQR, setShowQR]     = useState(false);
+  const [qrSaving, setQrSaving] = useState(false);
+  const [menuCode, setMenuCode] = useState(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailState, setEmailState] = useState("idle"); // idle | sending | sent | error
 
-  function getQRUrl() {
-    const encoded = encodeFavorites(favorites);
-    if (!encoded) return null;
-    const menuUrl = `${window.location.origin}/?menu=${encoded}`;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=M&data=${encodeURIComponent(menuUrl)}`;
+  async function handleOpenQR() {
+    setShowQR(true);
+    if (menuCode) return; // already saved this session
+    setQrSaving(true);
+    try {
+      const compact = favorites.map(f => ({
+        t: f.favoriteType, n: f.name, cr: f.courseRole, p: f.price,
+        d: (f.description || "").slice(0, 80), v: f.varietal, r: f.region,
+        gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || "").slice(0, 140),
+        cl: f.courseLabel, fp: f.fromPairing,
+      }));
+      const res = await fetch(SAVE_MENU_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ favorites: compact })
+      });
+      const data = await res.json();
+      if (data.ok) setMenuCode(data.menuId);
+    } catch(e) { /* fail silently — QR just won't show */ }
+    setQrSaving(false);
+  }
+
+  async function handleSendEmail() {
+    if (!emailInput || !menuCode) return;
+    setEmailState("sending");
+    try {
+      const res = await fetch(SEND_EMAIL_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput, menuId: menuCode })
+      });
+      const data = await res.json();
+      setEmailState(data.ok ? "sent" : "error");
+    } catch(e) { setEmailState("error"); }
   }
 
   const SectionHeader = ({ label }) => (
@@ -1272,7 +1353,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {favorites.length > 0 && (
-            <button onClick={() => setShowQR(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+            <button onClick={handleOpenQR} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
               Save ↗
             </button>
           )}
@@ -1343,26 +1424,49 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           </>
         )}
       </div>
-      {showQR && (() => {
-        const qrUrl = getQRUrl();
-        return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-            <div style={{ background: "#2b1800", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 320, width: "100%", textAlign: "center" }}>
-              <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 4 }}>Save Your Menu</div>
-              <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>Scan with your phone camera to keep your menu for the evening</div>
-              {qrUrl ? (
-                <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 16 }}>
-                  <img src={qrUrl} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
+      {showQR && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "#2b1800", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
+            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
+
+            {qrSaving ? (
+              <div style={{ padding: "40px 0", color: "#c9a96e", fontSize: 12, letterSpacing: "2px" }}>Saving your menu…</div>
+            ) : menuCode ? (
+              <>
+                <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>Scan to view your menu while you dine</div>
+                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: "#c9a96e" }}>Corduroy Guest</span> WiFi first</div>
+                <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
                 </div>
-              ) : (
-                <div style={{ color: "#6a5040", marginBottom: 16 }}>Unable to generate QR code</div>
-              )}
-              <div style={{ color: "#5a4030", fontSize: 11, fontStyle: "italic", marginBottom: 20 }}>Your selections are saved in this code — no account needed</div>
-              <button onClick={() => setShowQR(false)} style={{ background: "#c9a96e", color: "#0d0800", border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>Done</button>
-            </div>
+                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 20 }}>Code valid for 24 hours</div>
+
+                <div style={{ borderTop: "0.5px solid #3c2200", paddingTop: 20, marginBottom: 4 }}>
+                  <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", marginBottom: 6 }}>Want to keep your menu forever?</div>
+                  <div style={{ color: "#6a5040", fontSize: 11, marginBottom: 12 }}>We'll email you a permanent link — a lovely reminder of your evening.</div>
+                  {emailState === "sent" ? (
+                    <div style={{ color: "#4caf7d", fontSize: 13, padding: "10px 0" }}>✓ Sent! Check your inbox.</div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input type="email" placeholder="your@email.com" value={emailInput}
+                        onChange={e => setEmailInput(e.target.value)}
+                        style={{ flex: 1, background: "rgba(255,255,255,0.07)", border: "0.5px solid #5a4030", color: "#f0e8d8", padding: "8px 12px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none" }} />
+                      <button onClick={handleSendEmail} disabled={emailState === "sending" || !emailInput}
+                        style={{ background: emailInput ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 14px", borderRadius: 6, cursor: emailInput ? "pointer" : "default", fontFamily: "Georgia, serif", fontSize: 12, whiteSpace: "nowrap" }}>
+                        {emailState === "sending" ? "…" : "Send"}
+                      </button>
+                    </div>
+                  )}
+                  {emailState === "error" && <div style={{ color: "#e85050", fontSize: 11, marginTop: 6 }}>Couldn't send — please try again</div>}
+                </div>
+              </>
+            ) : (
+              <div style={{ color: "#6a5040", padding: "24px 0", fontSize: 13 }}>Unable to save menu. Please ask your server.</div>
+            )}
+
+            <button onClick={() => setShowQR(false)} style={{ marginTop: 20, background: "#c9a96e", color: "#0d0800", border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>Done</button>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
     </div>
   );
