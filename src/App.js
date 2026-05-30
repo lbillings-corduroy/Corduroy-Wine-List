@@ -1428,6 +1428,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       </div>
 
       {view === "pick" && (
+        <>
         <div>
           <div style={{ background: "#271500", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
             Tap dishes to add them, then find your perfect wine
@@ -1483,6 +1484,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             </button>
           </div>
         )}
+        </>
       )}
 
       {view === "result" && (
@@ -1505,62 +1507,76 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             <LoadingMessages messages={SOMMELIER_MESSAGES} onAllShown={handleMessagesComplete} />
           )}
 
-          {!pairingLoading && pairingResult && pairingResult.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <button onClick={handleDifferentOptions}
-                style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
-                Give Me Different Options
-              </button>
-              <div style={{ color: "#6a5545", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
-                If suggestions repeat, it reflects the limits of our current wine selection for this dish.
-              </div>
-            </div>
-          )}
-          {pairingResult && pairingResult.map((p, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
-                  <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
+          {(() => {
+            const pairings = Array.isArray(pairingResult) ? pairingResult : null;
+            const byCourse = pairingResult?.byCourse || null;
+            const hasResults = pairings?.length > 0 || byCourse?.length > 0;
+            const isEmpty = pairingResult && !pairingLoading && !hasResults;
+
+            const WineCard = (p, i) => (
+              <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
+                    <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {p.glassPrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>glass</span></div>}
+                    {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>bottle</span></div>}
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  {p.glassPrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>glass</span></div>}
-                  {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>bottle</span></div>}
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  {p.imageUrl && <div style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #2a1400" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+                    {(p.varietal || p.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
+                  </div>
                 </div>
+                <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+                {p.id && (() => {
+                  const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
+                  const isStarred = favorites.some(f => f.id === p.id);
+                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>{isStarred ? "★ Added to Shortlist" : "☆ Add to Shortlist"}</button>;
+                })()}
               </div>
-              <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                {p.imageUrl && (
-                  <div style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #2a1400" }}>
-                    <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            );
+
+            return (
+              <>
+                {!pairingLoading && hasResults && (
+                  <div style={{ marginBottom: 16 }}>
+                    <button onClick={handleDifferentOptions} style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
+                      Give Me Different Options
+                    </button>
+                    <div style={{ color: "#6a5545", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+                      If suggestions repeat, it reflects the limits of our current wine selection for this dish.
+                    </div>
                   </div>
                 )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
-                  {(p.varietal || p.region) && (
-                    <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
-                      {[p.varietal, p.region].filter(Boolean).join(" · ")}
+
+                {/* Single course */}
+                {pairings?.map((p, i) => WineCard(p, i))}
+
+                {/* Multi-course */}
+                {byCourse?.map((courseResult, ci) => (
+                  <div key={ci} style={{ marginBottom: 20 }}>
+                    <div style={{ borderBottom: "0.5px solid rgba(201,169,110,0.25)", paddingBottom: 8, marginBottom: 14 }}>
+                      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>
+                        {courseResult.course} Pairing
+                      </div>
+                      {courseResult.dishes?.length > 0 && (
+                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>
+                          For: {courseResult.dishes.join(", ")}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-              <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`))}
+                  </div>
+                ))}
 
-              {p.id && (() => {
-                const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
-                const isStarred = favorites.some(f => f.id === p.id);
-                return (
-                  <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>
-                    {isStarred ? "★ Added to Shortlist" : "☆ Add to Shortlist"}
-                  </button>
-                );
-              })()}
-            </div>
-          ))}
-
-          {pairingResult && pairingResult.length === 0 && (
-            <div style={{ color: "#6a5040", textAlign: "center", padding: "40px 0", fontSize: 14 }}>
-              Unable to find pairings — please ask your server.
-            </div>
-          )}
+                {isEmpty && <div style={{ color: "#6a5040", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
