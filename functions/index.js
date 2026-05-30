@@ -1391,3 +1391,84 @@ exports.forceSync = functions
       res.status(500).json({ error: error.message });
     }
   });
+
+// ─── Save Menu ────────────────────────────────────────────────────────────────
+exports.saveMenu = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { favorites } = req.body;
+    if (!favorites || !Array.isArray(favorites)) return res.status(400).json({ error: 'Invalid data' });
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let menuId = '';
+    for (let i = 0; i < 6; i++) menuId += chars[Math.floor(Math.random() * chars.length)];
+    const createdAt = Date.now();
+    const expiresAt = createdAt + (24 * 60 * 60 * 1000);
+    await admin.database().ref(`savedMenus/${menuId}`).set({ favorites, createdAt, expiresAt });
+    res.json({ ok: true, menuId, expiresAt });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Get Menu ─────────────────────────────────────────────────────────────────
+exports.getMenu = onRequest({ cors: true }, async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'No menu ID' });
+  try {
+    const snapshot = await admin.database().ref(`savedMenus/${id}`).once('value');
+    const data = snapshot.val();
+    if (!data) return res.status(404).json({ error: 'not_found' });
+    if (Date.now() > data.expiresAt) {
+      await admin.database().ref(`savedMenus/${id}`).remove();
+      return res.status(410).json({ error: 'expired' });
+    }
+    res.json({ ok: true, favorites: data.favorites, expiresAt: data.expiresAt });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Send Menu Email ──────────────────────────────────────────────────────────
+exports.sendMenuEmail = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { email, menuId } = req.body;
+    if (!email || !menuId) return res.status(400).json({ error: 'Missing email or menu ID' });
+    const snapshot = await admin.database().ref(`savedMenus/${menuId}`).once('value');
+    const data = snapshot.val();
+    if (!data || Date.now() > data.expiresAt) return res.status(410).json({ error: 'expired' });
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) return res.status(503).json({ error: 'not_configured' });
+    const menuUrl = `https://corduroy-wine-list.vercel.app/?m=${menuId}`;
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Appalachia Kitchen <menu@corduroy-inn.com>',
+        to: email,
+        subject: 'Your Menu from Appalachia Kitchen',
+        html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#1e1100;color:#f0e8d8;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <div style="color:#c9a96e;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Your Evening at</div>
+            <div style="font-size:22px;margin-bottom:4px;">Appalachia Kitchen</div>
+            <div style="color:#5a4030;font-size:12px;">Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+          </div>
+          <p style="color:#9a8060;font-size:14px;line-height:1.6;">Thank you for dining with us. Here is a link to your menu from this evening:</p>
+          <div style="text-align:center;margin:24px 0;">
+            <a href="${menuUrl}" style="background:#c9a96e;color:#0d0800;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;">View My Menu</a>
+          </div>
+          <p style="color:#5a4030;font-size:11px;text-align:center;">This link does not expire. We hope to see you again soon.</p>
+        </div>`
+      })
+    });
+    if (emailRes.ok) res.json({ ok: true });
+    else res.status(500).json({ error: 'send_failed' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Cleanup Expired Menus (runs daily at 3 AM) ───────────────────────────────
+exports.cleanupExpiredMenus = onSchedule('0 3 * * *', async () => {
+  const snapshot = await admin.database().ref('savedMenus').once('value');
+  const menus = snapshot.val();
+  if (!menus) return;
+  const now = Date.now();
+  const updates = {};
+  Object.entries(menus).forEach(([id, data]) => { if (data.expiresAt < now) updates[id] = null; });
+  if (Object.keys(updates).length > 0) await admin.database().ref('savedMenus').update(updates);
+});
