@@ -967,19 +967,21 @@ Respond in JSON only (no other text):
 
       // ── Food → Wine ───────────────────────────────────────────────────────
       if (type === 'food_to_wine') {
-        // Support single itemId or array itemIds for multi-dish pairing
-        const itemIds = req.body.itemIds || (itemId ? [itemId] : []);
-        if (itemIds.length === 0) return res.status(400).json({ error: 'itemId or itemIds required' });
+        // Accept items with courseRole or fall back to legacy itemIds
+        const itemsWithRoles = req.body.items ||
+          (req.body.itemIds || (itemId ? [itemId] : [])).map(id => ({ id, courseRole: 'main' }));
+        if (itemsWithRoles.length === 0) return res.status(400).json({ error: 'items required' });
 
         const [winesSnap, enrichSnap] = await Promise.all([
           db.ref('wines').once('value'),
           db.ref('wineEnrichment').once('value'),
         ]);
-        const foodSnaps = await Promise.all(itemIds.map(id => db.ref(`foodItems/${id}`).once('value')));
-        const foods = foodSnaps.map(s => s.val()).filter(Boolean);
-        if (foods.length === 0) return res.status(404).json({ error: 'Food items not found' });
-        // Keep food/food as alias for single-item backward compat
-        const food = foods[0];
+        const uniqueIds = [...new Set(itemsWithRoles.map(i => i.id))];
+        const foodSnaps = await Promise.all(uniqueIds.map(id => db.ref(`foodItems/${id}`).once('value')));
+        const foodById = {};
+        foodSnaps.forEach(s => { if (s.val()) foodById[s.key] = s.val(); });
+        if (Object.keys(foodById).length === 0) return res.status(404).json({ error: 'Food items not found' });
+        const food = foodById[uniqueIds[0]]; // backward compat alias
 
         const winesById = winesSnap.val() || {};
         const enrichment = enrichSnap.val() || {};
@@ -1030,14 +1032,20 @@ Respond in JSON only (no other text):
           ? `\n\nIMPORTANT: The guest has already seen these — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
           : '';
 
-        // Group foods by course
+        // Group by guest-selected course role
+        const roleLabels = { first: 'First Course', main: 'Main Course', dessert: 'Dessert' };
         const courseGroups = {};
-        foods.forEach(f => {
-          const course = f.course || 'Main';
-          if (!courseGroups[course]) courseGroups[course] = [];
-          courseGroups[course].push(f);
+        itemsWithRoles.forEach(({ id, courseRole }) => {
+          const food = foodById[id];
+          if (!food) return;
+          const label = roleLabels[courseRole] || 'Main Course';
+          if (!courseGroups[label]) courseGroups[label] = [];
+          // Avoid duplicate dishes in same group
+          if (!courseGroups[label].find(f => f.id === food.id)) courseGroups[label].push(food);
         });
-        const courseNames = Object.keys(courseGroups);
+        // Preserve logical course order
+        const courseOrder = ['First Course', 'Main Course', 'Dessert'];
+        const courseNames = courseOrder.filter(c => courseGroups[c]);
         const isMultiCourse = courseNames.length > 1;
 
         function enrichPairings(pairings) {
@@ -1069,8 +1077,9 @@ Respond in JSON only (no other text):
 {"courses":[{"course":"course name","pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}]}`;
           maxTokens = 1600;
         } else {
-          const dishList = foods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
-          const tableContext = foods.length === 1
+          const allFoods = itemsWithRoles.map(({ id }) => foodById[id]).filter(Boolean);
+          const dishList = allFoods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
+          const tableContext = allFoods.length === 1
             ? `A guest is ordering:\n${dishList}`
             : `A table of guests is sharing these dishes:\n${dishList}\n\nSuggest wines that work well across all dishes.`;
 
