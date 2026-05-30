@@ -406,7 +406,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
 
       {/* Edit panel */}
       {editingItem && (
-        <div style={{ position: "sticky", bottom: 0, background: "#2b1800", border: "0.5px solid #3c2200", borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+        <div style={{ position: "sticky", bottom: 0, background: "#4d2e00", border: "0.5px solid #3c2200", borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "1px", textTransform: "uppercase" }}>Edit · {editingItem.name}</div>
             <button onClick={() => setEditingItem(null)} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0 }}>×</button>
@@ -600,9 +600,9 @@ function ManagerScreen({ wines, onClose }) {
   const current = lists[activeTab] || [];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#1e1100", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#3d2200", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
       {/* Header */}
-      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
@@ -630,7 +630,7 @@ function ManagerScreen({ wines, onClose }) {
       </div>
 
       {/* Search */}
-      <div style={{ padding: "8px 20px 4px", background: "#2b1800" }}>
+      <div style={{ padding: "8px 20px 4px", background: "#4d2e00" }}>
         <div style={{ position: "relative" }}>
           <input type="text" placeholder="Search by wine name…" value={search}
             onChange={e => setSearch(e.target.value)}
@@ -666,7 +666,7 @@ function ManagerScreen({ wines, onClose }) {
                 </div>
                 {group.map((wine, i) => (
                   <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? "0.5px solid #1a0f00" : "none" }}>
-                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#301700", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
+                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#502e00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
                       {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -700,7 +700,7 @@ function ManagerScreen({ wines, onClose }) {
             <div key={wine.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 {/* Image or placeholder */}
-                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#301700", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
+                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#502e00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
                   {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -764,7 +764,7 @@ function ManagerScreen({ wines, onClose }) {
       </div>
 
       {/* Footer */}
-      <div style={{ background: "#2b1800", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
+      <div style={{ background: "#4d2e00", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
         <div style={{ color: "#4e3020", fontSize: 10, letterSpacing: "1px" }}>
           {wines.length} total wines · Tap AK logo 5× to access this screen
         </div>
@@ -797,7 +797,7 @@ function PinScreen({ onSuccess, onCancel }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
-      <div style={{ background: "#2b1800", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
+      <div style={{ background: "#4d2e00", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
         <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Manager Access</div>
         <div style={{ color: "#f0e8d8", fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
 
@@ -892,13 +892,13 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   const filteredGroupOrder = [...new Map(searchFiltered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
 
   if (loading) return (
-    <div style={{ background: "#231500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+    <div style={{ background: "#432800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading {title}...</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#231500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: "#432800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
       <div style={{ textAlign: "center", maxWidth: 400 }}>
         <div style={{ color: accentColor, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Unable to load {title}</div>
         <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
@@ -906,15 +906,15 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
           <div style={{ color: "#9a5040", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
           <div style={{ color: "#c0a090", fontSize: 12, fontFamily: "monospace", wordBreak: "break-all" }}>{error}</div>
         </div>
-        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#231500", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#432800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
 
   return (
-    <div style={{ background: "#231500", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: "#432800", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Header */}
-      <div style={{ background: "#231500", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+      <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: accentColor, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
@@ -938,7 +938,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
             <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
               background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
               border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
-              color: activeGroup === g ? "#231500" : "#c8a878",
+              color: activeGroup === g ? "#432800" : "#c8a878",
               fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
               fontFamily: "Georgia, serif", whiteSpace: "nowrap",
               fontWeight: activeGroup === g ? 600 : 400
@@ -954,7 +954,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         </div>
       </div>
 
-      <div style={{ background: "#271500", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+      <div style={{ background: "#472a00", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
@@ -977,7 +977,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#301700", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    <div style={{ color: "#502e00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                     {(item.style || item.category) && (
                       <div style={{ color: accentColor, fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
                         {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
@@ -996,7 +996,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
                     {item.price ? (
                       <>
-                        <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
                         <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>each</div>
                       </>
                     ) : (
@@ -1027,7 +1027,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#301700", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                <div style={{ color: "#502e00", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
                 {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
                 {(item.brewery || item.producer) && <div style={{ color: "#8a7060", fontSize: 11 }}>{item.brewery || item.producer}</div>}
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
@@ -1036,7 +1036,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                {item.price && <div style={{ color: "#301700", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+                {item.price && <div style={{ color: "#502e00", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
               </div>
             </div>
             {item.description && (
@@ -1102,7 +1102,7 @@ function GuestMenuLoader({ menuCode }) {
   }, [menuCode]);
 
   if (state === "loading") return (
-    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ color: "#c9a96e", fontSize: 22, marginBottom: 12 }}>✦</div>
         <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>Loading your menu…</div>
@@ -1111,7 +1111,7 @@ function GuestMenuLoader({ menuCode }) {
   );
 
   if (state === "expired") return (
-    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
       <div style={{ textAlign: "center", maxWidth: 360 }}>
         <div style={{ color: "#c9a96e", fontSize: 28, marginBottom: 16 }}>✦</div>
         <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 12 }}>Appalachia Kitchen</div>
@@ -1123,7 +1123,7 @@ function GuestMenuLoader({ menuCode }) {
   );
 
   if (state === "error") return (
-    <div style={{ background: "#1e1100", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
       <div style={{ textAlign: "center", color: "#6a5040", fontSize: 14 }}>Menu not found. Please ask your server for assistance.</div>
     </div>
   );
@@ -1155,7 +1155,7 @@ function GuestMenuScreen({ favorites }) {
   });
 
   const SectionHeader = ({ label }) => (
-    <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+    <div style={{ background: "#5e3600", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
       <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
     </div>
   );
@@ -1178,9 +1178,9 @@ function GuestMenuScreen({ favorites }) {
   );
 
   return (
-    <div style={{ background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 480, margin: "0 auto" }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 480, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "24px 20px 20px", textAlign: "center" }}>
+      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "24px 20px 20px", textAlign: "center" }}>
         <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
         <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
         <div style={{ color: "#5a4030", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
@@ -1313,7 +1313,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   }
 
   const SectionHeader = ({ label }) => (
-    <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+    <div style={{ background: "#5e3600", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
       <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
     </div>
   );
@@ -1344,9 +1344,9 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
-    <div style={{ width: "100%", maxWidth: 680, background: "#1e1100", display: "flex", flexDirection: "column", fontFamily: "Georgia, serif", overflow: "hidden" }}>
+    <div style={{ width: "100%", maxWidth: 680, background: "#3d2200", display: "flex", flexDirection: "column", fontFamily: "Georgia, serif", overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
           <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
@@ -1426,7 +1426,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
       </div>
       {showQR && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div style={{ background: "#2b1800", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
+          <div style={{ background: "#4d2e00", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
             <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
 
             {qrSaving ? (
@@ -1526,7 +1526,7 @@ function ItemPairingButton({ item }) {
     <div>
       {!loading && (
         <button onClick={handlePairing}
-          style={{ width: "100%", background: "#271500", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
+          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
           {result ? "Give Me Different Options" : "Suggested Food Pairing"}
         </button>
       )}
@@ -1539,7 +1539,7 @@ function ItemPairingButton({ item }) {
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
                 <div>
-                  <div style={{ color: "#301700", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
                   <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
                   <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
 
@@ -1602,7 +1602,7 @@ function WineDetailPanel({ wine, onClose }) {
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#301700", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: "#502e00", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
           <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
             {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
           </div>
@@ -1627,13 +1627,13 @@ function WineDetailPanel({ wine, onClose }) {
         {wine.glassPrice && (
           <div>
             <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
-            <div style={{ color: "#301700", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: "#502e00", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
           </div>
         )}
         {wine.bottlePrice && (
           <div>
             <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
-            <div style={{ color: "#301700", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: "#502e00", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
           </div>
         )}
         {!wine.glassPrice && !wine.bottlePrice && (
@@ -1643,7 +1643,7 @@ function WineDetailPanel({ wine, onClose }) {
 
       {!pairingLoading && (
         <button onClick={handlePairing}
-          style={{ width: "100%", background: "#271500", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
+          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
           Suggested Food Pairing
         </button>
       )}
@@ -1656,7 +1656,7 @@ function WineDetailPanel({ wine, onClose }) {
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
               <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
               <div>
-                <div style={{ color: "#301700", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
                 <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
                 <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
 
@@ -1789,8 +1789,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
-    <div style={{ background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
-      <div style={{ background: "#231500", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
             style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
@@ -1814,7 +1814,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               <button key={c} onClick={() => setActiveCourse(c)} style={{
                 background: activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.07)",
                 border: `0.5px solid ${activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.15)"}`,
-                color: activeCourse === c ? "#231500" : "#c8a878",
+                color: activeCourse === c ? "#432800" : "#c8a878",
                 fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
                 fontFamily: "Georgia, serif", whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
               }}>{c}</button>
@@ -1826,7 +1826,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       {view === "pick" && (
         <>
         <div>
-          <div style={{ background: "#271500", padding: "8px 16px 10px 20px" }}>
+          <div style={{ background: "#472a00", padding: "8px 16px 10px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
               <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
             <div style={{ display: "flex", alignItems: "center", marginRight: 2 }}>
@@ -1848,7 +1848,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
               return courseOrder.map(course => (
                 <div key={course}>
-                  <div style={{ padding: "8px 20px 6px", background: "#3c2000", borderBottom: "none", borderTop: "none" }}>
+                  <div style={{ padding: "8px 20px 6px", background: "#5e3600", borderBottom: "none", borderTop: "none" }}>
                     <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                   </div>
                   {byCourse[course].map(food => {
@@ -1873,7 +1873,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     return (
                           <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: "#301700", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              <div style={{ color: "#502e00", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
                               {food.description && <div style={{ color: "#8a7060", fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
                             </div>
                             <div style={{ color: "#8a7060", fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
@@ -1893,7 +1893,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
         {/* Sticky Find Pairings button */}
         {selectedFoods.length > 0 && (
-          <div style={{ position: "sticky", bottom: 0, background: "#1e1100", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px" }}>
+          <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px" }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
               {selectedFoods.map(f => (
                 <div key={f.id} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
@@ -2020,7 +2020,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           })()}
 
           {!pairingLoading && pairingResult && (
-            <div style={{ position: "sticky", bottom: 0, background: "#1e1100", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
+            <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
               <button onClick={onShowShortlist}
                 style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
                 ★ Go to My Menu
@@ -2064,7 +2064,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
   return (
     <div style={{
-      background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif",
+      background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif",
       display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "flex-start", padding: "48px 32px 40px",
       opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
@@ -2294,18 +2294,18 @@ function AppContent() {
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
   if (loading) return (
-    <div style={{ background: "#271500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+    <div style={{ background: "#472a00", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ fontSize: 32 }}>🍷</div>
       <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading Wine List</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#271500", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "#472a00", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#c9a96e", fontFamily: "Georgia, serif", textAlign: "center" }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🍷</div>
         <div>{error}</div>
-        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#271500", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#472a00", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
@@ -2319,7 +2319,7 @@ function AppContent() {
       {/* Sticky wrapper — keeps back button + filter header together */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         {/* Back to home */}
-        <div style={{ background: "#231500", padding: "8px 16px", display: "flex", alignItems: "center" }}>
+        <div style={{ background: "#432800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
           <button onClick={() => setScreen("home")} style={{
             background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
             fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
@@ -2330,7 +2330,7 @@ function AppContent() {
         </div>
 
       {/* Header */}
-      <div style={{ background: "#271500", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
+      <div style={{ background: "#472a00", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div onClick={handleLogoTap} style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", userSelect: "none" }}>
             <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
@@ -2398,7 +2398,7 @@ function AppContent() {
       </div>
       </div>{/* end sticky wrapper */}
 
-      <div style={{ background: "#271500", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+      <div style={{ background: "#472a00", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
         {searchFiltered.filter(w => w.available !== false).length} {searchFiltered.filter(w => w.available !== false).length === 1 ? "wine" : "wines"}
         {searchFiltered.filter(w => w.available === false).length > 0 && <span style={{ color: "#c0706a", marginLeft: 6 }}>· {searchFiltered.filter(w => w.available === false).length} out of stock</span>}
         {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
@@ -2447,7 +2447,7 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "#301700", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        <div style={{ color: "#502e00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
           <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
@@ -2468,12 +2468,12 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
           <div style={{ background: "#f0ebe0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
         ) : wine.glassPrice ? (
           <>
-            <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>glass</div>
           </>
         ) : wine.bottlePrice ? (
           <>
-            <div style={{ color: "#301700", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
             <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>bottle</div>
           </>
         ) : (
