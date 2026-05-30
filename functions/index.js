@@ -1067,7 +1067,7 @@ ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
 {"courses":[{"course":"course name","pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}]}`;
-          maxTokens = 1200;
+          maxTokens = 1600;
         } else {
           const dishList = foods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
           const tableContext = foods.length === 1
@@ -1090,12 +1090,34 @@ Respond in JSON only (no other text):
           { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
         );
         const text = response.data.content[0].text;
-        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+        console.log(`food_to_wine response (${isMultiCourse ? 'multi' : 'single'}): ${text.substring(0, 200)}`);
+
+        // Robust JSON extraction — finds the outermost {} even if Claude adds text around it
+        function extractJson(raw) {
+          const stripped = raw.replace(/```json|```/g, '').trim();
+          const start = stripped.indexOf('{');
+          const end = stripped.lastIndexOf('}');
+          if (start !== -1 && end !== -1 && end > start) {
+            return JSON.parse(stripped.substring(start, end + 1));
+          }
+          return JSON.parse(stripped);
+        }
+
+        const result = extractJson(text);
 
         if (isMultiCourse) {
-          const enrichedCourses = (result.courses || []).map(c => ({
+          // Claude may return courses under different keys — handle both
+          const rawCourses = result.courses || result.byCourse || result.course_pairings || [];
+          if (rawCourses.length === 0) {
+            // Fallback: if Claude returned flat pairings instead of course structure, treat as single course
+            console.log('Multi-course fallback: no courses key found, using flat pairings');
+            return res.json({ pairings: enrichPairings(result.pairings || []) });
+          }
+          const enrichedCourses = rawCourses.map(c => ({
             ...c,
-            dishes: courseGroups[c.course]?.map(d => d.name) || [],
+            // Match course name loosely in case Claude uses slightly different casing
+            dishes: courseGroups[c.course] ? courseGroups[c.course].map(d => d.name) :
+              (Object.entries(courseGroups).find(([k]) => k.toLowerCase() === (c.course || '').toLowerCase())?.[1] || []).map(d => d.name),
             pairings: enrichPairings(c.pairings)
           }));
           return res.json({ byCourse: enrichedCourses });
