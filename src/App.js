@@ -1530,19 +1530,35 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
       {view === "result" && (
         <div style={{ padding: "20px 20px" }}>
-          {selectedFoods.length > 0 && (
-            <div style={{ background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.25)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>
-                {selectedFoods.length === 1 ? "Your selection" : `Your table's selections (${selectedFoods.length} dishes)`}
-              </div>
-              {selectedFoods.map((f, i) => (
-                <div key={f.id} style={{ marginBottom: i < selectedFoods.length - 1 ? 8 : 0, paddingBottom: i < selectedFoods.length - 1 ? 8 : 0, borderBottom: i < selectedFoods.length - 1 ? "0.5px solid rgba(201,169,110,0.15)" : "none" }}>
-                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>{f.name}</div>
-                  {f.description && <div style={{ color: "#6a5040", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>{f.description}</div>}
+          {selectedFoods.length > 0 && pairingLoading && (() => {
+            const roleOrder = ["first", "main", "dessert"];
+            const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+            const grouped = {};
+            selectedFoods.forEach(f => {
+              const r = f.courseRole || "main";
+              if (!grouped[r]) grouped[r] = [];
+              grouped[r].push(f);
+            });
+            const courses = roleOrder.filter(r => grouped[r]);
+            return (
+              <div style={{ background: "rgba(201,169,110,0.06)", border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+                <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>
+                  Your table's selections
                 </div>
-              ))}
-            </div>
-          )}
+                {courses.map((role, ci) => (
+                  <div key={role} style={{ marginBottom: ci < courses.length - 1 ? 14 : 0 }}>
+                    <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>{roleLabels[role]}</div>
+                    {grouped[role].map((f, i) => (
+                      <div key={`${f.id}-${role}`} style={{ marginBottom: i < grouped[role].length - 1 ? 6 : 0, paddingLeft: 10, borderLeft: "1.5px solid rgba(201,169,110,0.25)" }}>
+                        <div style={{ color: "#f0e8d8", fontSize: 13 }}>{f.name}</div>
+                        {f.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {pairingLoading && (
             <LoadingMessages messages={SOMMELIER_MESSAGES} onAllShown={handleMessagesComplete} />
@@ -1599,14 +1615,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
                 {/* Multi-course */}
                 {byCourse?.map((courseResult, ci) => (
-                  <div key={ci} style={{ marginBottom: 20 }}>
-                    <div style={{ borderBottom: "0.5px solid rgba(201,169,110,0.25)", paddingBottom: 8, marginBottom: 14 }}>
-                      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>
-                        {courseResult.course} Pairing
+                  <div key={ci} style={{ marginBottom: 24 }}>
+                    <div style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+                      <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600, marginBottom: courseResult.dishes?.length > 0 ? 6 : 0 }}>
+                        ✦ {courseResult.course}
                       </div>
                       {courseResult.dishes?.length > 0 && (
-                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>
-                          For: {courseResult.dishes.join(", ")}
+                        <div style={{ color: "#9a8060", fontSize: 12, fontStyle: "italic" }}>
+                          {courseResult.dishes.join(" · ")}
                         </div>
                       )}
                     </div>
