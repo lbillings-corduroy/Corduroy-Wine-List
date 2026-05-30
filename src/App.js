@@ -1347,6 +1347,24 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     if (!isAdding && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
   }
 
+  function storeResult(data) {
+    if (data.byCourse) {
+      const ids = {};
+      data.byCourse.forEach(c => c.pairings?.forEach(p => { if (p.id) ids[`${c.course}-${p.level}`] = p.id; }));
+      setLastShownIds(ids);
+      const result = { byCourse: data.byCourse };
+      pendingPairing.current = result;
+      if (messagesReady) { setPairingResult(result); setPairingLoading(false); pendingPairing.current = null; }
+    } else {
+      const pairings = data.pairings || [];
+      const ids = {};
+      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
+      setLastShownIds(ids);
+      pendingPairing.current = pairings;
+      if (messagesReady) { setPairingResult(pairings); setPairingLoading(false); pendingPairing.current = null; }
+    }
+  }
+
   async function handleGetPairings() {
     if (selectedFoods.length === 0) return;
     setPairingLoading(true);
@@ -1360,13 +1378,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id) })
       });
-      const data = await res.json();
-      const pairings = data.pairings || [];
-      const ids = {};
-      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
-      setLastShownIds(ids);
-      pendingPairing.current = pairings;
-    } catch (e) { pendingPairing.current = []; }
+      storeResult(await res.json());
+    } catch (e) {
+      pendingPairing.current = [];
+      if (messagesReady) { setPairingResult([]); setPairingLoading(false); pendingPairing.current = null; }
+    }
   }
 
   async function handleDifferentOptions() {
@@ -1374,18 +1390,17 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     setPairingLoading(true);
     setPairingResult(null);
     pendingPairing.current = null;
+    setMessagesReady(false);
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id), excludeWineIds: lastShownIds })
       });
-      const data = await res.json();
-      const pairings = data.pairings || [];
-      const ids = {};
-      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
-      setLastShownIds(ids);
-      pendingPairing.current = pairings;
-    } catch (e) { pendingPairing.current = []; }
+      storeResult(await res.json());
+    } catch (e) {
+      pendingPairing.current = [];
+      if (messagesReady) { setPairingResult([]); setPairingLoading(false); pendingPairing.current = null; }
+    }
   }
 
   const availableFood = foodItems.filter(f => !f.excluded);
