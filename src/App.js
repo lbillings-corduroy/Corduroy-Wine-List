@@ -1054,55 +1054,137 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
 // ─── Shortlist Screen ─────────────────────────────────────────────────────────
 
 function ShortlistScreen({ favorites, onRemove, onClose }) {
+  const courseOrder  = ["first", "main", "dessert"];
+  const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+
+  const foodItems  = favorites.filter(f => f.favoriteType === "food");
+  const wineItems  = favorites.filter(f => f.favoriteType === "wine");
+  const drinkItems = favorites.filter(f => f.favoriteType !== "food" && f.favoriteType !== "wine");
+
+  const foodByCourse = {};
+  foodItems.forEach(f => {
+    const r = f.courseRole || "main";
+    if (!foodByCourse[r]) foodByCourse[r] = [];
+    foodByCourse[r].push(f);
+  });
+  const foodCourses = courseOrder.filter(r => foodByCourse[r]);
+
+  // Wines with courseLabel are embedded in their course; others shown separately
+  const winesByCourseLabel = {};
+  const standaloneWines = [];
+  wineItems.forEach(w => {
+    if (w.courseLabel) {
+      if (!winesByCourseLabel[w.courseLabel]) winesByCourseLabel[w.courseLabel] = [];
+      winesByCourseLabel[w.courseLabel].push(w);
+    } else {
+      standaloneWines.push(w);
+    }
+  });
+
+  const hasCourses = foodCourses.length > 0;
+
+  const SectionHeader = ({ label }) => (
+    <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    </div>
+  );
+
+  const RemoveBtn = ({ item }) => (
+    <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: "#4a3020", cursor: "pointer", fontSize: 20, padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}>×</button>
+  );
+
+  const WineCard = ({ item }) => (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        {item.imageUrl
+          ? <div style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#5a4030" }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#5a4030" }}>bottle</span></div>}
+          </div>
+        </div>
+        <RemoveBtn item={item} />
+      </div>
+      {item.reason && <div style={{ color: "#8a7060", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #2a1400" }}>"{item.reason}"</div>}
+    </div>
+  );
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "#1e1100", zIndex: 500, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+      {/* Header */}
       <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "3px", textTransform: "uppercase" }}>My Shortlist</div>
-          <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>{favorites.length} {favorites.length === 1 ? "item" : "items"} starred</div>
+          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
+          <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
         </div>
-        <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 18px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "0.5px" }}>
-          Close
-        </button>
+        <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 18px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "0.5px" }}>Done</button>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
         {favorites.length === 0 ? (
-          <div style={{ color: "#5a4030", textAlign: "center", padding: "60px 20px", fontSize: 14 }}>
+          <div style={{ color: "#5a4030", textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 36, marginBottom: 16 }}>☆</div>
-            <div>Tap the star on any wine, beer, or pour to add it here</div>
+            <div style={{ fontSize: 14 }}>Star wines, dishes, and drinks to build your menu for the evening</div>
           </div>
         ) : (
-          favorites.map(item => (
-            <div key={item.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ fontSize: 20, flexShrink: 0 }}>
-                {item.favoriteType === "wine" ? "🍷" : item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : item.favoriteType === "food" ? "🍽️" : "🥃"}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
-                <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
-                  {item.favoriteType === "wine"
-                    ? (item.varietal || "Wine") + (item.region ? ` · ${item.region}` : "")
-                    : item.favoriteType === "beer"
-                    ? (item.style || "Beer") + (item.brewery ? ` · ${item.brewery}` : "")
-                    : item.favoriteType === "food"
-                    ? (item.course || "Food")
-                    : (item.category || "Pour") + (item.producer ? ` · ${item.producer}` : "")}
+          <>
+            {/* Food by course, with paired wines embedded */}
+            {hasCourses && foodCourses.map(role => {
+              const label = courseLabels[role];
+              const courseWines = winesByCourseLabel[label] || [];
+              return (
+                <div key={role}>
+                  <SectionHeader label={label} />
+                  {foodByCourse[role].map(item => (
+                    <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                      <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
+                        {item.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
+                        {item.price && <div style={{ color: "#9a8060", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                      </div>
+                      <RemoveBtn item={item} />
+                    </div>
+                  ))}
+                  {courseWines.map(item => <WineCard key={item.id} item={item} />)}
                 </div>
+              );
+            })}
+
+            {/* Standalone wines — added from wine list, not from a course pairing */}
+            {standaloneWines.length > 0 && (
+              <div>
+                <SectionHeader label="Wines" />
+                {standaloneWines.map(item => <WineCard key={item.id} item={item} />)}
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
-                {item.favoriteType === "wine" ? (
-                  item.glassPrice
-                    ? <><div style={{ color: "#f0e8d8", fontSize: 14 }}>{formatPrice(item.glassPrice)}</div><div style={{ color: "#5a4030", fontSize: 10 }}>glass</div></>
-                    : item.bottlePrice
-                    ? <><div style={{ color: "#f0e8d8", fontSize: 14 }}>{formatPrice(item.bottlePrice)}</div><div style={{ color: "#5a4030", fontSize: 10 }}>bottle</div></>
-                    : null
-                ) : item.price ? (
-                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>${Math.round(item.price)}</div>
-                ) : null}
+            )}
+
+            {/* Other drinks */}
+            {drinkItems.length > 0 && (
+              <div>
+                <SectionHeader label="Drinks" />
+                {drinkItems.map(item => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ fontSize: 20, flexShrink: 0 }}>
+                      {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
+                      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginTop: 2 }}>
+                        {item.favoriteType === "beer" ? (item.style || "Beer") : item.favoriteType === "cocktail" ? "Cocktail" : item.favoriteType === "nab" ? "Non-Alcoholic" : "Premium Pour"}
+                      </div>
+                    </div>
+                    {item.price && <div style={{ color: "#9a8060", fontSize: 12, flexShrink: 0 }}>{formatPrice(item.price)}</div>}
+                    <RemoveBtn item={item} />
+                  </div>
+                ))}
               </div>
-              <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: "#5a4030", cursor: "pointer", fontSize: 22, padding: "4px", lineHeight: 1, flexShrink: 0 }}>×</button>
-            </div>
-          ))
+            )}
+          </>
         )}
       </div>
     </div>
@@ -1570,7 +1652,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             const hasResults = pairings?.length > 0 || byCourse?.length > 0;
             const isEmpty = pairingResult && !pairingLoading && !hasResults;
 
-            const WineCard = (p, i) => (
+            const WineCard = (p, i, courseLabel) => (
               <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                   <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
@@ -1592,7 +1674,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 {p.id && (() => {
                   const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
                   const isStarred = favorites.some(f => f.id === p.id);
-                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>{isStarred ? "★ Added to Shortlist" : "☆ Add to Shortlist"}</button>;
+                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
                 })()}
               </div>
             );
@@ -1626,7 +1708,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                         </div>
                       )}
                     </div>
-                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`))}
+                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`, courseResult.course))}
                   </div>
                 ))}
 
@@ -1634,6 +1716,15 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               </>
             );
           })()}
+
+          {!pairingLoading && pairingResult && (
+            <div style={{ position: "sticky", bottom: 0, background: "#1e1100", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
+              <button onClick={onShowShortlist}
+                style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+                ★ Go to My Menu
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1739,7 +1830,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
       {/* Shortlist button */}
       {favorites.length > 0 && (
         <button onClick={onShowShortlist} style={{ marginTop: 24, background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "10px 28px", borderRadius: 24, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 8 }}>
-          ★ My Shortlist <span style={{ background: "rgba(201,169,110,0.25)", borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
+          ★ My Menu <span style={{ background: "rgba(201,169,110,0.25)", borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
         </button>
       )}
 
