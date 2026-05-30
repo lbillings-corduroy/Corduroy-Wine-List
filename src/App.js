@@ -1051,6 +1051,154 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   );
 }
 
+// ─── My Menu QR Code Helpers ─────────────────────────────────────────────────
+
+function encodeFavorites(favorites) {
+  const compact = favorites.map(f => {
+    if (f.favoriteType === 'food') return { t: 'food', n: f.name, cr: f.courseRole, p: f.price, d: (f.description || '').slice(0, 80) };
+    if (f.favoriteType === 'wine') return { t: 'wine', n: f.name, v: f.varietal, r: f.region, gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || '').slice(0, 140), cl: f.courseLabel, fp: f.fromPairing };
+    return { t: f.favoriteType, n: f.name, p: f.price };
+  });
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(compact)))); } catch(e) { return null; }
+}
+
+function decodeFavorites(encoded) {
+  const compact = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  return compact.map((f, i) => ({
+    id: `shared-${i}`,
+    favoriteType: f.t,
+    name: f.n,
+    courseRole: f.cr,
+    price: f.p,
+    description: f.d,
+    varietal: f.v,
+    region: f.r,
+    glassPrice: f.gp,
+    bottlePrice: f.bp,
+    reason: f.rs,
+    courseLabel: f.cl,
+    fromPairing: f.fp,
+  }));
+}
+
+// ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
+
+function GuestMenuScreen({ favorites }) {
+  const courseOrder  = ["first", "main", "dessert"];
+  const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+
+  const foodItems  = favorites.filter(f => f.favoriteType === "food");
+  const wineItems  = favorites.filter(f => f.favoriteType === "wine");
+  const drinkItems = favorites.filter(f => f.favoriteType !== "food" && f.favoriteType !== "wine");
+
+  const foodByCourse = {};
+  foodItems.forEach(f => { const r = f.courseRole || "main"; if (!foodByCourse[r]) foodByCourse[r] = []; foodByCourse[r].push(f); });
+  const foodCourses = courseOrder.filter(r => foodByCourse[r]);
+
+  const winesByCourseLabel = {};
+  const standaloneWines = [];
+  wineItems.forEach(w => {
+    if (w.fromPairing && w.courseLabel) {
+      if (!winesByCourseLabel[w.courseLabel]) winesByCourseLabel[w.courseLabel] = [];
+      winesByCourseLabel[w.courseLabel].push(w);
+    } else { standaloneWines.push(w); }
+  });
+
+  const [showQR, setShowQR] = useState(false);
+
+  function getQRUrl() {
+    const encoded = encodeFavorites(favorites);
+    if (!encoded) return null;
+    const menuUrl = `${window.location.origin}/?menu=${encoded}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=M&data=${encodeURIComponent(menuUrl)}`;
+  }
+
+  const SectionHeader = ({ label }) => (
+    <div style={{ background: "#3c2000", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    </div>
+  );
+
+  const WineCard = ({ item }) => (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#5a4030" }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#5a4030" }}>bottle</span></div>}
+          </div>
+        </div>
+      </div>
+      {item.reason && <div style={{ color: "#8a7060", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #2a1400" }}>"{item.reason}"</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#1e1100", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 480, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "24px 20px 20px", textAlign: "center" }}>
+        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
+        <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
+        <div style={{ color: "#5a4030", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+      </div>
+
+      <div style={{ padding: "16px 16px 48px" }}>
+        {foodCourses.map(role => {
+          const label = courseLabels[role];
+          const courseWines = winesByCourseLabel[label] || [];
+          return (
+            <div key={role}>
+              <SectionHeader label={label} />
+              {foodByCourse[role].map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
+                    {item.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
+                    {item.price && <div style={{ color: "#9a8060", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                  </div>
+                </div>
+              ))}
+              {courseWines.map(item => <WineCard key={item.id} item={item} />)}
+            </div>
+          );
+        })}
+
+        {standaloneWines.length > 0 && (
+          <div>
+            <SectionHeader label="Wines" />
+            {standaloneWines.map(item => <WineCard key={item.id} item={item} />)}
+          </div>
+        )}
+
+        {drinkItems.length > 0 && (
+          <div>
+            <SectionHeader label="Drinks" />
+            {drinkItems.map(item => (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                <div style={{ fontSize: 20, flexShrink: 0 }}>
+                  {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
+                </div>
+                {item.price && <div style={{ color: "#9a8060", fontSize: 12 }}>{formatPrice(item.price)}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ textAlign: "center", padding: "0 20px 32px", color: "#3c2800", fontSize: 10, letterSpacing: "1px" }}>
+        CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV
+      </div>
+    </div>
+  );
+}
+
 // ─── Shortlist Screen ─────────────────────────────────────────────────────────
 
 function ShortlistScreen({ favorites, onRemove, onClose }) {
@@ -1122,7 +1270,14 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
           <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
         </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {favorites.length > 0 && (
+            <button onClick={() => setShowQR(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              Save ↗
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
@@ -1188,6 +1343,26 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           </>
         )}
       </div>
+      {showQR && (() => {
+        const qrUrl = getQRUrl();
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div style={{ background: "#2b1800", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 320, width: "100%", textAlign: "center" }}>
+              <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 4 }}>Save Your Menu</div>
+              <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>Scan with your phone camera to keep your menu for the evening</div>
+              {qrUrl ? (
+                <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 16 }}>
+                  <img src={qrUrl} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
+                </div>
+              ) : (
+                <div style={{ color: "#6a5040", marginBottom: 16 }}>Unable to generate QR code</div>
+              )}
+              <div style={{ color: "#5a4030", fontSize: 11, fontStyle: "italic", marginBottom: 20 }}>Your selections are saved in this code — no account needed</div>
+              <button onClick={() => setShowQR(false)} style={{ background: "#c9a96e", color: "#0d0800", border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>Done</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
     </div>
   );
@@ -1865,6 +2040,16 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
+  // If opened via QR code link, show guest read-only menu
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedMenu = urlParams.get('menu');
+  if (sharedMenu) {
+    try {
+      const sharedFavorites = decodeFavorites(sharedMenu);
+      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} />;
+    } catch(e) { /* invalid data — fall through to normal app */ }
+  }
+
   const [screen, setScreen] = useState("home");
   const [wines, setWines] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
