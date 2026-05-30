@@ -1030,39 +1030,78 @@ Respond in JSON only (no other text):
           ? `\n\nIMPORTANT: The guest has already seen these — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
           : '';
 
-        const dishList = foods.map(f =>
-          `- ${f.name}${f.description ? `: ${f.description}` : ''}${f.course ? ` (${f.course})` : ''}`
-        ).join('\n');
-        const tableContext = foods.length === 1
-          ? `A guest is ordering:\n${dishList}`
-          : `A table of ${foods.length} guests is ordering these dishes:\n${dishList}\n\nSuggest wines that work well across the whole table.`;
+        // Group foods by course
+        const courseGroups = {};
+        foods.forEach(f => {
+          const course = f.course || 'Main';
+          if (!courseGroups[course]) courseGroups[course] = [];
+          courseGroups[course].push(f);
+        });
+        const courseNames = Object.keys(courseGroups);
+        const isMultiCourse = courseNames.length > 1;
 
-        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. ${tableContext}
+        function enrichPairings(pairings) {
+          return (pairings || []).map(p => {
+            const w = wineObjects.find(wo => wo.id === p.id);
+            return { ...p, imageUrl: w ? (w.toastImageUrl || null) : null, glassPrice: w ? w.glassPrice : p.glassPrice, bottlePrice: w ? w.bottlePrice : p.bottlePrice };
+          });
+        }
+
+        let prompt, maxTokens;
+
+        if (isMultiCourse) {
+          // Build per-course description
+          const courseSections = courseNames.map(course => {
+            const dishes = courseGroups[course];
+            const dishDesc = dishes.map(d => d.name + (d.description ? ` (${d.description})` : '')).join(', ');
+            return `${course.toUpperCase()}: ${dishDesc}`;
+          }).join('\n');
+
+          prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia.
+
+This table is ordering multiple courses:
+${courseSections}
+
+For EACH course, suggest exactly three wines — one Value, one Mid-Range, one Premium — that pair beautifully with that course's dish(es). Choose wines that also flow well together as a progression through the meal. You MUST pick from the correct section for each tier.
+${wineListByTier}${excludeNote}
+
+Respond in JSON only (no other text):
+{"courses":[{"course":"course name","pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}]}`;
+          maxTokens = 1200;
+        } else {
+          const dishList = foods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
+          const tableContext = foods.length === 1
+            ? `A guest is ordering:\n${dishList}`
+            : `A table of guests is sharing these dishes:\n${dishList}\n\nSuggest wines that work well across all dishes.`;
+
+          prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. ${tableContext}
 
 Suggest exactly three wines that pair beautifully with ${foods.length === 1 ? 'this dish' : 'these dishes'} — one from each price tier below. You MUST pick from the correct section for each tier.
 ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
 {"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
+          maxTokens = 800;
+        }
 
         const response = await axios.post(
           'https://api.anthropic.com/v1/messages',
-          { model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: prompt }] },
+          { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] },
           { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
         );
         const text = response.data.content[0].text;
         const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        // Enrich pairings with image URLs and verified prices from our data
-        const enrichedPairings = (result.pairings || []).map(p => {
-          const w = wineObjects.find(wo => wo.id === p.id);
-          return {
-            ...p,
-            imageUrl: w ? (w.toastImageUrl || null) : null,
-            glassPrice: w ? w.glassPrice : p.glassPrice,
-            bottlePrice: w ? w.bottlePrice : p.bottlePrice,
-          };
-        });
-        return res.json({ pairings: enrichedPairings });
+
+        if (isMultiCourse) {
+          const enrichedCourses = (result.courses || []).map(c => ({
+            ...c,
+            dishes: courseGroups[c.course]?.map(d => d.name) || [],
+            pairings: enrichPairings(c.pairings)
+          }));
+          return res.json({ byCourse: enrichedCourses });
+        } else {
+          return res.json({ pairings: enrichPairings(result.pairings) });
+        }
       }
 
 
