@@ -2489,12 +2489,16 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
 // Checks for shared menu QR link BEFORE rendering AppContent (avoids hook violations)
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
-  const sharedMenu = urlParams.get('menu');
-  if (sharedMenu) {
+  // Short DB-backed code: ?m=ABC123
+  const menuCode = urlParams.get('m');
+  if (menuCode) return <GuestMenuLoader menuCode={menuCode} />;
+  // Legacy long-URL code: ?menu=BASE64 (kept for backward compatibility)
+  const menuParam = urlParams.get('menu');
+  if (menuParam) {
     try {
-      const sharedFavorites = decodeFavorites(sharedMenu);
+      const sharedFavorites = decodeFavorites(menuParam);
       if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} />;
-    } catch(e) { /* invalid data — fall through to normal app */ }
+    } catch(e) {}
   }
   return <AppContent />;
 }
