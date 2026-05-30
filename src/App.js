@@ -1443,24 +1443,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                   <span style={{ color: "#5a4030", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
                 </div>
 
-                <div style={{ borderTop: "0.5px solid #3c2200", paddingTop: 20, marginBottom: 4 }}>
-                  <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", marginBottom: 6 }}>Want to keep your menu forever?</div>
-                  <div style={{ color: "#6a5040", fontSize: 11, marginBottom: 12 }}>We'll email you a permanent link — a lovely reminder of your evening.</div>
-                  {emailState === "sent" ? (
-                    <div style={{ color: "#4caf7d", fontSize: 13, padding: "10px 0" }}>✓ Sent! Check your inbox.</div>
-                  ) : (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <input type="email" placeholder="your@email.com" value={emailInput}
-                        onChange={e => setEmailInput(e.target.value)}
-                        style={{ flex: 1, background: "rgba(255,255,255,0.07)", border: "0.5px solid #5a4030", color: "#f0e8d8", padding: "8px 12px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none" }} />
-                      <button onClick={handleSendEmail} disabled={emailState === "sending" || !emailInput}
-                        style={{ background: emailInput ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 14px", borderRadius: 6, cursor: emailInput ? "pointer" : "default", fontFamily: "Georgia, serif", fontSize: 12, whiteSpace: "nowrap" }}>
-                        {emailState === "sending" ? "…" : "Send"}
-                      </button>
-                    </div>
-                  )}
-                  {emailState === "error" && <div style={{ color: "#e85050", fontSize: 11, marginTop: 6 }}>Couldn't send — please try again</div>}
-                </div>
+                {/* Email section — coming soon, code preserved for when Resend is configured */}
               </>
             ) : (
               <div style={{ color: "#6a5040", padding: "24px 0", fontSize: 13 }}>Unable to save menu. Please ask your server.</div>
@@ -2321,7 +2304,7 @@ function AppContent() {
         {/* Back to home */}
         <div style={{ background: "#432800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
           <button onClick={() => setScreen("home")} style={{
-            background: "none", border: "none", color: "#c9a96e", cursor: "pointer",
+            background: "none", border: "none", color: "#f0e8d8", cursor: "pointer",
             fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
             display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
           }}>
@@ -2398,17 +2381,20 @@ function AppContent() {
       </div>
       </div>{/* end sticky wrapper */}
 
-      <div style={{ background: "#472a00", padding: "6px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {searchFiltered.filter(w => w.available !== false).length} {searchFiltered.filter(w => w.available !== false).length === 1 ? "wine" : "wines"}
-        {searchFiltered.filter(w => w.available === false).length > 0 && <span style={{ color: "#c0706a", marginLeft: 6 }}>· {searchFiltered.filter(w => w.available === false).length} out of stock</span>}
-        {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
+      <div style={{ background: "#472a00", padding: "6px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
+          {searchFiltered.filter(w => w.available !== false).length} {searchFiltered.filter(w => w.available !== false).length === 1 ? "wine" : "wines"}
+          {searchFiltered.filter(w => w.available === false).length > 0 && <span style={{ color: "#c0706a", marginLeft: 6 }}>· {searchFiltered.filter(w => w.available === false).length} out of stock</span>}
+          {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
+        </span>
+        <span style={{ color: "#6a5040", fontSize: 10, fontStyle: "italic" }}>☆ Star to save to My Menu</span>
       </div>
 
       <div style={{ background: "#faf8f4" }}>
         {groupOrder.map((group, gi) => (
           <div key={group}>
             <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
-              <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{group}</div>
+              <div style={{ color: "#f0e8d8", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{group}</div>
             </div>
             <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
               {grouped[group].map((wine, i) => (
@@ -2449,14 +2435,14 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#502e00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
-          <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
+          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
           </div>
         )}
         {wine.description ? (
-          <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{wine.description}</div>
+          <div style={{ color: "#8a7060", fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{wine.description} <span style={{ color: "#c9a96e", fontSize: 11 }}>Details ›</span></div>
         ) : (
-          <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
+          <div style={{ color: "#c9a96e", fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
         )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
