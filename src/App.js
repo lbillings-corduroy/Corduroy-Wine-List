@@ -977,16 +977,16 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#502e00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    <div style={{ color: "#502e00", fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                     {(item.style || item.category) && (
-                      <div style={{ color: accentColor, fontSize: 10, letterSpacing: "0.3px", marginBottom: 2 }}>
+                      <div style={{ color: accentColor, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
                         {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
                       </div>
                     )}
                     {item.description ? (
-                      <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description}</div>
+                      <div style={{ color: "#8a7060", fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description} <span style={{ color: accentColor, fontSize: 11 }}>Details ›</span></div>
                     ) : (
-                      <div style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Tap for details</div>
+                      <div style={{ color: accentColor, fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -2433,7 +2433,7 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "#502e00", fontSize: 14, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        <div style={{ color: "#502e00", fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
           <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
@@ -2452,6 +2452,8 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
         <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
         {wine.available === false ? (
           <div style={{ background: "#f0ebe0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
+        ) : wine.glassPrice && wine.bottlePrice ? (
+          <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: "#b0a090" }}>/</span>{Math.round(wine.bottlePrice)}</div>
         ) : wine.glassPrice ? (
           <>
             <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
