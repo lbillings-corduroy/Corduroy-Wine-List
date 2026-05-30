@@ -958,7 +958,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
-      <div>
+      <div style={{ background: "#faf8f4" }}>
         {filteredGroupOrder.map((group, gi) => (
           <div key={group}>
             <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
@@ -1438,7 +1438,10 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                 <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
                 </div>
-                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 20 }}>Code valid for 24 hours</div>
+                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Code valid for 24 hours</div>
+                <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 20, wordBreak: "break-all" }}>
+                  <span style={{ color: "#5a4030", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
+                </div>
 
                 <div style={{ borderTop: "0.5px solid #3c2200", paddingTop: 20, marginBottom: 4 }}>
                   <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", marginBottom: 6 }}>Want to keep your menu forever?</div>
