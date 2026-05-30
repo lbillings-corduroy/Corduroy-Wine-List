@@ -1114,14 +1114,15 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#1e1100", zIndex: 500, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
+    <div style={{ width: "100%", maxWidth: 680, background: "#1e1100", display: "flex", flexDirection: "column", fontFamily: "Georgia, serif", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#2b1800", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
           <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
         </div>
-        <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 18px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "0.5px" }}>Done</button>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
@@ -1187,6 +1188,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }
