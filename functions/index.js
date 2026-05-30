@@ -1122,13 +1122,22 @@ Respond in JSON only (no other text):
             console.log('Multi-course fallback: no courses key found, using flat pairings');
             return res.json({ pairings: enrichPairings(result.pairings || []) });
           }
-          const enrichedCourses = rawCourses.map(c => ({
-            ...c,
-            // Match course name loosely in case Claude uses slightly different casing
-            dishes: courseGroups[c.course] ? courseGroups[c.course].map(d => d.name) :
-              (Object.entries(courseGroups).find(([k]) => k.toLowerCase() === (c.course || '').toLowerCase())?.[1] || []).map(d => d.name),
-            pairings: enrichPairings(c.pairings)
-          }));
+          // Normalize Claude's course names to our standard labels regardless of casing
+          function normalizeCourse(name) {
+            const l = (name || '').toLowerCase();
+            if (l.includes('first') || l.includes('starter') || l.includes('appetizer')) return 'First Course';
+            if (l.includes('dessert') || l.includes('sweet')) return 'Dessert';
+            return 'Main Course';
+          }
+          const enrichedCourses = rawCourses.map(c => {
+            const normalizedCourse = normalizeCourse(c.course);
+            return {
+              ...c,
+              course: normalizedCourse,
+              dishes: (courseGroups[normalizedCourse] || courseGroups[c.course] || []).map(d => d.name),
+              pairings: enrichPairings(c.pairings)
+            };
+          });
           return res.json({ byCourse: enrichedCourses });
         } else {
           return res.json({ pairings: enrichPairings(result.pairings) });
