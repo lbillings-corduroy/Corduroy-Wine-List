@@ -1428,7 +1428,23 @@ exports.getMenu = functions.https.onRequest(async (req, res) => {
       await admin.database().ref(`savedMenus/${id}`).remove();
       return res.status(410).json({ error: 'expired' });
     }
-    res.json({ ok: true, favorites: data.favorites, expiresAt: data.expiresAt });
+    // Convert compact keys back to full field names for GuestMenuScreen
+    const fullFavorites = (data.favorites || []).map((f, i) => ({
+      id: `shared-${i}`,
+      favoriteType: f.t,
+      name: f.n,
+      courseRole: f.cr,
+      price: f.p,
+      description: f.d,
+      varietal: f.v,
+      region: f.r,
+      glassPrice: f.gp,
+      bottlePrice: f.bp,
+      reason: f.rs,
+      courseLabel: f.cl,
+      fromPairing: f.fp,
+    }));
+    res.json({ ok: true, favorites: fullFavorites, expiresAt: data.expiresAt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
