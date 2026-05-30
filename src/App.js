@@ -1683,7 +1683,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 </div>
                 <div style={{ color: "#8a7060", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
                 {p.id && (() => {
-                  const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice };
+                  const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice, imageUrl: p.imageUrl || null, reason: p.reason || null, level: p.level || null, courseLabel: p.courseLabel || null, fromPairing: true };
                   const isStarred = favorites.some(f => f.id === p.id);
                   return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
                 })()}
