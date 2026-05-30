@@ -1069,11 +1069,11 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   });
   const foodCourses = courseOrder.filter(r => foodByCourse[r]);
 
-  // Wines with courseLabel are embedded in their course; others shown separately
+  // Wines from AI pairing embed in their course; wines from wine list sit standalone
   const winesByCourseLabel = {};
   const standaloneWines = [];
   wineItems.forEach(w => {
-    if (w.courseLabel) {
+    if (w.fromPairing && w.courseLabel) {
       if (!winesByCourseLabel[w.courseLabel]) winesByCourseLabel[w.courseLabel] = [];
       winesByCourseLabel[w.courseLabel].push(w);
     } else {
@@ -1440,10 +1440,15 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   function storeResult(data) {
     const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
     if (data.byCourse) {
+      // Embed courseLabel directly on each pairing so it travels with the data
+      const taggedCourses = data.byCourse.map(c => ({
+        ...c,
+        pairings: (c.pairings || []).map(p => ({ ...p, courseLabel: c.course }))
+      }));
       const ids = {};
-      data.byCourse.forEach(c => c.pairings?.forEach(p => { if (p.id) ids[`${c.course}-${p.level}`] = p.id; }));
+      taggedCourses.forEach(c => c.pairings?.forEach(p => { if (p.id) ids[`${c.course}-${p.level}`] = p.id; }));
       setLastShownIds(ids);
-      const result = { byCourse: data.byCourse };
+      const result = { byCourse: taggedCourses };
       pendingPairing.current = result;
       if (messagesReady) { setPairingResult(result); setPairingLoading(false); pendingPairing.current = null; }
     } else {
@@ -1658,7 +1663,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             const hasResults = pairings?.length > 0 || byCourse?.length > 0;
             const isEmpty = pairingResult && !pairingLoading && !hasResults;
 
-            const WineCard = (p, i, courseLabel) => (
+            const WineCard = (p, i) => (
               <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                   <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
@@ -1714,7 +1719,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                         </div>
                       )}
                     </div>
-                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`, courseResult.course))}
+                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`))}
                   </div>
                 ))}
 
