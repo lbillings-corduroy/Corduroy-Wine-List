@@ -1431,11 +1431,12 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     const hadAny = selectedFoods.some(f => f.id === food.id);
     const hasAny = newSelected.some(f => f.id === food.id);
     const isFav = favorites.some(f => f.id === food.id);
-    if (!hadAny && hasAny && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
-    if (hadAny && !hasAny && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
+    if (!hadAny && hasAny && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course, courseRole: role, description: food.description }, "food");
+    if (hadAny && !hasAny && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course, courseRole: role, description: food.description }, "food");
   }
 
   function storeResult(data) {
+    const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
     if (data.byCourse) {
       const ids = {};
       data.byCourse.forEach(c => c.pairings?.forEach(p => { if (p.id) ids[`${c.course}-${p.level}`] = p.id; }));
@@ -1444,7 +1445,10 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       pendingPairing.current = result;
       if (messagesReady) { setPairingResult(result); setPairingLoading(false); pendingPairing.current = null; }
     } else {
-      const pairings = data.pairings || [];
+      // Single course — determine course label from selected foods
+      const roles = [...new Set(selectedFoods.map(f => f.courseRole || "main"))];
+      const singleCourseLabel = roles.length === 1 ? (roleLabels[roles[0]] || null) : null;
+      const pairings = (data.pairings || []).map(p => ({ ...p, courseLabel: singleCourseLabel }));
       const ids = {};
       pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
       setLastShownIds(ids);
