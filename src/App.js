@@ -1728,7 +1728,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>DES</div>
             </div>
             </div>
-            <div style={{ color: "#5a4030", fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+            <div style={{ color: "#9a7855", fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
               For larger parties, run the sommelier a second time to capture additional guests' selections.
             </div>
           </div>
@@ -2039,17 +2039,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
-export default function App() {
-  // If opened via QR code link, show guest read-only menu
-  const urlParams = new URLSearchParams(window.location.search);
-  const sharedMenu = urlParams.get('menu');
-  if (sharedMenu) {
-    try {
-      const sharedFavorites = decodeFavorites(sharedMenu);
-      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} />;
-    } catch(e) { /* invalid data — fall through to normal app */ }
-  }
-
+function AppContent() {
   const [screen, setScreen] = useState("home");
   const [wines, setWines] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -2386,4 +2376,18 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
       </div>
     </div>
   );
+}
+
+// ─── Root Export ─────────────────────────────────────────────────────────────
+// Checks for shared menu QR link BEFORE rendering AppContent (avoids hook violations)
+export default function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedMenu = urlParams.get('menu');
+  if (sharedMenu) {
+    try {
+      const sharedFavorites = decodeFavorites(sharedMenu);
+      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} />;
+    } catch(e) { /* invalid data — fall through to normal app */ }
+  }
+  return <AppContent />;
 }
