@@ -955,7 +955,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
       </div>
 
-      <div style={{ background: "#faf8f4" }}>
+      <div>
         {filteredGroupOrder.map((group, gi) => (
           <div key={group}>
             <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
@@ -1454,7 +1454,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           <div style={{ background: "#271500", padding: "8px 16px 10px 20px", display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
             <div style={{ display: "flex", gap: 8 }}>
-              {["1st", "Main", "Dessert"].map(h => (
+              {["1st", "Main", "Des."].map(h => (
                 <div key={h} style={{ width: 22, textAlign: "center", color: "#5a4030", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{h}</div>
               ))}
             </div>
@@ -1468,8 +1468,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
               return courseOrder.map(course => (
                 <div key={course}>
-                  <div style={{ padding: "12px 20px 6px", background: "#f5f0e8", borderBottom: "0.5px solid #e8e0d0", borderTop: "0.5px solid #e8e0d0" }}>
-                    <div style={{ color: "#6a4020", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
+                  <div style={{ padding: "8px 20px 6px", background: "#3c2000", borderBottom: "none", borderTop: "none" }}>
+                    <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                   </div>
                   {byCourse[course].map(food => {
                     const isEntree = food.course === "Entrees";
