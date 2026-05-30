@@ -1780,17 +1780,14 @@ export default function App() {
       setActiveVarietal("All");
       setSelectedWine(null);
     }
-    function handleVisibility() { if (!document.hidden) resetApp(); }
     function resetIdle() {
       if (idleTimer.current) clearTimeout(idleTimer.current);
-      idleTimer.current = setTimeout(resetApp, 15 * 60 * 1000);
+      idleTimer.current = setTimeout(() => window.location.reload(), 15 * 60 * 1000);
     }
     const events = ["touchstart", "touchmove", "click", "scroll"];
-    document.addEventListener("visibilitychange", handleVisibility);
     events.forEach(e => document.addEventListener(e, resetIdle, { passive: true }));
     resetIdle();
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
       events.forEach(e => document.removeEventListener(e, resetIdle));
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
