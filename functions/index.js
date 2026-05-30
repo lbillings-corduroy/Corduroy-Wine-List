@@ -967,13 +967,19 @@ Respond in JSON only (no other text):
 
       // ── Food → Wine ───────────────────────────────────────────────────────
       if (type === 'food_to_wine') {
-        const [foodSnap, winesSnap, enrichSnap] = await Promise.all([
-          db.ref(`foodItems/${itemId}`).once('value'),
+        // Support single itemId or array itemIds for multi-dish pairing
+        const itemIds = req.body.itemIds || (itemId ? [itemId] : []);
+        if (itemIds.length === 0) return res.status(400).json({ error: 'itemId or itemIds required' });
+
+        const [winesSnap, enrichSnap] = await Promise.all([
           db.ref('wines').once('value'),
           db.ref('wineEnrichment').once('value'),
         ]);
-        const food = foodSnap.val();
-        if (!food) return res.status(404).json({ error: 'Food item not found' });
+        const foodSnaps = await Promise.all(itemIds.map(id => db.ref(`foodItems/${id}`).once('value')));
+        const foods = foodSnaps.map(s => s.val()).filter(Boolean);
+        if (foods.length === 0) return res.status(404).json({ error: 'Food items not found' });
+        // Keep food/food as alias for single-item backward compat
+        const food = foods[0];
 
         const winesById = winesSnap.val() || {};
         const enrichment = enrichSnap.val() || {};
@@ -1024,12 +1030,16 @@ Respond in JSON only (no other text):
           ? `\n\nIMPORTANT: The guest has already seen these — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
           : '';
 
-        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is ordering:
+        const dishList = foods.map(f =>
+          `- ${f.name}${f.description ? `: ${f.description}` : ''}${f.course ? ` (${f.course})` : ''}`
+        ).join('\n');
+        const tableContext = foods.length === 1
+          ? `A guest is ordering:\n${dishList}`
+          : `A table of ${foods.length} guests is ordering these dishes:\n${dishList}\n\nSuggest wines that work well across the whole table.`;
 
-Dish: ${food.name}${food.description ? `\nDescription: ${food.description}` : ''}
-Course: ${food.course}
+        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. ${tableContext}
 
-Suggest exactly three wines that pair beautifully with this dish — one from each price tier below. You MUST pick from the correct section for each tier.
+Suggest exactly three wines that pair beautifully with ${foods.length === 1 ? 'this dish' : 'these dishes'} — one from each price tier below. You MUST pick from the correct section for each tier.
 ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
