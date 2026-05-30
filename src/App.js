@@ -2080,7 +2080,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
       {/* Logo — tap 5x for manager access */}
       <div onClick={handleLogoTap} style={{ marginBottom: 40, textAlign: "center", cursor: "default", userSelect: "none" }}>
         <img
-          src="/Appalachia Kitchen Logo colour (1).png"
+          src="/Appalachia Kitchen Logo White App.png"
           alt="Appalachia Kitchen"
           style={{ width: "min(340px, 80vw)", opacity: 0.95, filter: "brightness(1.5) contrast(1.05)" }}
         />
