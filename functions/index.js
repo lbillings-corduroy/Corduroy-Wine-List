@@ -1393,7 +1393,11 @@ exports.forceSync = functions
   });
 
 // ─── Save Menu ────────────────────────────────────────────────────────────────
-exports.saveMenu = onRequest({ cors: true }, async (req, res) => {
+exports.saveMenu = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { favorites } = req.body;
@@ -1409,7 +1413,11 @@ exports.saveMenu = onRequest({ cors: true }, async (req, res) => {
 });
 
 // ─── Get Menu ─────────────────────────────────────────────────────────────────
-exports.getMenu = onRequest({ cors: true }, async (req, res) => {
+exports.getMenu = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'No menu ID' });
   try {
@@ -1425,7 +1433,11 @@ exports.getMenu = onRequest({ cors: true }, async (req, res) => {
 });
 
 // ─── Send Menu Email ──────────────────────────────────────────────────────────
-exports.sendMenuEmail = onRequest({ cors: true }, async (req, res) => {
+exports.sendMenuEmail = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { email, menuId } = req.body;
@@ -1443,18 +1455,7 @@ exports.sendMenuEmail = onRequest({ cors: true }, async (req, res) => {
         from: 'Appalachia Kitchen <menu@corduroy-inn.com>',
         to: email,
         subject: 'Your Menu from Appalachia Kitchen',
-        html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#1e1100;color:#f0e8d8;">
-          <div style="text-align:center;margin-bottom:24px;">
-            <div style="color:#c9a96e;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Your Evening at</div>
-            <div style="font-size:22px;margin-bottom:4px;">Appalachia Kitchen</div>
-            <div style="color:#5a4030;font-size:12px;">Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
-          </div>
-          <p style="color:#9a8060;font-size:14px;line-height:1.6;">Thank you for dining with us. Here is a link to your menu from this evening:</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="${menuUrl}" style="background:#c9a96e;color:#0d0800;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;">View My Menu</a>
-          </div>
-          <p style="color:#5a4030;font-size:11px;text-align:center;">This link does not expire. We hope to see you again soon.</p>
-        </div>`
+        html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#1e1100;color:#f0e8d8;"><div style="text-align:center;margin-bottom:24px;"><div style="color:#c9a96e;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Your Evening at</div><div style="font-size:22px;margin-bottom:4px;">Appalachia Kitchen</div><div style="color:#5a4030;font-size:12px;">Corduroy Inn &amp; Lodge &middot; Snowshoe Mountain, WV</div></div><p style="color:#9a8060;font-size:14px;line-height:1.6;">Thank you for dining with us. Here is a link to your menu from this evening:</p><div style="text-align:center;margin:24px 0;"><a href="${menuUrl}" style="background:#c9a96e;color:#0d0800;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;">View My Menu</a></div><p style="color:#5a4030;font-size:11px;text-align:center;">We hope to see you again soon.</p></div>`
       })
     });
     if (emailRes.ok) res.json({ ok: true });
@@ -1463,12 +1464,15 @@ exports.sendMenuEmail = onRequest({ cors: true }, async (req, res) => {
 });
 
 // ─── Cleanup Expired Menus (runs daily at 3 AM) ───────────────────────────────
-exports.cleanupExpiredMenus = onSchedule('0 3 * * *', async () => {
-  const snapshot = await admin.database().ref('savedMenus').once('value');
-  const menus = snapshot.val();
-  if (!menus) return;
-  const now = Date.now();
-  const updates = {};
-  Object.entries(menus).forEach(([id, data]) => { if (data.expiresAt < now) updates[id] = null; });
-  if (Object.keys(updates).length > 0) await admin.database().ref('savedMenus').update(updates);
-});
+exports.cleanupExpiredMenus = functions
+  .pubsub.schedule('0 3 * * *')
+  .onRun(async (context) => {
+    const snapshot = await admin.database().ref('savedMenus').once('value');
+    const menus = snapshot.val();
+    if (!menus) return null;
+    const now = Date.now();
+    const updates = {};
+    Object.entries(menus).forEach(([id, data]) => { if (data.expiresAt < now) updates[id] = null; });
+    if (Object.keys(updates).length > 0) await admin.database().ref('savedMenus').update(updates);
+    return null;
+  });
