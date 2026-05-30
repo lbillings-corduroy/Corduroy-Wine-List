@@ -1472,24 +1472,21 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{course}</div>
                   </div>
                   {byCourse[course].map(food => {
-                    const isSelected = selectedFoods.some(f => f.id === food.id);
+                    const isEntree = food.course === "Entrees";
+                    const isDessert = food.course === "Dessert";
+                    const chkFirst  = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
+                    const chkMain   = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
+                    const chkDessert = selectedFoods.some(f => f.id === food.id && f.courseRole === "dessert");
+                    const anySelected = chkFirst || chkMain || chkDessert;
+
+                    const Chk = ({ checked, role, disabled }) => (
+                      <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
+                        style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? "#c9a96e" : disabled ? "transparent" : "#d0c0b0"}`, background: checked ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                        {checked && <span style={{ color: "#0d0800", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                      </div>
+                    );
+
                     return (
-                      {(() => {
-                        const isEntree = food.course === "Entrees";
-                        const isDessert = food.course === "Dessert";
-                        const chkFirst  = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
-                        const chkMain   = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
-                        const chkDessert = selectedFoods.some(f => f.id === food.id && f.courseRole === "dessert");
-                        const anySelected = chkFirst || chkMain || chkDessert;
-
-                        const Chk = ({ checked, role, disabled }) => (
-                          <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
-                            style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? "#c9a96e" : disabled ? "transparent" : "#d0c0b0"}`, background: checked ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-                            {checked && <span style={{ color: "#0d0800", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                          </div>
-                        );
-
-                        return (
                           <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ color: "#301700", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
@@ -1502,8 +1499,6 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                               <Chk checked={chkDessert} role="dessert" disabled={!isDessert} />
                             </div>
                           </div>
-                        );
-                      })()}
                     );
                   })}
                 </div>
