@@ -1075,7 +1075,7 @@ ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
 {"courses":[{"course":"course name","pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}]}`;
-          maxTokens = 1600;
+          maxTokens = 2400;
         } else {
           const allFoods = itemsWithRoles.map(({ id }) => foodById[id]).filter(Boolean);
           const dishList = allFoods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
