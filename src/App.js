@@ -1336,15 +1336,21 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     setMessagesReady(true);
   }
 
-  function handleFoodToggle(food) {
-    const isAdding = !selectedFoods.find(f => f.id === food.id);
-    setSelectedFoods(prev =>
-      isAdding ? [...prev, food] : prev.filter(f => f.id !== food.id)
-    );
-    // Selecting a dish adds it to the shortlist automatically
+  function handleFoodToggle(food, role) {
+    const hasRole = selectedFoods.some(f => f.id === food.id && f.courseRole === role);
+    let newSelected;
+    if (hasRole) {
+      newSelected = selectedFoods.filter(f => !(f.id === food.id && f.courseRole === role));
+    } else {
+      newSelected = [...selectedFoods, { ...food, courseRole: role }];
+    }
+    setSelectedFoods(newSelected);
+    // Add to shortlist when first selection for this dish; remove when all selections cleared
+    const hadAny = selectedFoods.some(f => f.id === food.id);
+    const hasAny = newSelected.some(f => f.id === food.id);
     const isFav = favorites.some(f => f.id === food.id);
-    if (isAdding && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
-    if (!isAdding && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
+    if (!hadAny && hasAny && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
+    if (hadAny && !hasAny && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course }, "food");
   }
 
   function storeResult(data) {
@@ -1376,7 +1382,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id) })
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })) })
       });
       storeResult(await res.json());
     } catch (e) {
@@ -1394,7 +1400,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", itemIds: selectedFoods.map(f => f.id), excludeWineIds: lastShownIds })
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), excludeWineIds: lastShownIds })
       });
       storeResult(await res.json());
     } catch (e) {
@@ -1445,8 +1451,13 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       {view === "pick" && (
         <>
         <div>
-          <div style={{ background: "#271500", padding: "8px 20px 10px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-            Tap dishes to add them, then find your perfect wine
+          <div style={{ background: "#271500", padding: "8px 16px 10px 20px", display: "flex", alignItems: "center" }}>
+            <div style={{ flex: 1, color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>Select dishes for pairing</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {["1st", "Main", "Dessert"].map(h => (
+                <div key={h} style={{ width: 38, textAlign: "center", color: "#5a4030", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{h}</div>
+              ))}
+            </div>
           </div>
           <div style={{ background: "#faf8f4" }}>
             {loadingFood ? (
@@ -1463,17 +1474,36 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   {byCourse[course].map(food => {
                     const isSelected = selectedFoods.some(f => f.id === food.id);
                     return (
-                      <div key={food.id}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px 13px 20px", borderBottom: "0.5px solid #e8e0d0", background: isSelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
-                        <div onClick={() => handleFoodToggle(food)} style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${isSelected ? "#c9a96e" : "#d0c0b0"}`, background: isSelected ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s", cursor: "pointer" }}>
-                          {isSelected && <span style={{ color: "#0d0800", fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                        </div>
-                        <div onClick={() => handleFoodToggle(food)} style={{ flex: 1, cursor: "pointer" }}>
-                          <div style={{ color: "#301700", fontSize: 14, marginBottom: 2 }}>{food.name}</div>
-                          {food.description && <div style={{ color: "#8a7060", fontSize: 12, lineHeight: 1.4 }}>{food.description}</div>}
-                        </div>
-                        <div style={{ color: "#301700", fontSize: 13, flexShrink: 0 }}>{formatPrice(food.price)}</div>
-                      </div>
+                      {(() => {
+                        const isEntree = food.course === "Entrees";
+                        const isDessert = food.course === "Dessert";
+                        const chkFirst  = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
+                        const chkMain   = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
+                        const chkDessert = selectedFoods.some(f => f.id === food.id && f.courseRole === "dessert");
+                        const anySelected = chkFirst || chkMain || chkDessert;
+
+                        const Chk = ({ checked, role, disabled }) => (
+                          <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
+                            style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? "#c9a96e" : disabled ? "transparent" : "#d0c0b0"}`, background: checked ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                            {checked && <span style={{ color: "#0d0800", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                          </div>
+                        );
+
+                        return (
+                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: "#301700", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              {food.description && <div style={{ color: "#8a7060", fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
+                            </div>
+                            <div style={{ color: "#8a7060", fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
+                            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                              <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert} />
+                              <Chk checked={chkMain}    role="main"    disabled={isDessert} />
+                              <Chk checked={chkDessert} role="dessert" disabled={!isDessert} />
+                            </div>
+                          </div>
+                        );
+                      })()}
                     );
                   })}
                 </div>
@@ -1489,13 +1519,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               {selectedFoods.map(f => (
                 <div key={f.id} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ color: "#f0e8d8", fontSize: 11 }}>{f.name}</span>
-                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f); }} style={{ color: "#6a5040", fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
+                  {f.courseRole !== "main" && <span style={{ color: "#9a7855", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.courseRole === "first" ? "1st" : "Dessert"}</span>}
+                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f, f.courseRole); }} style={{ color: "#6a5040", fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
                 </div>
               ))}
             </div>
             <button onClick={handleGetPairings}
               style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
-              Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"} →
+              Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"}{[...new Set(selectedFoods.map(f => f.courseRole))].length > 1 ? ` · ${[...new Set(selectedFoods.map(f => f.courseRole))].length} Courses` : ""} →
             </button>
           </div>
         )}
