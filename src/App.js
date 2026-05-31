@@ -13,6 +13,7 @@ const FORCE_SYNC_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.ne
 const SAVE_MENU_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveMenu";
 const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getMenu";
 const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
+const RESERVATION_URL = "https://www.appalachiakitchen.com/";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -1269,8 +1270,10 @@ function GuestMenuScreen({ favorites, savedAt }) {
         <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
         <div style={{ color: "#9a8060", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
         {savedAt && (
-          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.5px", marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>
-            {new Date(savedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>
+            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.5px" }}>
+              {new Date(savedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
           </div>
         )}
       </div>
@@ -1534,7 +1537,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                 <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
                 </div>
-                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Code valid for 24 hours</div>
+                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Scan anytime — this code does not expire</div>
                 <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 20, wordBreak: "break-all" }}>
                   <span style={{ color: "#9a8060", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
                 </div>
