@@ -1491,6 +1491,72 @@ exports.sendMenuEmail = functions.https.onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── Sommelier Chat Endpoint ──────────────────────────────────────────────────
+// Hard-boxed to F&B at Appalachia Kitchen only. No price comparisons to retail
+// or other restaurants. No off-topic conversation. Polite redirects for anything
+// outside food and beverage.
+
+exports.sommelierChat = functions
+  .runWith({ timeoutSeconds: 30, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+
+    try {
+      const { messages, contextItem } = req.body;
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'messages array required' });
+      }
+
+      const contextLine = contextItem
+        ? `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page.`
+        : 'The guest opened this chat from the main menu.';
+
+      const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise — you're talking to a guest at the table, not writing an essay.
+
+${contextLine}
+
+YOUR ONLY PURPOSE is to help guests explore the food and beverage menu at Appalachia Kitchen tonight. This includes:
+- Wines, beers, cocktails, spirits, and non-alcoholic beverages on our menu
+- Food dishes on our current menu
+- Pairing suggestions between food and beverages
+- Answering questions about tasting notes, flavor profiles, or ingredients
+- Helping guests make decisions based on their preferences
+
+STRICT RULES — never break these under any circumstances:
+1. NEVER compare our prices to retail wine shop prices, grocery store prices, or prices at other restaurants. If asked, say something like: "I'm not able to make that comparison, but I'm happy to help you find something you'll love tonight."
+2. NEVER discuss topics outside food and beverage — sports, news, weather, travel, politics, entertainment, or anything unrelated to tonight's dining experience. Politely redirect: "I'm best at helping you find something delicious tonight — what can I help you with?"
+3. NEVER recommend items not on our menu. If unsure whether something is available, say to check with the server.
+4. Keep responses concise and conversational — 2-4 sentences is usually right. Guests are at the table.
+5. If a guest is rude or tries to get you off-topic repeatedly, stay warm and keep redirecting to food and beverage.`;
+
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: 'claude-sonnet-4-6',
+          max_tokens: 400,
+          system: systemPrompt,
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+        },
+        {
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+        }
+      );
+
+      const reply = response.data.content[0].text;
+      return res.json({ reply });
+    } catch (error) {
+      console.error('sommelierChat error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
 // ─── Cleanup Expired Menus (runs daily at 3 AM) ───────────────────────────────
 exports.cleanupExpiredMenus = functions
   .pubsub.schedule('0 3 * * *')
