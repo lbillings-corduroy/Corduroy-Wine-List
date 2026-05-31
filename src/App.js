@@ -1936,11 +1936,6 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           <div style={{ background: "#472a00", padding: "8px 16px 10px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
               <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
-            <div style={{ display: "flex", alignItems: "center", marginRight: 2 }}>
-              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 6 }}>1ST</div>
-              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", marginRight: 12 }}>MAIN</div>
-              <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>DES</div>
-            </div>
             </div>
             <div style={{ color: "#9a7855", fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
               For larger parties, run the sommelier a second time to capture additional guests' selections.
