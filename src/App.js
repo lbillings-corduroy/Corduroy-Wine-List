@@ -1210,7 +1210,7 @@ function GuestMenuLoader({ menuCode }) {
     </div>
   );
 
-  return <GuestMenuScreen favorites={favorites} />;
+  return <GuestMenuScreen favorites={favorites} savedAt={savedAt} />;
 }
 
 // ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
