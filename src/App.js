@@ -564,20 +564,28 @@ function ManagerScreen({ wines, onClose }) {
     setLocalWines(prev => prev.map(w => w.id === id ? { ...w, ...fields } : w));
   }
 
-  async function handleApprove(wine) {
+  async function handleApprove(item) {
+    const itemType = item._type || "wine";
     try {
       await fetch(MANAGER_UPDATE_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: wine.id, itemType: "wine", updates: { uncertain: false, approved: true } })
+        body: JSON.stringify({ itemId: item.id, itemType, updates: { uncertain: false, approved: true } })
       });
-      setLocalWines(prev => prev.map(w => w.id === wine.id ? { ...w, uncertain: false, approved: true } : w));
+      if (itemType === "wine") {
+        setLocalWines(prev => prev.map(w => w.id === item.id ? { ...w, uncertain: false, approved: true } : w));
+      } else {
+        // For beer/pours in allItems — just remove from uncertain list on approval
+        setAllItems(prev => prev.map(i => i.id === item.id ? { ...i, uncertain: false, approved: true } : i));
+      }
     } catch (e) { console.error(e); }
   }
 
   const q = search.toLowerCase();
   const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
 
-  const uncertain = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
+  const uncertainWines = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
+  const uncertainOther = q ? allItems.filter(i => i.uncertain && !i.approved && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.uncertain && !i.approved);
+  const uncertain = [...uncertainWines, ...uncertainOther];
   const noImageWines = filterBySearch(localWines.filter(w => !w.imageUrl));
   const noImageOther = q ? allItems.filter(i => !i.imageUrl && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => !i.imageUrl);
   const noImage = [...noImageWines, ...noImageOther];
@@ -1959,7 +1967,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 {p.id && (() => {
                   const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice, imageUrl: p.imageUrl || null, reason: p.reason || null, level: p.level || null, courseLabel: p.courseLabel || null, fromPairing: true };
                   const isStarred = favorites.some(f => f.id === p.id);
-                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.15)" : "none", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.3)"}`, color: isStarred ? "#c9a96e" : "#6a5040", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
+                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.2)" : "rgba(201,169,110,0.1)", border: `1px solid ${isStarred ? "#c9a96e" : "#c9a96e"}`, color: "#c9a96e", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
                 })()}
               </div>
             );
@@ -2120,7 +2128,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
       )}
 
       {/* Footer */}
-      <div style={{ marginTop: 32, color: "#4e3e24", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+      <div style={{ marginTop: 32, color: "#9a7855", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
         Corduroy Inn & Lodge · Snowshoe Mountain
       </div>
     </div>
@@ -2299,48 +2307,27 @@ function AppContent() {
     <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
 
 
-      {/* Sticky wrapper — keeps back button + filter header together */}
+      {/* Sticky wrapper */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        {/* Back to home */}
-        <div style={{ background: "#432800", padding: "8px 16px", display: "flex", alignItems: "center" }}>
-          <button onClick={() => setScreen("home")} style={{
-            background: "none", border: "none", color: "#f0e8d8", cursor: "pointer",
-            fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px",
-            display: "flex", alignItems: "center", gap: 6, padding: "4px 0"
-          }}>
+      {/* Header — matches ItemListScreen style */}
+      <div style={{ background: "#432800", padding: "0 20px" }}>
+        <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#f0e8d8", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
           </button>
-        </div>
-
-      {/* Header */}
-      <div style={{ background: "#472a00", padding: "20px 20px 12px", borderBottom: "1px solid #2a1400" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div onClick={handleLogoTap} style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid #c9a96e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", userSelect: "none" }}>
-            <span style={{ color: "#c9a96e", fontSize: 12, letterSpacing: 1 }}>AK</span>
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>Wine List</div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "2.5px", textTransform: "uppercase" }}>Corduroy Inn &amp; Lodge · Snowshoe Mountain</div>
-            <div style={{ color: "#f0e8d8", fontSize: 19 }}>Appalachia Kitchen</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-              {favorites.length > 0 && (
-                <button onClick={() => setShowShortlist(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
-                  ★ {favorites.length}
-                </button>
-              )}
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf7d" }} />
-                  <span style={{ color: "#4caf7d", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Live</span>
-                </div>
-                <div style={{ color: "#5a4030", fontSize: 10, marginTop: 2 }}>{timeAgo(lastUpdated)}</div>
-              </div>
-            </div>
+          <div style={{ width: 80, textAlign: "right" }}>
+            {favorites.length > 0 && (
+              <button onClick={() => setShowShortlist(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                ★ {favorites.length}
+              </button>
+            )}
           </div>
         </div>
 
-        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 12 }} />
+        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {tiers.map(t => (
