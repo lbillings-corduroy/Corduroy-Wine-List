@@ -583,9 +583,15 @@ function ManagerScreen({ wines, onClose }) {
   const q = search.toLowerCase();
   const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
 
+  const [reviewSubTab, setReviewSubTab] = useState("pending");
+
   const uncertainWines = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
   const uncertainOther = q ? allItems.filter(i => i.uncertain && !i.approved && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.uncertain && !i.approved);
   const uncertain = [...uncertainWines, ...uncertainOther];
+
+  const reviewedWines = filterBySearch(localWines.filter(w => w.approved || w.manuallyEdited));
+  const reviewedOther = q ? allItems.filter(i => (i.approved || i.manuallyEdited) && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.approved || i.manuallyEdited);
+  const reviewed = [...reviewedWines, ...reviewedOther];
   const noImageWines = filterBySearch(localWines.filter(w => !w.imageUrl));
   const noImageOther = q ? allItems.filter(i => !i.imageUrl && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => !i.imageUrl);
   const noImage = [...noImageWines, ...noImageOther];
@@ -594,7 +600,7 @@ function ManagerScreen({ wines, onClose }) {
   const duplicateGroups = findDuplicates(q ? localWines.filter(w => (w.name || "").toLowerCase().includes(q)) : localWines);
 
   const tabs = [
-    { id: "uncertain", label: "⚠️ Review", count: uncertain.length },
+    { id: "uncertain", label: "⚠️ Review", count: uncertain.length + reviewed.length },
     { id: "noimage", label: "🖼 No Image", count: noImage.length },
     { id: "noprice", label: "$ No Price", count: noPrice.length },
     { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
@@ -656,6 +662,17 @@ function ManagerScreen({ wines, onClose }) {
           <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
         ) : activeTab === "food" ? (
           <FoodManagerTab />
+        ) : activeTab === "uncertain" && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: 16 }}>
+              <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? "#e8a050" : "#6a5040", fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
+                ⚠️ Needs Review ({uncertain.length})
+              </button>
+              <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "reviewed" ? "rgba(76,175,125,0.15)" : "transparent", color: reviewSubTab === "reviewed" ? "#4caf7d" : "#6a5040", fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
+                ✓ Reviewed ({reviewed.length})
+              </button>
+            </div>
+          </div>
         ) : activeTab === "duplicates" ? (
           duplicateGroups.length === 0 ? (
             <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
@@ -698,13 +715,22 @@ function ManagerScreen({ wines, onClose }) {
               </div>
             );
           })
-        ) : current.length === 0 ? (
+        ) : (activeTab === "uncertain" && reviewSubTab === "pending" && uncertain.length === 0) ? (
+          <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+            <div style={{ fontSize: 14 }}>Nothing needs review</div>
+          </div>
+        ) : (activeTab === "uncertain" && reviewSubTab === "reviewed" && reviewed.length === 0) ? (
+          <div style={{ textAlign: "center", color: "#6a5040", padding: 40 }}>
+            <div style={{ fontSize: 14 }}>No reviewed items yet</div>
+          </div>
+        ) : (activeTab !== "uncertain" && current.length === 0) ? (
           <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 14 }}>All clear</div>
           </div>
         ) : (
-          current.map(wine => (
+          (activeTab === "uncertain" ? (reviewSubTab === "pending" ? uncertain : reviewed) : current).map(wine => (
             <div key={wine.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 {/* Image or placeholder */}
@@ -716,7 +742,14 @@ function ManagerScreen({ wines, onClose }) {
                   <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
                     {wine.subgroup} · {wine.tier}
                   </div>
-                  {activeTab === "uncertain" && (
+                  {activeTab === "uncertain" && reviewSubTab === "reviewed" && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(76,175,125,0.1)", border: "0.5px solid #4caf7d", borderRadius: 6, padding: "4px 10px" }}>
+                        <span style={{ color: "#4caf7d", fontSize: 11 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved by manager"}</span>
+                      </div>
+                    </div>
+                  )}
+                  {activeTab === "uncertain" && reviewSubTab === "pending" && (
                     <div style={{ marginTop: 6 }}>
                       {(wine.uncertainReason || wine.uncertain_reason) && (
                         <div style={{ color: "#e8a050", fontSize: 11, marginBottom: 6, fontStyle: "italic" }}>
@@ -739,7 +772,7 @@ function ManagerScreen({ wines, onClose }) {
                       )}
                       <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
                         style={{ background: "rgba(76,175,125,0.15)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                        Looks Good ✓ — Remove from Review
+                        Looks Good ✓ — Mark as Reviewed
                       </button>
                     </div>
                   )}
