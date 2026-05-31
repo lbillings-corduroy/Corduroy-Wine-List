@@ -1325,8 +1325,15 @@ function GuestMenuScreen({ favorites, savedAt }) {
         )}
       </div>
 
-      <div style={{ textAlign: "center", padding: "0 20px 32px", color: "#9a8060", fontSize: 10, letterSpacing: "1px" }}>
-        CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV
+      <div style={{ textAlign: "center", padding: "24px 20px 40px", margin: "8px 16px 0", borderTop: "0.5px solid rgba(201,169,110,0.15)" }}>
+        <div style={{ color: "#c9a96e", fontSize: 13, marginBottom: 12 }}>Enjoyed your evening?</div>
+        <a href={RESERVATION_URL} target="_blank" rel="noopener noreferrer"
+          style={{ display: "inline-block", background: "#c9a96e", color: "#0d0800", textDecoration: "none", padding: "10px 24px", borderRadius: 8, fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 16 }}>
+          Book Your Next Visit
+        </a>
+        <div style={{ color: "#5a4030", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+          Corduroy Inn & Lodge · Snowshoe Mountain, WV
+        </div>
       </div>
     </div>
   );
