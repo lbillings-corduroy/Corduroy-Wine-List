@@ -1454,6 +1454,7 @@ exports.getMenu = functions.https.onRequest(async (req, res) => {
       reason: f.rs,
       courseLabel: f.cl,
       fromPairing: f.fp,
+      imageUrl: f.img || null,
     }));
     res.json({ ok: true, favorites: fullFavorites, expiresAt: data.expiresAt });
   } catch (e) { res.status(500).json({ error: e.message }); }
