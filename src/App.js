@@ -1807,7 +1807,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
-    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
+    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
       <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
@@ -2001,17 +2001,6 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
             return (
               <>
-                {!pairingLoading && hasResults && (
-                  <div style={{ marginBottom: 16 }}>
-                    <button onClick={handleDifferentOptions} style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
-                      Give Me Different Options
-                    </button>
-                    <div style={{ color: "#9a8060", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
-                      If suggestions repeat, it reflects the limits of our current wine selection for this dish.
-                    </div>
-                  </div>
-                )}
-
                 {/* Single course */}
                 {pairings?.map((p, i) => WineCard(p, i))}
 
@@ -2031,6 +2020,17 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`))}
                   </div>
                 ))}
+
+                {!pairingLoading && hasResults && (
+                  <div style={{ marginTop: 8, marginBottom: 8 }}>
+                    <button onClick={handleDifferentOptions} style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
+                      Give Me Different Options
+                    </button>
+                    <div style={{ color: "#9a8060", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+                      If suggestions repeat, it reflects the limits of our current wine selection for this dish.
+                    </div>
+                  </div>
+                )}
 
                 {isEmpty && <div style={{ color: "#9a8060", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
               </>
