@@ -656,23 +656,23 @@ function ManagerScreen({ wines, onClose }) {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {/* Review sub-tab switcher — rendered outside ternary to avoid chain break */}
+        {activeTab === "uncertain" && (
+          <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: 16 }}>
+            <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? "#e8a050" : "#6a5040", fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
+              ⚠️ Needs Review ({uncertain.length})
+            </button>
+            <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "reviewed" ? "rgba(76,175,125,0.15)" : "transparent", color: reviewSubTab === "reviewed" ? "#4caf7d" : "#6a5040", fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
+              ✓ Reviewed ({reviewed.length})
+            </button>
+          </div>
+        )}
         {activeTab === "sync" ? (
           <SyncTab />
         ) : activeTab === "all" ? (
           <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
         ) : activeTab === "food" ? (
           <FoodManagerTab />
-        ) : activeTab === "uncertain" && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: 16 }}>
-              <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? "#e8a050" : "#6a5040", fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
-                ⚠️ Needs Review ({uncertain.length})
-              </button>
-              <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "reviewed" ? "rgba(76,175,125,0.15)" : "transparent", color: reviewSubTab === "reviewed" ? "#4caf7d" : "#6a5040", fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
-                ✓ Reviewed ({reviewed.length})
-              </button>
-            </div>
-          </div>
         ) : activeTab === "duplicates" ? (
           duplicateGroups.length === 0 ? (
             <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
