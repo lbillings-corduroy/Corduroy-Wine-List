@@ -627,8 +627,10 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    // Hide items pending manager review from customers
-    const approvedWines = mergedWines.filter(w => !w.uncertain || enrichment[w.id]?.approved);
+    // Hide uncertain items from customers, but let manager screen see all via ?admin=1
+    const approvedWines = req.query.admin === '1'
+      ? mergedWines
+      : mergedWines.filter(w => !w.uncertain || enrichment[w.id]?.approved);
     res.json({ wines: approvedWines, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -675,8 +677,9 @@ exports.getBeers = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    // Hide items pending manager review from customers
-    const approvedBeers = merged.filter(b => !b.uncertain || enrichment[b.id]?.approved);
+    const approvedBeers = req.query.admin === '1'
+      ? merged
+      : merged.filter(b => !b.uncertain || enrichment[b.id]?.approved);
     res.json({ beers: approvedBeers, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -723,8 +726,9 @@ exports.getPours = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    // Hide items pending manager review from customers
-    const approvedPours = merged.filter(p => !p.uncertain || enrichment[p.id]?.approved);
+    const approvedPours = req.query.admin === '1'
+      ? merged
+      : merged.filter(p => !p.uncertain || enrichment[p.id]?.approved);
     res.json({ pours: approvedPours, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
