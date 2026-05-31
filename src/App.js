@@ -852,7 +852,7 @@ function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children 
           ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+          <div style={{ color: "#e8d5a0", fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
         </div>
         <div style={{ width: 80, textAlign: "right" }}>
           {favorites.length > 0 && (
@@ -1815,7 +1815,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>{view === "result" ? "Back" : "Main Menu"}</span>
           </button>
           <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
+            <div style={{ color: "#e8d5a0", fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
           </div>
           <div style={{ width: 80, textAlign: "right" }}>
             {favorites.length > 0 && (
