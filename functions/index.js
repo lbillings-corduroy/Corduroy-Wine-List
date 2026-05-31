@@ -627,7 +627,9 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    res.json({ wines: mergedWines, lastUpdated });
+    // Hide items pending manager review from customers
+    const approvedWines = mergedWines.filter(w => !w.uncertain || enrichment[w.id]?.approved);
+    res.json({ wines: approvedWines, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -673,7 +675,9 @@ exports.getBeers = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    res.json({ beers: merged, lastUpdated });
+    // Hide items pending manager review from customers
+    const approvedBeers = merged.filter(b => !b.uncertain || enrichment[b.id]?.approved);
+    res.json({ beers: approvedBeers, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -719,7 +723,9 @@ exports.getPours = functions.https.onRequest(async (req, res) => {
       };
     });
 
-    res.json({ pours: merged, lastUpdated });
+    // Hide items pending manager review from customers
+    const approvedPours = merged.filter(p => !p.uncertain || enrichment[p.id]?.approved);
+    res.json({ pours: approvedPours, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -988,7 +994,8 @@ Respond in JSON only (no other text):
 
         // Sort wines by price and split into thirds so tiers reflect actual prices
         const wineObjects = Object.values(winesById)
-          .filter(w => (w.bottlePrice || w.glassPrice) && w.available !== false)
+          .filter(w => (w.bottlePrice || w.glassPrice) && w.available !== false
+            && !(enrichment[w.id]?.uncertain && !enrichment[w.id]?.approved))
           .map(w => {
             const e = enrichment[w.id] || {};
             return {
