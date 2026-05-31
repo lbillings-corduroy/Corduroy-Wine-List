@@ -1268,6 +1268,11 @@ function GuestMenuScreen({ favorites, savedAt }) {
         <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
         <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
         <div style={{ color: "#9a8060", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+        {savedAt && (
+          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.5px", marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>
+            {new Date(savedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "16px 16px 48px" }}>
