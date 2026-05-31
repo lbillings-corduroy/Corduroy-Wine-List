@@ -1807,7 +1807,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
+    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
       <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
@@ -1931,7 +1931,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       )}
 
       {view === "result" && (
-        <div style={{ padding: "20px 20px" }}>
+        <div style={{ padding: "20px 20px", background: "#faf8f4" }}>
           {selectedFoods.length > 0 && pairingLoading && (() => {
             const roleOrder = ["first", "main", "dessert"];
             const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
@@ -1952,7 +1952,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>{roleLabels[role]}</div>
                     {grouped[role].map((f, i) => (
                       <div key={`${f.id}-${role}`} style={{ marginBottom: i < grouped[role].length - 1 ? 6 : 0, paddingLeft: 10, borderLeft: "1.5px solid rgba(201,169,110,0.25)" }}>
-                        <div style={{ color: "#f0e8d8", fontSize: 13 }}>{f.name}</div>
+                        <div style={{ color: "#301700", fontSize: 13 }}>{f.name}</div>
                         {f.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
                       </div>
                     ))}
@@ -1973,20 +1973,20 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             const isEmpty = pairingResult && !pairingLoading && !hasResults;
 
             const WineCard = (p, i) => (
-              <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+              <div key={i} style={{ background: "#ffffff", border: "0.5px solid #e0d8c8", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                   <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
                     <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {p.glassPrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>glass</span></div>}
-                    {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#5a4030", fontSize: 10 }}>bottle</span></div>}
+                    {p.glassPrice && <div style={{ color: "#301700", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#8a7060", fontSize: 10 }}>glass</span></div>}
+                    {p.bottlePrice && <div style={{ color: "#301700", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#8a7060", fontSize: 10 }}>bottle</span></div>}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
                   {p.imageUrl && <div style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #2a1400" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#f0e8d8", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+                    <div style={{ color: "#301700", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
                     {(p.varietal || p.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
                   </div>
                 </div>
@@ -2032,7 +2032,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   </div>
                 ))}
 
-                {isEmpty && <div style={{ color: "#6a5040", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
+                {isEmpty && <div style={{ color: "#8a7060", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
               </>
             );
           })()}
