@@ -841,7 +841,51 @@ function PinScreen({ onSuccess, onCancel }) {
   );
 }
 
-// ─── Generic Item List Screen (Beer, Pours, Cocktails) ───────────────────────
+// ─── Shared List Sub-Components ──────────────────────────────────────────────
+// Edit these once and changes apply to Wine, Beer, Cocktails, Pours, NAB
+
+function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children }) {
+  return (
+    <div style={{ background: "#432800", padding: "0 20px" }}>
+      <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#f0e8d8", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+          ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
+        </button>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+        </div>
+        <div style={{ width: 80, textAlign: "right" }}>
+          {favorites.length > 0 && (
+            <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              ★ {favorites.length}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
+      {children}
+    </div>
+  );
+}
+
+function ListSectionHeading({ label, borderTop }) {
+  return (
+    <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? "0.5px solid #e8e0d0" : "none" }}>
+      <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
+    </div>
+  );
+}
+
+function ListCountBar({ left, right }) {
+  return (
+    <div style={{ background: "#472a00", padding: "5px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>{left}</span>
+      {right && <span style={{ color: "#6a5040", fontSize: 10, fontStyle: "italic" }}>{right}</span>}
+    </div>
+  );
+}
+
+// ─── Generic Item List Screen (Beer, Pours, Cocktails, NAB) ──────────────────
 
 function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
   const [items, setItems] = useState([]);
@@ -921,57 +965,40 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
 
   return (
     <div style={{ background: "#432800", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
-      {/* Header */}
-      <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
-        <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: accentColor, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
-          </button>
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ color: accentColor, fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+      {/* Shared header — edit ListScreenHeader to change all list screens */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
+        <ListScreenHeader title={title} onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {groups.map(g => (
+              <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
+                background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
+                border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
+                color: activeGroup === g ? "#432800" : "#c8a878",
+                fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
+                fontFamily: "Georgia, serif", whiteSpace: "nowrap",
+                fontWeight: activeGroup === g ? 600 : 400
+              }}>{g === "All" ? (allLabel || `All ${title}`) : g}</button>
+            ))}
           </div>
-          <div style={{ width: 60, textAlign: "right" }}>
-            {favorites.length > 0 && (
-              <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                ★ {favorites.length}
-              </button>
-            )}
+          <div style={{ padding: "4px 0 10px", position: "relative" }}>
+            <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
+              onChange={e => setItemSearch(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+            />
+            {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
           </div>
-        </div>
-
-        <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${accentColor}44, transparent)`, marginBottom: 10 }} />
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-          {groups.map(g => (
-            <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
-              background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
-              border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
-              color: activeGroup === g ? "#432800" : "#c8a878",
-              fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
-              fontFamily: "Georgia, serif", whiteSpace: "nowrap",
-              fontWeight: activeGroup === g ? 600 : 400
-            }}>{g === "All" ? (allLabel || `All ${title}`) : g}</button>
-          ))}
-        </div>
-        <div style={{ padding: "4px 0 10px", position: "relative" }}>
-          <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
-            onChange={e => setItemSearch(e.target.value)}
-            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
-          />
-          {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
-        </div>
+        </ListScreenHeader>
       </div>
 
-      <div style={{ background: "#472a00", padding: "5px 20px 8px", color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-        {searchFiltered.length} {searchFiltered.length === 1 ? "item" : "items"}{itemSearch ? ` · "${itemSearch}"` : ""}
-      </div>
+      <ListCountBar
+        left={`${searchFiltered.length} ${searchFiltered.length === 1 ? "item" : "items"}${itemSearch ? ` · "${itemSearch}"` : ""}`}
+        right="☆ Star to save to My Menu"
+      />
 
       <div style={{ background: "#faf8f4" }}>
         {filteredGroupOrder.map((group, gi) => (
           <div key={group}>
-            <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
-              <div style={{ color: accentColor, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{group}</div>
-            </div>
+            <ListSectionHeading label={group} borderTop={gi > 0} />
             <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
               {grouped[group].map(item => (
                 <div key={item.id} onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
@@ -2135,6 +2162,130 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
   );
 }
 
+// ─── Wine List Screen ─────────────────────────────────────────────────────────
+
+function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist }) {
+  const [activeTier, setActiveTier]       = useState("All");
+  const [activeSubgroup, setActiveSubgroup] = useState("All");
+  const [activeVarietal, setActiveVarietal] = useState("All");
+  const [selectedWine, setSelectedWine]   = useState(null);
+  const [wineSearch, setWineSearch]       = useState("");
+  const [visible, setVisible]             = useState(false);
+  useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
+
+  const availableWines = wines.filter(w => w.available !== false);
+  const tierOrder   = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
+  const tiers       = ["All", ...tierOrder];
+  const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
+  const subgroupOrder  = [...new Map(filteredByTier.map(w => [w.subgroup, true])).keys()].filter(Boolean);
+  const subgroups      = ["All", ...subgroupOrder];
+  const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
+  const varietalSet    = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
+  const varietals      = ["All", ...Array.from(varietalSet).sort()];
+
+  const allMatchingWines = wines.filter(w => {
+    if (activeTier !== "All" && w.tier !== activeTier) return false;
+    if (activeSubgroup !== "All" && w.subgroup !== activeSubgroup) return false;
+    if (activeVarietal !== "All" && consolidateVarietal(w.varietal) !== activeVarietal) return false;
+    return true;
+  });
+  const searchFiltered = wineSearch.trim() === ""
+    ? allMatchingWines
+    : allMatchingWines.filter(w => {
+        const q = wineSearch.toLowerCase();
+        return (w.name || "").toLowerCase().includes(q)
+          || (w.varietal || "").toLowerCase().includes(q)
+          || (w.region || "").toLowerCase().includes(q)
+          || (w.description || "").toLowerCase().includes(q);
+      });
+
+  const grouped = {};
+  const sortedForGrouping = [
+    ...searchFiltered.filter(w => w.available !== false),
+    ...searchFiltered.filter(w => w.available === false),
+  ];
+  sortedForGrouping.forEach(wine => {
+    const key = wine.subgroup || wine.tier || "Wine";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(wine);
+  });
+  const groupOrder = [...new Map(sortedForGrouping.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
+
+  const availCount = searchFiltered.filter(w => w.available !== false).length;
+  const oosCount   = searchFiltered.filter(w => w.available === false).length;
+  const countLeft  = `${availCount} ${availCount === 1 ? "wine" : "wines"}${oosCount > 0 ? ` · ${oosCount} out of stock` : ""}${wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}`;
+
+  return (
+    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {/* Shared header — edit ListScreenHeader to change all list screens */}
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        <ListScreenHeader title="Wine List" onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {tiers.map(t => (
+              <FilterBtn key={t} label={t === "All" ? "All Wines" : TIER_LABELS[t] || t}
+                active={activeTier === t}
+                onClick={() => { setActiveTier(t); setActiveSubgroup("All"); setActiveVarietal("All"); setSelectedWine(null); }} />
+            ))}
+          </div>
+          {activeTier !== "All" && subgroups.length > 2 && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
+              {subgroups.map(s => (
+                <FilterBtn key={s} small label={s === "All" ? "All" : s.replace(/^(Cellar |House )/, "")}
+                  active={activeSubgroup === s}
+                  onClick={() => { setActiveSubgroup(s); setActiveVarietal("All"); setSelectedWine(null); }} />
+              ))}
+            </div>
+          )}
+          {varietals.length > 2 && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
+              {varietals.map(v => (
+                <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
+                  active={activeVarietal === v}
+                  onClick={() => { setActiveVarietal(v); setSelectedWine(null); }} />
+              ))}
+            </div>
+          )}
+          <div style={{ padding: "4px 0 10px", position: "relative" }}>
+            <input type="text" placeholder="Search wines, grapes, regions…" value={wineSearch}
+              onChange={e => setWineSearch(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+            />
+            {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+          </div>
+        </ListScreenHeader>
+      </div>
+
+      <ListCountBar left={countLeft} right="☆ Star to save to My Menu" />
+
+      <div style={{ background: "#faf8f4" }}>
+        {groupOrder.map((group, gi) => (
+          <div key={group}>
+            <ListSectionHeading label={group} borderTop={gi > 0} />
+            <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
+              {grouped[group].map(wine => (
+                <WineCard key={wine.id} wine={wine} selected={selectedWine === wine.id}
+                  onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)}
+                  isFavorited={favorites.some(f => f.id === wine.id)}
+                  onToggleFavorite={onToggleFavorite} />
+              ))}
+            </div>
+          </div>
+        ))}
+        {searchFiltered.length === 0 && (
+          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>
+            {wineSearch ? `No wines matching "${wineSearch}"` : "No wines in this selection"}
+          </div>
+        )}
+      </div>
+
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} /> : null; })()}
+      <div style={{ height: 32 }} />
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 function AppContent() {
@@ -2143,17 +2294,9 @@ function AppContent() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTier, setActiveTier] = useState("All");
-  const [activeSubgroup, setActiveSubgroup] = useState("All");
-  const [activeVarietal, setActiveVarietal] = useState("All");
-  const [selectedWine, setSelectedWine] = useState(null);
-  const [visible, setVisible] = useState(false);
-  const [logoTaps, setLogoTaps] = useState(0);
   const [showPin, setShowPin] = useState(false);
   const [showManager, setShowManager] = useState(false);
-  const logoTapTimer = useRef(null);
   const idleTimer = useRef(null);
-  const [wineSearch, setWineSearch] = useState("");
   const [favorites, setFavorites] = useState([]);
   const [showShortlist, setShowShortlist] = useState(false);
 
@@ -2167,18 +2310,11 @@ function AppContent() {
     return () => clearTimeout(pollTimer);
   }, []);
 
-  useEffect(() => { if (!loading) setTimeout(() => setVisible(true), 50); }, [loading]);
-
   useEffect(() => {
     function resetApp() {
       setScreen("home");
       setFavorites([]);
       setShowShortlist(false);
-      setWineSearch("");
-      setActiveTier("All");
-      setActiveSubgroup("All");
-      setActiveVarietal("All");
-      setSelectedWine(null);
     }
     function resetIdle() {
       if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -2214,60 +2350,8 @@ function AppContent() {
     finally { setLoading(false); }
   }
 
-  function handleLogoTap() {
-    const next = logoTaps + 1;
-    setLogoTaps(next);
-    if (logoTapTimer.current) clearTimeout(logoTapTimer.current);
-    if (next >= 5) {
-      setLogoTaps(0);
-      setShowPin(true);
-    } else {
-      logoTapTimer.current = setTimeout(() => setLogoTaps(0), 2000);
-    }
-  }
-
-  // Filter pills use available wines only (don't show OOS-only varietals in filters)
-  const availableWines = wines.filter(w => w.available !== false);
-  const tierOrder = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
-  const tiers = ["All", ...tierOrder];
-  const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
-  const subgroupOrder = [...new Map(filteredByTier.map(w => [w.subgroup, true])).keys()].filter(Boolean);
-  const subgroups = ["All", ...subgroupOrder];
-  const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
-  const varietalSet = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
-  const varietals = ["All", ...Array.from(varietalSet).sort()];
-  const filtered = activeVarietal === "All" ? filteredBySubgroup : filteredBySubgroup.filter(w => consolidateVarietal(w.varietal) === activeVarietal);
-
-  // For rendering, include OOS wines that match the same tier/subgroup/varietal filters
-  const allMatchingWines = wines.filter(w => {
-    if (activeTier !== "All" && w.tier !== activeTier) return false;
-    if (activeSubgroup !== "All" && w.subgroup !== activeSubgroup) return false;
-    if (activeVarietal !== "All" && consolidateVarietal(w.varietal) !== activeVarietal) return false;
-    return true;
-  });
-
-  const searchFiltered = wineSearch.trim() === ""
-    ? allMatchingWines
-    : allMatchingWines.filter(w => {
-        const q = wineSearch.toLowerCase();
-        return (w.name || "").toLowerCase().includes(q)
-          || (w.varietal || "").toLowerCase().includes(q)
-          || (w.region || "").toLowerCase().includes(q)
-          || (w.description || "").toLowerCase().includes(q);
-      });
-
-  // Sort: available wines first, OOS wines at bottom of each group
-  const grouped = {};
-  const sortedForGrouping = [
-    ...searchFiltered.filter(w => w.available !== false),
-    ...searchFiltered.filter(w => w.available === false)
-  ];
-  sortedForGrouping.forEach(wine => {
-    const key = wine.subgroup || wine.tier || "Wine";
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(wine);
-  });
-  const groupOrder = [...new Map(sortedForGrouping.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
+  // Wine filtering is now handled inside WineListScreen
+  // Wine filtering moved to WineListScreen
 
   const shortlistOverlay = (
     <>
@@ -2278,132 +2362,16 @@ function AppContent() {
   );
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
+  if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
   if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
 
-  if (loading) return (
-    <div style={{ background: "#472a00", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-      <div style={{ fontSize: 32 }}>🍷</div>
-      <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading Wine List</div>
-    </div>
-  );
-
-  if (error) return (
-    <div style={{ background: "#472a00", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: "#c9a96e", fontFamily: "Georgia, serif", textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>🍷</div>
-        <div>{error}</div>
-        <button onClick={fetchWines} style={{ marginTop: 16, background: "#c9a96e", color: "#472a00", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <>
-    {shortlistOverlay}
-    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
-
-
-      {/* Sticky wrapper */}
-      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-      {/* Header — matches ItemListScreen style */}
-      <div style={{ background: "#432800", padding: "0 20px" }}>
-        <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#f0e8d8", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
-          </button>
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "4px", textTransform: "uppercase" }}>Wine List</div>
-          </div>
-          <div style={{ width: 80, textAlign: "right" }}>
-            {favorites.length > 0 && (
-              <button onClick={() => setShowShortlist(true)} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                ★ {favorites.length}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          {tiers.map(t => (
-            <FilterBtn key={t} label={t === "All" ? "All Wines" : TIER_LABELS[t] || t}
-              active={activeTier === t}
-              onClick={() => { setActiveTier(t); setActiveSubgroup("All"); setActiveVarietal("All"); setSelectedWine(null); }} />
-          ))}
-        </div>
-
-        {activeTier !== "All" && subgroups.length > 2 && (
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
-            {subgroups.map(s => (
-              <FilterBtn key={s} small label={s === "All" ? "All" : s.replace(/^(Cellar |House )/, "")}
-                active={activeSubgroup === s}
-                onClick={() => { setActiveSubgroup(s); setActiveVarietal("All"); setSelectedWine(null); }} />
-            ))}
-          </div>
-        )}
-
-        {varietals.length > 2 && (
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-            <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
-            {varietals.map(v => (
-              <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
-                active={activeVarietal === v}
-                onClick={() => { setActiveVarietal(v); setSelectedWine(null); }} />
-            ))}
-          </div>
-        )}
-        <div style={{ padding: "4px 0 10px", position: "relative" }}>
-          <input type="text" placeholder="Search wines, grapes, regions…" value={wineSearch}
-            onChange={e => setWineSearch(e.target.value)}
-            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
-          />
-          {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
-        </div>
-      </div>
-      </div>{/* end sticky wrapper */}
-
-      <div style={{ background: "#472a00", padding: "6px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>
-          {searchFiltered.filter(w => w.available !== false).length} {searchFiltered.filter(w => w.available !== false).length === 1 ? "wine" : "wines"}
-          {searchFiltered.filter(w => w.available === false).length > 0 && <span style={{ color: "#c0706a", marginLeft: 6 }}>· {searchFiltered.filter(w => w.available === false).length} out of stock</span>}
-          {wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}
-        </span>
-        <span style={{ color: "#6a5040", fontSize: 10, fontStyle: "italic" }}>☆ Star to save to My Menu</span>
-      </div>
-
-      <div style={{ background: "#faf8f4" }}>
-        {groupOrder.map((group, gi) => (
-          <div key={group}>
-            <div style={{ padding: "18px 20px 6px", borderTop: gi > 0 ? "0.5px solid #e8e0d0" : "none" }}>
-              <div style={{ color: "#f0e8d8", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{group}</div>
-            </div>
-            <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-              {grouped[group].map((wine, i) => (
-                <WineCard key={wine.id} wine={wine} selected={selectedWine === wine.id}
-                  onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)}
-                  isFavorited={favorites.some(f => f.id === wine.id)}
-                  onToggleFavorite={(w) => toggleFavorite(w, "wine")} />
-              ))}
-            </div>
-          </div>
-        ))}
-        {searchFiltered.length === 0 && (
-          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>{wineSearch ? `No wines matching "${wineSearch}"` : "No wines in this selection"}</div>
-        )}
-      </div>
-
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} /> : null; })()}
-
-      <div style={{ height: 32 }} />
-    </div>
-    </>
-  );
+  // AppContent no longer renders the wine list directly
+  // All screens accounted for above — return home as fallback
+  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
 }
 
 function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
