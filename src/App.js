@@ -14,6 +14,7 @@ const SAVE_MENU_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net
 const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getMenu";
 const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
 const RESERVATION_URL = "https://www.appalachiakitchen.com/";
+const CHAT_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sommelierChat";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -1564,6 +1565,149 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   );
 }
 
+// ─── Sommelier Chat ───────────────────────────────────────────────────────────
+// A slide-up chat drawer that opens from any pairing entry point.
+// The backend system prompt hard-boxes the AI to F&B at Appalachia Kitchen only.
+//
+// Props:
+//   isOpen       — controls visibility
+//   onClose      — called when user taps X or backdrop
+//   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
+//                  used to personalise the opening message; null for generic open
+
+function SommelierChat({ isOpen, onClose, contextItem }) {
+  const OPENER = contextItem
+    ? `I see you're looking at the ${contextItem.name}. Before I start searching, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or anything else?`
+    : "Before I start my search, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or budget?";
+
+  const [messages, setMessages]   = useState([]);
+  const [input, setInput]         = useState("");
+  const [sending, setSending]     = useState(false);
+  const bottomRef                 = useRef(null);
+  const inputRef                  = useRef(null);
+
+  // Reset and seed with opener whenever the drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      setMessages([{ role: "assistant", text: OPENER }]);
+      setInput("");
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, contextItem?.name]);
+
+  // Auto-scroll to bottom after each new message
+  useEffect(() => {
+    if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || sending) return;
+
+    const newMessages = [...messages, { role: "user", text }];
+    setMessages(newMessages);
+    setInput("");
+    setSending(true);
+
+    try {
+      const res = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.text })),
+          contextItem: contextItem || null,
+        }),
+      });
+      const data = await res.json();
+      setMessages(prev => [...prev, { role: "assistant", text: data.reply || "I'm not sure — please ask your server." }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please ask your server for help." }]);
+    }
+    setSending(false);
+  }
+
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+
+  if (!isOpen) return null;
+
+  return (
+    // Backdrop
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    >
+      {/* Drawer */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: "Georgia, serif" }}
+      >
+        {/* Header */}
+        <div style={{ background: "#472a00", borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
+            <div style={{ color: "#f0e8d8", fontSize: 13 }}>Appalachia Kitchen</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", fontSize: 18, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >×</button>
+        </div>
+
+        {/* Message list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px" }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 10 }}>
+              <div style={{
+                maxWidth: "80%",
+                background: m.role === "user" ? "#472a00" : "#faf5ec",
+                color: m.role === "user" ? "#f0e8d8" : "#3d2000",
+                border: m.role === "user" ? "none" : "0.5px solid #e8dcc8",
+                borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
+                padding: "10px 14px",
+                fontSize: 13,
+                lineHeight: 1.6,
+              }}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {sending && (
+            <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 10 }}>
+              <div style={{ background: "#faf5ec", border: "0.5px solid #e8dcc8", borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
+                <span style={{ color: "#c9a96e", fontSize: 18, letterSpacing: 4 }}>• • •</span>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input bar */}
+        <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid #e8e0d0", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Type your reply…"
+            rows={1}
+            style={{ flex: 1, background: "#faf8f4", border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: "Georgia, serif", fontSize: 13, color: "#3d2000", outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || sending}
+            style={{ background: input.trim() && !sending ? "#c9a96e" : "rgba(201,169,110,0.2)", border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}
+          >
+            <span style={{ color: input.trim() && !sending ? "#0d0800" : "#c9a96e", fontSize: 16, lineHeight: 1 }}>›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
 function ItemPairingButton({ item }) {
@@ -1572,6 +1716,7 @@ function ItemPairingButton({ item }) {
   const [shownDishes, setShownDishes] = useState([]);
   const pendingResult = useRef(null);
   const [msgReady, setMsgReady] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   function handleMsgComplete() {
     if (pendingResult.current !== null) {
@@ -1614,10 +1759,17 @@ function ItemPairingButton({ item }) {
   return (
     <div>
       {!loading && (
-        <button onClick={handlePairing}
-          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: result ? 12 : 0 }}>
-          {result ? "Give Me Different Options" : "Suggested Food Pairing"}
-        </button>
+        <div style={{ display: "flex", gap: 8, marginBottom: result ? 12 : 0 }}>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
+            {result ? "Give Me Different Options" : "Suggested Food Pairing"}
+          </button>
+          <button onClick={() => setChatOpen(true)}
+            style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
+            title="Ask the Sommelier">
+            ✦ Ask
+          </button>
+        </div>
       )}
       {loading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleMsgComplete} />}
       {result && result.length > 0 && (
@@ -1641,6 +1793,11 @@ function ItemPairingButton({ item }) {
       {result && result.length === 0 && (
         <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
+      <SommelierChat
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        contextItem={{ name: item.name, type: item.style || item.category || "beverage" }}
+      />
     </div>
   );
 }
@@ -1691,6 +1848,7 @@ function WineDetailPanel({ wine, onClose }) {
   const [shownDishes, setShownDishes] = useState([]);
   const pendingDishes = useRef(null);
   const [dishMessagesReady, setDishMessagesReady] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   function handleDishMessagesComplete() {
     if (pendingDishes.current !== null) {
@@ -1768,10 +1926,17 @@ function WineDetailPanel({ wine, onClose }) {
       </div>
 
       {!pairingLoading && (
-        <button onClick={handlePairing}
-          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: pairingResult ? 14 : 0 }}>
-          Suggested Food Pairing
-        </button>
+        <div style={{ display: "flex", gap: 8, marginBottom: pairingResult ? 14 : 0 }}>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
+            Suggested Food Pairing
+          </button>
+          <button onClick={() => setChatOpen(true)}
+            style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
+            title="Ask the Sommelier">
+            ✦ Ask
+          </button>
+        </div>
       )}
       {pairingLoading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleDishMessagesComplete} />}
 
@@ -1794,6 +1959,11 @@ function WineDetailPanel({ wine, onClose }) {
       {pairingResult && pairingResult.length === 0 && (
         <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
+      <SommelierChat
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        contextItem={{ name: wine.name, type: wine.varietal || "wine" }}
+      />
     </div>
   );
 }
