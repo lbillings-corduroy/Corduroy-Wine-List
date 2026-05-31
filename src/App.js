@@ -550,10 +550,13 @@ function ManagerScreen({ wines, onClose }) {
   const [allItems, setAllItems] = useState([]); // beers + pours for no-image tab
 
   useEffect(() => {
+    // Fetch all wines including uncertain ones (admin bypass) + beers + pours
     Promise.all([
-      fetch(BEER_URL).then(r => r.json()),
-      fetch(POURS_URL).then(r => r.json()),
-    ]).then(([bData, pData]) => {
+      fetch(FIREBASE_URL + "?admin=1").then(r => r.json()),
+      fetch(BEER_URL + "?admin=1").then(r => r.json()),
+      fetch(POURS_URL + "?admin=1").then(r => r.json()),
+    ]).then(([wData, bData, pData]) => {
+      if (wData.wines) setLocalWines(Array.isArray(wData.wines) ? wData.wines : Object.values(wData.wines));
       const beers = (bData.beers || []).map(i => ({ ...i, _type: "beer" }));
       const pours = (pData.pours || []).map(i => ({ ...i, _type: "pour" }));
       setAllItems([...beers, ...pours]);
