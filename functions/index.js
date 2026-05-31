@@ -1085,7 +1085,7 @@ Respond in JSON only (no other text):
 
           prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. ${tableContext}
 
-Suggest exactly three wines that pair beautifully with ${foods.length === 1 ? 'this dish' : 'these dishes'} — one from each price tier below. You MUST pick from the correct section for each tier.
+Suggest exactly three wines that pair beautifully with ${allFoods.length === 1 ? 'this dish' : 'these dishes'} — one from each price tier below. You MUST pick from the correct section for each tier.
 ${wineListByTier}${excludeNote}
 
 Respond in JSON only (no other text):
