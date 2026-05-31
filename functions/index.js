@@ -1663,6 +1663,18 @@ STRICT RULES -- never break these under any circumstances:
 4. Keep responses concise and conversational -- 2-4 sentences is right. Guests are at the table.
 5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.`;
 
+      // Build lookup maps so we can match names mentioned in the reply to real menu items
+      const wineByName = {};
+      orderedWines.forEach(w => {
+        const e = wineEnrich[w.id] || {};
+        const name = (e.correctedName || w.name).toLowerCase();
+        wineByName[name] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
+      });
+      const foodByName = {};
+      orderedFood.forEach(f => {
+        foodByName[f.name.toLowerCase()] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
+      });
+
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
         {
@@ -1681,7 +1693,25 @@ STRICT RULES -- never break these under any circumstances:
       );
 
       const reply = response.data.content[0].text;
-      return res.json({ reply });
+
+      // Scan the reply text for menu item names and return them as actionable suggestions
+      const suggestions = [];
+      const replyLower = reply.toLowerCase();
+
+      // Check wines
+      for (const [nameLower, wine] of Object.entries(wineByName)) {
+        if (replyLower.includes(nameLower)) {
+          suggestions.push({ type: 'wine', ...wine });
+        }
+      }
+      // Check food
+      for (const [nameLower, food] of Object.entries(foodByName)) {
+        if (nameLower.length > 4 && replyLower.includes(nameLower)) {
+          suggestions.push({ type: 'food', ...food });
+        }
+      }
+
+      return res.json({ reply, suggestions });
     } catch (error) {
       console.error('sommelierChat error:', error.message);
       return res.status(500).json({ error: error.message });
