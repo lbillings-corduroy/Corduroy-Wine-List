@@ -934,6 +934,10 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   const [visible, setVisible] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
   const [zoomedLabel, setZoomedLabel] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatContext, setChatContext] = useState(null);
+
+  function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
 
   useEffect(() => {
     fetch(endpoint)
@@ -1092,7 +1096,6 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         )}
       </div>
 
-      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       {/* Expanded detail panel */}
       {selectedItem && (() => {
         const item = items.find(i => i.id === selectedItem);
@@ -1123,11 +1126,13 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 {item.description}
               </div>
             )}
-            <ItemPairingButton item={item} />
+            <ItemPairingButton item={item} onOpenChat={handleOpenChat} />
           </div>
         );
       })()}
 
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} />
       <div style={{ height: 32 }} />
     </div>
   );
@@ -1709,13 +1714,12 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
 
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
-function ItemPairingButton({ item }) {
+function ItemPairingButton({ item, onOpenChat }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [shownDishes, setShownDishes] = useState([]);
   const pendingResult = useRef(null);
   const [msgReady, setMsgReady] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
 
   function handleMsgComplete() {
     if (pendingResult.current !== null) {
@@ -1763,7 +1767,7 @@ function ItemPairingButton({ item }) {
             style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
             {result ? "Give Me Different Options" : "Suggested Food Pairing"}
           </button>
-          <button onClick={() => setChatOpen(true)}
+          <button onClick={() => onOpenChat && onOpenChat({ name: item.name, type: item.style || item.category || "beverage" })}
             style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
             title="Ask the Sommelier">
             ✦ Ask
@@ -1792,11 +1796,6 @@ function ItemPairingButton({ item }) {
       {result && result.length === 0 && (
         <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
-      <SommelierChat
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-        contextItem={{ name: item.name, type: item.style || item.category || "beverage" }}
-      />
     </div>
   );
 }
@@ -1840,14 +1839,13 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose }) {
+function WineDetailPanel({ wine, onClose, onOpenChat }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
   const [shownDishes, setShownDishes] = useState([]);
   const pendingDishes = useRef(null);
   const [dishMessagesReady, setDishMessagesReady] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
 
   function handleDishMessagesComplete() {
     if (pendingDishes.current !== null) {
@@ -1930,7 +1928,7 @@ function WineDetailPanel({ wine, onClose }) {
             style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
             Suggested Food Pairing
           </button>
-          <button onClick={() => setChatOpen(true)}
+          <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine" })}
             style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
             title="Ask the Sommelier">
             ✦ Ask
@@ -1949,7 +1947,6 @@ function WineDetailPanel({ wine, onClose }) {
                 <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
                 <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
                 <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
-
               </div>
             </div>
           ))}
@@ -1958,11 +1955,6 @@ function WineDetailPanel({ wine, onClose }) {
       {pairingResult && pairingResult.length === 0 && (
         <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
-      <SommelierChat
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-        contextItem={{ name: wine.name, type: wine.varietal || "wine" }}
-      />
     </div>
   );
 }
@@ -1977,6 +1969,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [pairingResult, setPairingResult] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [view, setView] = useState("pick");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     fetch(FOOD_URL).then(r => r.json())
@@ -2301,9 +2294,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
                 {!pairingLoading && hasResults && (
                   <div style={{ marginTop: 8, marginBottom: 8 }}>
-                    <button onClick={handleDifferentOptions} style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 8 }}>
-                      Give Me Different Options
-                    </button>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                      <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
+                        Give Me Different Options
+                      </button>
+                      <button onClick={() => setChatOpen(true)} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
+                        ✦ Ask
+                      </button>
+                    </div>
                     <div style={{ color: "#9a8060", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
                       If suggestions repeat, it reflects the limits of our current wine selection for this dish.
                     </div>
@@ -2326,11 +2324,10 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         </div>
       )}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={null} />
     </div>
   );
 }
-
-// ─── Home Screen ─────────────────────────────────────────────────────────────
 
 function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {} }) {
   const [visible, setVisible] = useState(false);
@@ -2451,7 +2448,11 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const [wineSearch, setWineSearch]       = useState("");
   const [visible, setVisible]             = useState(false);
   const [zoomedLabel, setZoomedLabel]     = useState(null);
+  const [chatOpen, setChatOpen]           = useState(false);
+  const [chatContext, setChatContext]      = useState(null);
   useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
+
+  function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
 
   const availableWines = wines.filter(w => w.available !== false);
   const tierOrder   = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
@@ -2561,8 +2562,9 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} />
       <div style={{ height: 32 }} />
     </div>
   );
