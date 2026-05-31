@@ -1955,9 +1955,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
                       <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
-                      <div style={{ width: 22, textAlign: "right", overflow: "visible", whiteSpace: "nowrap", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Entrees" && course !== "Soups & Salads" && course !== "Starters" ? "visible" : "hidden" }}>
-                        {course === "Dessert" ? "DESSERT" : "DES"}
-                      </div>
+                      <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course === "Dessert" ? "visible" : "hidden" }}>DES</div>
                     </div>
                   </div>
                   {byCourse[course].map(food => {
