@@ -1132,7 +1132,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
       })()}
 
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       <div style={{ height: 32 }} />
     </div>
   );
@@ -1580,27 +1580,26 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 //   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
 //                  used to personalise the opening message; null for generic open
 
-function SommelierChat({ isOpen, onClose, contextItem }) {
+function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleFavorite }) {
   const OPENER = contextItem
     ? `I see you're looking at the ${contextItem.name}. Before I start searching, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or anything else?`
     : "Before I start my search, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or budget?";
 
+  // Each message: { role, text, suggestions? }
   const [messages, setMessages]   = useState([]);
   const [input, setInput]         = useState("");
   const [sending, setSending]     = useState(false);
   const bottomRef                 = useRef(null);
   const inputRef                  = useRef(null);
 
-  // Reset and seed with opener whenever the drawer opens
   useEffect(() => {
     if (isOpen) {
-      setMessages([{ role: "assistant", text: OPENER }]);
+      setMessages([{ role: "assistant", text: OPENER, suggestions: [] }]);
       setInput("");
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [isOpen, contextItem?.name]); // intentional: only re-seed when item or open state changes
 
-  // Auto-scroll to bottom after each new message
   useEffect(() => {
     if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen]);
@@ -1609,7 +1608,7 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
     const text = input.trim();
     if (!text || sending) return;
 
-    const newMessages = [...messages, { role: "user", text }];
+    const newMessages = [...messages, { role: "user", text, suggestions: [] }];
     setMessages(newMessages);
     setInput("");
     setSending(true);
@@ -1624,9 +1623,13 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
         }),
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { role: "assistant", text: data.reply || "I'm not sure — please ask your server." }]);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: data.reply || "I'm not sure — please ask your server.",
+        suggestions: data.suggestions || [],
+      }]);
     } catch {
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please ask your server for help." }]);
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please ask your server for help.", suggestions: [] }]);
     }
     setSending(false);
   }
@@ -1635,15 +1638,38 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
+  function handleAddToMenu(suggestion) {
+    if (!onToggleFavorite) return;
+    if (suggestion.type === "wine") {
+      onToggleFavorite({
+        id: suggestion.id,
+        name: suggestion.name,
+        varietal: suggestion.varietal || null,
+        region: suggestion.region || null,
+        glassPrice: suggestion.glassPrice || null,
+        bottlePrice: suggestion.bottlePrice || null,
+        imageUrl: suggestion.imageUrl || null,
+        fromPairing: false,
+      }, "wine");
+    } else if (suggestion.type === "food") {
+      onToggleFavorite({
+        id: suggestion.id,
+        name: suggestion.name,
+        price: suggestion.price || null,
+        course: suggestion.course || null,
+        description: suggestion.description || null,
+        courseRole: "main",
+      }, "food");
+    }
+  }
+
   if (!isOpen) return null;
 
   return (
-    // Backdrop
     <div
       onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
     >
-      {/* Drawer */}
       <div
         onClick={e => e.stopPropagation()}
         style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: "Georgia, serif" }}
@@ -1663,19 +1689,49 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
         {/* Message list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px" }}>
           {messages.map((m, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 10 }}>
-              <div style={{
-                maxWidth: "80%",
-                background: m.role === "user" ? "#472a00" : "#faf5ec",
-                color: m.role === "user" ? "#f0e8d8" : "#3d2000",
-                border: m.role === "user" ? "none" : "0.5px solid #e8dcc8",
-                borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                padding: "10px 14px",
-                fontSize: 13,
-                lineHeight: 1.6,
-              }}>
-                {m.text}
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth: "85%",
+                  background: m.role === "user" ? "#472a00" : "#faf5ec",
+                  color: m.role === "user" ? "#f0e8d8" : "#3d2000",
+                  border: m.role === "user" ? "none" : "0.5px solid #e8dcc8",
+                  borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}>
+                  {m.text}
+                </div>
               </div>
+
+              {/* Suggestion chips — shown below assistant messages that mention menu items */}
+              {m.role === "assistant" && m.suggestions && m.suggestions.length > 0 && (
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4 }}>
+                  {m.suggestions.map((s, si) => {
+                    const isAdded = favorites.some(f => f.id === s.id);
+                    const icon = s.type === "wine" ? "🍷" : "🍽";
+                    const sub = s.type === "wine"
+                      ? [s.varietal, s.region].filter(Boolean).join(" · ")
+                      : s.course;
+                    return (
+                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? "rgba(76,175,125,0.08)" : "rgba(201,169,110,0.07)", border: `0.5px solid ${isAdded ? "#4caf7d" : "rgba(201,169,110,0.4)"}`, borderRadius: 10, padding: "8px 12px" }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: "#3d2000", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          {sub && <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
+                        </div>
+                        <button
+                          onClick={() => handleAddToMenu(s)}
+                          style={{ background: isAdded ? "rgba(76,175,125,0.15)" : "#472a00", border: isAdded ? "0.5px solid #4caf7d" : "none", color: isAdded ? "#4caf7d" : "#c9a96e", fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap", flexShrink: 0 }}
+                        >
+                          {isAdded ? "★ Added" : "☆ Add to My Menu"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ))}
           {sending && (
@@ -2324,7 +2380,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         </div>
       )}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={null} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={null} favorites={favorites} onToggleFavorite={onToggleFavorite} />
     </div>
   );
 }
@@ -2564,7 +2620,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 
       {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} />
+      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       <div style={{ height: 32 }} />
     </div>
   );
