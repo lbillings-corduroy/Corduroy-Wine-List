@@ -931,6 +931,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   const [selectedItem, setSelectedItem] = useState(null);
   const [visible, setVisible] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
+  const [zoomedLabel, setZoomedLabel] = useState(null);
 
   useEffect(() => {
     fetch(endpoint)
@@ -1044,7 +1045,9 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     borderLeft: selectedItem === item.id ? `2px solid ${accentColor}` : "2px solid transparent",
                     borderRadius: 8, padding: "11px 8px", cursor: "pointer", transition: "all 0.15s"
                   }}>
-                  <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
+                  <div
+                    onClick={item.imageUrl ? e => { e.stopPropagation(); setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }); } : undefined}
+                    style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${item.imageUrl ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1087,6 +1090,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         )}
       </div>
 
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       {/* Expanded detail panel */}
       {selectedItem && (() => {
         const item = items.find(i => i.id === selectedItem);
@@ -1094,7 +1098,9 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         return (
           <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)" }}>
             <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-              <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+              <div
+                onClick={item.imageUrl ? () => setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }) : undefined}
+                style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: `0.5px solid ${item.imageUrl ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1130,7 +1136,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
 function encodeFavorites(favorites) {
   const compact = favorites.map(f => {
     if (f.favoriteType === 'food') return { t: 'food', n: f.name, cr: f.courseRole, p: f.price, d: (f.description || '').slice(0, 80) };
-    if (f.favoriteType === 'wine') return { t: 'wine', n: f.name, v: f.varietal, r: f.region, gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || '').slice(0, 140), cl: f.courseLabel, fp: f.fromPairing };
+    if (f.favoriteType === 'wine') return { t: 'wine', n: f.name, v: f.varietal, r: f.region, gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || '').slice(0, 140), cl: f.courseLabel, fp: f.fromPairing, img: f.imageUrl || null };
     return { t: f.favoriteType, n: f.name, p: f.price };
   });
   try { return btoa(unescape(encodeURIComponent(JSON.stringify(compact)))); } catch(e) { return null; }
@@ -1234,17 +1240,19 @@ function GuestMenuScreen({ favorites }) {
   const WineCard = ({ item }) => (
     <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>
+        {item.imageUrl
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: "0.5px solid #c9a96e" }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
           {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#5a4030" }}>glass</span></div>}
-            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#5a4030" }}>bottle</span></div>}
+            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#9a8060" }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#9a8060" }}>bottle</span></div>}
           </div>
         </div>
       </div>
-      {item.reason && <div style={{ color: "#8a7060", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #2a1400" }}>"{item.reason}"</div>}
+      {item.reason && <div style={{ color: "#c8b49a", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
     </div>
   );
 
@@ -1254,7 +1262,7 @@ function GuestMenuScreen({ favorites }) {
       <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "24px 20px 20px", textAlign: "center" }}>
         <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
         <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
-        <div style={{ color: "#5a4030", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+        <div style={{ color: "#9a8060", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
       </div>
 
       <div style={{ padding: "16px 16px 48px" }}>
@@ -1269,8 +1277,8 @@ function GuestMenuScreen({ favorites }) {
                   <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
-                    {item.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
-                    {item.price && <div style={{ color: "#9a8060", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                    {item.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
+                    {item.price && <div style={{ color: "#b8a080", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
                   </div>
                 </div>
               ))}
@@ -1304,7 +1312,7 @@ function GuestMenuScreen({ favorites }) {
         )}
       </div>
 
-      <div style={{ textAlign: "center", padding: "0 20px 32px", color: "#3c2800", fontSize: 10, letterSpacing: "1px" }}>
+      <div style={{ textAlign: "center", padding: "0 20px 32px", color: "#9a8060", fontSize: 10, letterSpacing: "1px" }}>
         CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV
       </div>
     </div>
@@ -1345,6 +1353,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 
   const [showQR, setShowQR]     = useState(false);
   const [qrSaving, setQrSaving] = useState(false);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
   const [menuCode, setMenuCode] = useState(null);
   const [emailInput, setEmailInput] = useState("");
   const [emailState, setEmailState] = useState("idle"); // idle | sending | sent | error
@@ -1358,7 +1367,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
         t: f.favoriteType, n: f.name, cr: f.courseRole, p: f.price,
         d: (f.description || "").slice(0, 80), v: f.varietal, r: f.region,
         gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || "").slice(0, 140),
-        cl: f.courseLabel, fp: f.fromPairing,
+        cl: f.courseLabel, fp: f.fromPairing, img: f.imageUrl || null,
       }));
       const res = await fetch(SAVE_MENU_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1397,19 +1406,19 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
     <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         {item.imageUrl
-          ? <div style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: "0.5px solid #c9a96e" }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
           : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
           {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#5a4030" }}>glass</span></div>}
-            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#5a4030" }}>bottle</span></div>}
+            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#9a8060" }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#9a8060" }}>bottle</span></div>}
           </div>
         </div>
         <RemoveBtn item={item} />
       </div>
-      {item.reason && <div style={{ color: "#8a7060", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #2a1400" }}>"{item.reason}"</div>}
+      {item.reason && <div style={{ color: "#c8b49a", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
     </div>
   );
 
@@ -1452,8 +1461,8 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                       <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
-                        {item.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
-                        {item.price && <div style={{ color: "#9a8060", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                        {item.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
+                        {item.price && <div style={{ color: "#b8a080", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
                       </div>
                       <RemoveBtn item={item} />
                     </div>
@@ -1495,6 +1504,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
           </>
         )}
       </div>
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       {showQR && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ background: "#4d2e00", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
@@ -1505,13 +1515,13 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
             ) : menuCode ? (
               <>
                 <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>Scan to view your menu while you dine</div>
-                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: "#c9a96e" }}>Corduroy Guest</span> WiFi first</div>
+                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: "#c9a96e" }}>Corduroy Guest</span> WiFi first</div>
                 <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
                 </div>
-                <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Code valid for 24 hours</div>
+                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Code valid for 24 hours</div>
                 <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 20, wordBreak: "break-all" }}>
-                  <span style={{ color: "#5a4030", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
+                  <span style={{ color: "#9a8060", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
                 </div>
 
                 {/* Email section — coming soon, code preserved for when Resend is configured */}
@@ -1606,6 +1616,43 @@ function ItemPairingButton({ item }) {
       {result && result.length === 0 && (
         <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
+    </div>
+  );
+}
+
+// ─── Label Zoom Modal ─────────────────────────────────────────────────────────
+
+function LabelModal({ wine, onClose }) {
+  if (!wine) return null;
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 800,
+      background: "rgba(0,0,0,0.92)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: 32, cursor: "pointer"
+    }}>
+      <img
+        src={wine.imageUrl}
+        alt={wine.name}
+        style={{
+          maxHeight: "72vh", maxWidth: "80vw",
+          objectFit: "contain", borderRadius: 8,
+          boxShadow: "0 8px 48px rgba(0,0,0,0.7)"
+        }}
+        onClick={e => e.stopPropagation()}
+      />
+      <div style={{ marginTop: 20, textAlign: "center" }}>
+        <div style={{ color: "#f0e8d8", fontSize: 16, fontFamily: "Georgia, serif", marginBottom: 4 }}>{wine.name}</div>
+        {(wine.varietal || wine.region) && (
+          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>
+            {[wine.varietal, wine.region].filter(Boolean).join(" · ")}
+          </div>
+        )}
+      </div>
+      <div style={{ marginTop: 24, color: "#5a4030", fontSize: 11, fontFamily: "Georgia, serif", letterSpacing: "1px" }}>
+        TAP ANYWHERE TO CLOSE
+      </div>
     </div>
   );
 }
@@ -1746,6 +1793,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [lastShownIds, setLastShownIds] = useState({});
   const pendingPairing = useRef(null);
   const [messagesReady, setMessagesReady] = useState(false);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
 
   function handleMessagesComplete() {
     if (pendingPairing.current !== null) {
@@ -2020,7 +2068,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                  {p.imageUrl && <div style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #2a1400" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+                  {p.imageUrl && <div onClick={() => setZoomedLabel({ name: p.name, varietal: p.varietal, region: p.region, imageUrl: p.imageUrl })} style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #c9a96e", cursor: "zoom-in" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#f5ede0", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
                     {(p.varietal || p.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
@@ -2083,6 +2131,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           )}
         </div>
       )}
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
     </div>
   );
 }
@@ -2207,6 +2256,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const [selectedWine, setSelectedWine]   = useState(null);
   const [wineSearch, setWineSearch]       = useState("");
   const [visible, setVisible]             = useState(false);
+  const [zoomedLabel, setZoomedLabel]     = useState(null);
   useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
 
   const availableWines = wines.filter(w => w.available !== false);
@@ -2304,7 +2354,8 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
                 <WineCard key={wine.id} wine={wine} selected={selectedWine === wine.id}
                   onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)}
                   isFavorited={favorites.some(f => f.id === wine.id)}
-                  onToggleFavorite={onToggleFavorite} />
+                  onToggleFavorite={onToggleFavorite}
+                  onZoomLabel={wine.imageUrl ? () => setZoomedLabel(wine) : null} />
               ))}
             </div>
           </div>
@@ -2317,6 +2368,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
       </div>
 
       {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} /> : null; })()}
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <div style={{ height: 32 }} />
     </div>
   );
@@ -2410,7 +2462,7 @@ function AppContent() {
   return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
 }
 
-function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
+function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZoomLabel }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
@@ -2420,7 +2472,9 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite }) {
       borderRadius: 8, padding: "11px 8px", cursor: "pointer",
       transition: "all 0.15s", opacity: wine.available === false ? 0.4 : 1
     }}>
-      <div style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden" }}>
+      <div
+        onClick={onZoomLabel ? e => { e.stopPropagation(); onZoomLabel(); } : undefined}
+        style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${onZoomLabel ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: onZoomLabel ? "zoom-in" : "default" }}>
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
