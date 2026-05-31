@@ -1139,12 +1139,15 @@ function encodeFavorites(favorites) {
     if (f.favoriteType === 'wine') return { t: 'wine', n: f.name, v: f.varietal, r: f.region, gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || '').slice(0, 140), cl: f.courseLabel, fp: f.fromPairing, img: f.imageUrl || null };
     return { t: f.favoriteType, n: f.name, p: f.price };
   });
-  try { return btoa(unescape(encodeURIComponent(JSON.stringify(compact)))); } catch(e) { return null; }
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, dt: Date.now(), items: compact })))); } catch(e) { return null; }
 }
 
 function decodeFavorites(encoded) {
-  const compact = JSON.parse(decodeURIComponent(escape(atob(encoded))));
-  return compact.map((f, i) => ({
+  const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  // Handle both new format { v, dt, items } and old format (plain array)
+  const compact = Array.isArray(parsed) ? parsed : (parsed.items || []);
+  const savedAt = Array.isArray(parsed) ? null : (parsed.dt || null);
+  const favorites = compact.map((f, i) => ({
     id: `shared-${i}`,
     favoriteType: f.t,
     name: f.n,
@@ -1159,6 +1162,7 @@ function decodeFavorites(encoded) {
     courseLabel: f.cl,
     fromPairing: f.fp,
   }));
+  return Object.assign(favorites, { _savedAt: savedAt });
 }
 
 // ─── Guest Menu Loader (fetches saved menu from DB by short code) ─────────────
@@ -1166,12 +1170,13 @@ function decodeFavorites(encoded) {
 function GuestMenuLoader({ menuCode }) {
   const [state, setState] = useState("loading"); // loading | ready | expired | error
   const [favorites, setFavorites] = useState([]);
+  const [savedAt, setSavedAt] = useState(null);
 
   useEffect(() => {
     fetch(`${GET_MENU_URL}?id=${menuCode}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok && data.favorites) { setFavorites(data.favorites); setState("ready"); }
+        if (data.ok && data.favorites) { setFavorites(data.favorites); setSavedAt(data.createdAt || null); setState("ready"); }
         else if (data.error === "expired") setState("expired");
         else setState("error");
       })
@@ -1210,7 +1215,7 @@ function GuestMenuLoader({ menuCode }) {
 
 // ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
 
-function GuestMenuScreen({ favorites }) {
+function GuestMenuScreen({ favorites, savedAt }) {
   const courseOrder  = ["first", "main", "dessert"];
   const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
 
@@ -2530,7 +2535,7 @@ export default function App() {
   if (menuParam) {
     try {
       const sharedFavorites = decodeFavorites(menuParam);
-      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} />;
+      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} savedAt={sharedFavorites._savedAt} />;
     } catch(e) {}
   }
   return <AppContent />;
