@@ -1593,8 +1593,7 @@ function SommelierChat({ isOpen, onClose, contextItem }) {
       setInput("");
       setTimeout(() => inputRef.current?.focus(), 300);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, contextItem?.name]);
+  }, [isOpen, contextItem?.name]); // intentional: only re-seed when item or open state changes
 
   // Auto-scroll to bottom after each new message
   useEffect(() => {
