@@ -1431,18 +1431,23 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
     <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
     <div style={{ width: "100%", maxWidth: 680, background: "#3d2200", display: "flex", flexDirection: "column", fontFamily: "Georgia, serif", overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
-          <div style={{ color: "#5a4030", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
+            <div style={{ color: "#c8b49a", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {favorites.length > 0 && (
             <button onClick={handleOpenQR} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
               Save ↗
             </button>
           )}
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
+          </div>
+        </div>
+        <div style={{ borderTop: "0.5px solid rgba(201,169,110,0.2)", paddingTop: 8, color: "#c9a96e", fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
+          Ready to order? Your server will be happy to help.
         </div>
       </div>
 
