@@ -1510,33 +1510,164 @@ exports.sommelierChat = functions
         return res.status(400).json({ error: 'messages array required' });
       }
 
+      // Load live menu data from Firebase
+      const db = admin.database();
+      const [
+        winesSnap, wineEnrichSnap, wineOrderSnap,
+        beersSnap, beerEnrichSnap, beerOrderSnap,
+        poursSnap, poursEnrichSnap, poursOrderSnap,
+        foodSnap, foodOrderSnap, exclusionsSnap,
+        cocktailsSnap, cocktailsOrderSnap,
+        nabSnap, nabOrderSnap,
+      ] = await Promise.all([
+        db.ref('wines').once('value'),
+        db.ref('wineEnrichment').once('value'),
+        db.ref('wineOrder').once('value'),
+        db.ref('beers').once('value'),
+        db.ref('beerEnrichment').once('value'),
+        db.ref('beerOrder').once('value'),
+        db.ref('pours').once('value'),
+        db.ref('poursEnrichment').once('value'),
+        db.ref('poursOrder').once('value'),
+        db.ref('foodItems').once('value'),
+        db.ref('foodOrder').once('value'),
+        db.ref('foodExclusions').once('value'),
+        db.ref('cocktails').once('value'),
+        db.ref('cocktailsOrder').once('value'),
+        db.ref('nab').once('value'),
+        db.ref('nabOrder').once('value'),
+      ]);
+
+      // Build wine list
+      const winesById = winesSnap.val() || {};
+      const wineEnrich = wineEnrichSnap.val() || {};
+      const wineOrder = wineOrderSnap.val() || [];
+      const orderedWines = (wineOrder.length > 0
+        ? wineOrder.map(id => winesById[id]).filter(Boolean)
+        : Object.values(winesById)
+      ).filter(w => w.available !== false && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
+
+      const wineLines = orderedWines.map(w => {
+        const e = wineEnrich[w.id] || {};
+        const name = e.correctedName || w.name;
+        const prices = [];
+        if (w.glassPrice) prices.push(`$${Math.round(w.glassPrice)} glass`);
+        if (w.bottlePrice) prices.push(`$${Math.round(w.bottlePrice)} bottle`);
+        const meta = [e.varietal, e.region].filter(Boolean).join(', ');
+        return `  - ${name}${meta ? ` (${meta})` : ''}${prices.length ? ' -- ' + prices.join(', ') : ''}${e.description ? ' | ' + e.description : ''}`;
+      });
+
+      // Build beer list
+      const beersById = beersSnap.val() || {};
+      const beerEnrich = beerEnrichSnap.val() || {};
+      const beerOrder = beerOrderSnap.val() || [];
+      const orderedBeers = (beerOrder.length > 0
+        ? beerOrder.map(id => beersById[id]).filter(Boolean)
+        : Object.values(beersById)
+      ).filter(b => b.available !== false);
+
+      const beerLines = orderedBeers.map(b => {
+        const e = beerEnrich[b.id] || {};
+        const price = b.price || b.groupPrice;
+        return `  - ${e.correctedName || b.name}${e.style ? ` (${e.style})` : ''}${e.brewery ? ` -- ${e.brewery}` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
+      });
+
+      // Build premium pours list
+      const poursById = poursSnap.val() || {};
+      const poursEnrich = poursEnrichSnap.val() || {};
+      const poursOrder = poursOrderSnap.val() || [];
+      const orderedPours = (poursOrder.length > 0
+        ? poursOrder.map(id => poursById[id]).filter(Boolean)
+        : Object.values(poursById)
+      ).filter(p => p.available !== false);
+
+      const pourLines = orderedPours.map(p => {
+        const e = poursEnrich[p.id] || {};
+        const price = p.price || p.groupPrice;
+        return `  - ${e.correctedName || p.name}${e.category ? ` (${e.category})` : ''}${e.producer ? ` -- ${e.producer}` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
+      });
+
+      // Build cocktails list
+      const cocktailsById = cocktailsSnap.val() || {};
+      const cocktailsOrder = cocktailsOrderSnap.val() || [];
+      const orderedCocktails = (cocktailsOrder.length > 0
+        ? cocktailsOrder.map(id => cocktailsById[id]).filter(Boolean)
+        : Object.values(cocktailsById)
+      ).filter(c => c.available !== false);
+
+      const cocktailLines = orderedCocktails.map(c => {
+        const price = c.price || c.groupPrice;
+        return `  - ${c.name}${price ? ` -- $${Math.round(price)}` : ''}${c.description ? ' | ' + c.description : ''}`;
+      });
+
+      // Build NAB list
+      const nabById = nabSnap.val() || {};
+      const nabOrder = nabOrderSnap.val() || [];
+      const orderedNAB = (nabOrder.length > 0
+        ? nabOrder.map(id => nabById[id]).filter(Boolean)
+        : Object.values(nabById)
+      ).filter(n => n.available !== false);
+
+      const nabLines = orderedNAB.map(n => {
+        const price = n.price || n.groupPrice;
+        return `  - ${n.name}${n.subgroup ? ` (${n.subgroup})` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
+      });
+
+      // Build food menu grouped by course
+      const foodById = foodSnap.val() || {};
+      const foodOrder = foodOrderSnap.val() || [];
+      const exclusions = exclusionsSnap.val() || {};
+      const orderedFood = (foodOrder.length > 0
+        ? foodOrder.map(id => foodById[id]).filter(Boolean)
+        : Object.values(foodById)
+      ).filter(f => !exclusions[f.id]);
+
+      const foodByCourse = {};
+      orderedFood.forEach(f => {
+        if (!foodByCourse[f.course]) foodByCourse[f.course] = [];
+        foodByCourse[f.course].push(f);
+      });
+      const foodSection = Object.entries(foodByCourse).map(([course, items]) =>
+        `  ${course}:\n` + items.map(f =>
+          `    - ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ''}${f.description ? ': ' + f.description : ''}`
+        ).join('\n')
+      ).join('\n');
+
+      // Assemble the full menu block
+      const menuBlock = [
+        wineLines.length     ? `WINES:\n${wineLines.join('\n')}` : null,
+        beerLines.length     ? `BEERS:\n${beerLines.join('\n')}` : null,
+        pourLines.length     ? `PREMIUM POURS:\n${pourLines.join('\n')}` : null,
+        cocktailLines.length ? `SPECIALTY COCKTAILS:\n${cocktailLines.join('\n')}` : null,
+        nabLines.length      ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
+        foodSection          ? `FOOD MENU:\n${foodSection}` : null,
+      ].filter(Boolean).join('\n\n');
+
       const contextLine = contextItem
-        ? `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page.`
+        ? `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Use that as your starting point.`
         : 'The guest opened this chat from the main menu.';
 
-      const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise — you're talking to a guest at the table, not writing an essay.
+      const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
 
 ${contextLine}
 
-YOUR ONLY PURPOSE is to help guests explore the food and beverage menu at Appalachia Kitchen tonight. This includes:
-- Wines, beers, cocktails, spirits, and non-alcoholic beverages on our menu
-- Food dishes on our current menu
-- Pairing suggestions between food and beverages
-- Answering questions about tasting notes, flavor profiles, or ingredients
-- Helping guests make decisions based on their preferences
+You have full access to tonight's complete menu below. Use it to give specific, confident recommendations by name. When a guest asks about food pairings, dietary needs, or what's available, answer directly from the menu -- do not tell guests to ask their server for information you already have here.
 
-STRICT RULES — never break these under any circumstances:
-1. NEVER compare our prices to retail wine shop prices, grocery store prices, or prices at other restaurants. If asked, say something like: "I'm not able to make that comparison, but I'm happy to help you find something you'll love tonight."
-2. NEVER discuss topics outside food and beverage — sports, news, weather, travel, politics, entertainment, or anything unrelated to tonight's dining experience. Politely redirect: "I'm best at helping you find something delicious tonight — what can I help you with?"
-3. NEVER recommend items not on our menu. If unsure whether something is available, say to check with the server.
-4. Keep responses concise and conversational — 2-4 sentences is usually right. Guests are at the table.
-5. If a guest is rude or tries to get you off-topic repeatedly, stay warm and keep redirecting to food and beverage.`;
+TONIGHT'S COMPLETE MENU:
+${menuBlock}
+
+STRICT RULES -- never break these under any circumstances:
+1. NEVER compare our prices to retail wine shop prices, grocery store prices, or prices at other restaurants. If asked, say: "I'm not able to make that comparison, but I'm happy to help you find something you'll love tonight."
+2. NEVER discuss topics outside food and beverage -- sports, news, weather, travel, politics, entertainment, or anything else unrelated to tonight's dining. Politely redirect: "I'm best at helping you find something delicious tonight -- what can I help you with?"
+3. ONLY recommend items that appear in the menu above. Do not invent dishes or beverages.
+4. Keep responses concise and conversational -- 2-4 sentences is right. Guests are at the table.
+5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.`;
 
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
         {
           model: 'claude-sonnet-4-6',
-          max_tokens: 400,
+          max_tokens: 500,
           system: systemPrompt,
           messages: messages.map(m => ({ role: m.role, content: m.content })),
         },
