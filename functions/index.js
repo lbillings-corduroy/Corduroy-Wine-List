@@ -1417,9 +1417,8 @@ exports.saveMenu = functions.https.onRequest(async (req, res) => {
     let menuId = '';
     for (let i = 0; i < 6; i++) menuId += chars[Math.floor(Math.random() * chars.length)];
     const createdAt = Date.now();
-    const expiresAt = createdAt + (24 * 60 * 60 * 1000);
-    await admin.database().ref(`savedMenus/${menuId}`).set({ favorites, createdAt, expiresAt });
-    res.json({ ok: true, menuId, expiresAt });
+    await admin.database().ref(`savedMenus/${menuId}`).set({ favorites, createdAt });
+    res.json({ ok: true, menuId, createdAt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1435,7 +1434,8 @@ exports.getMenu = functions.https.onRequest(async (req, res) => {
     const snapshot = await admin.database().ref(`savedMenus/${id}`).once('value');
     const data = snapshot.val();
     if (!data) return res.status(404).json({ error: 'not_found' });
-    if (Date.now() > data.expiresAt) {
+    // Only check expiry for old records that have an expiresAt field
+    if (data.expiresAt && Date.now() > data.expiresAt) {
       await admin.database().ref(`savedMenus/${id}`).remove();
       return res.status(410).json({ error: 'expired' });
     }
