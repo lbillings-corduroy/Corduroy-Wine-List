@@ -1953,7 +1953,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     {grouped[role].map((f, i) => (
                       <div key={`${f.id}-${role}`} style={{ marginBottom: i < grouped[role].length - 1 ? 6 : 0, paddingLeft: 10, borderLeft: "1.5px solid rgba(201,169,110,0.25)" }}>
                         <div style={{ color: "#f0e8d8", fontSize: 13 }}>{f.name}</div>
-                        {f.description && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
+                        {f.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
                       </div>
                     ))}
                   </div>
