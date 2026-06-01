@@ -2364,15 +2364,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 ))}
 
                 {!pairingLoading && hasResults && (
-                  <div style={{ marginTop: 8, marginBottom: 8 }}>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                      <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
-                        Give Me Different Options
-                      </button>
-                      <button onClick={() => setChatOpen(true)} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
-                        ✦ Ask
-                      </button>
-                    </div>
+                  <div style={{ marginBottom: 8 }}>
                     <div style={{ color: "#9a8060", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
                       If suggestions repeat, it reflects the limits of our current wine selection for this dish.
                     </div>
@@ -2386,6 +2378,14 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
           {!pairingLoading && pairingResult && (
             <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
+                  Different Options
+                </button>
+                <button onClick={() => setChatOpen(true)} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
+                  ✦ Ask
+                </button>
+              </div>
               <button onClick={onShowShortlist}
                 style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
                 ★ Go to My Menu
