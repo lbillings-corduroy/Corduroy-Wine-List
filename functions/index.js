@@ -368,17 +368,26 @@ function normalizeVarietal(raw) {
 
 // ─── Claude Enrichment — Wine ─────────────────────────────────────────────────
 
-async function enrichWineWithClaude(wineName, vintage) {
+async function enrichWineWithClaude(wineName, vintage, hints = {}) {
   if (!ANTHROPIC_API_KEY) return null;
   const vintageNote = vintage ? `The vintage is ${vintage}.` : 'This is a house pour with no specific vintage.';
+
+  // Build hint block from any manager-confirmed fields
+  const hintLines = [];
+  if (hints.region)   hintLines.push(`- Region: "${hints.region}" (confirmed by manager — treat as fact, do not override)`);
+  if (hints.varietal) hintLines.push(`- Varietal: "${hints.varietal}" (confirmed by manager — treat as fact, do not override)`);
+  if (hints.correctedName && hints.correctedName !== wineName) hintLines.push(`- Corrected name: "${hints.correctedName}" (confirmed by manager)`);
+  const hintBlock = hintLines.length > 0
+    ? `\nThe restaurant manager has confirmed the following details — treat these as facts and do not change them:\n${hintLines.join('\n')}\n`
+    : '';
+
   const prompt = `You are a professional sommelier and wine data expert. I need accurate information about this wine for a restaurant iPad wine list.
 
 Wine: "${wineName}"
-${vintageNote}
-
+${vintageNote}${hintBlock}
 Tasks:
 1. Identify the correct wine (fix any spelling/capitalization errors in the name)
-2. If you are uncertain what wine this is, set "uncertain" to true
+2. If you are uncertain what wine this is, set "uncertain" to true. However, if the manager has confirmed the region above, use that to resolve your uncertainty — do not mark as uncertain just because the name is ambiguous.
 
 Respond in JSON only (no other text):
 {
@@ -411,11 +420,17 @@ Respond in JSON only (no other text):
 
 // ─── Claude Enrichment — Beer ─────────────────────────────────────────────────
 
-async function enrichBeerWithClaude(beerName) {
+async function enrichBeerWithClaude(beerName, hints = {}) {
   if (!ANTHROPIC_API_KEY) return null;
+  const hintLines = [];
+  if (hints.brewery) hintLines.push(`- Brewery: "${hints.brewery}" (confirmed by manager — treat as fact)`);
+  if (hints.style)   hintLines.push(`- Style: "${hints.style}" (confirmed by manager — treat as fact)`);
+  const hintBlock = hintLines.length > 0
+    ? `\nThe restaurant manager has confirmed the following:\n${hintLines.join('\n')}\n`
+    : '';
   const prompt = `You are a craft beer expert. I need accurate information about this beer for a restaurant menu app.
 
-Beer: "${beerName}"
+Beer: "${beerName}"${hintBlock}
 
 Respond in JSON only (no other text):
 {
@@ -446,11 +461,17 @@ Respond in JSON only (no other text):
 
 // ─── Claude Enrichment — Premium Pours ───────────────────────────────────────
 
-async function enrichPourWithClaude(pourName) {
+async function enrichPourWithClaude(pourName, hints = {}) {
   if (!ANTHROPIC_API_KEY) return null;
+  const hintLines = [];
+  if (hints.producer)  hintLines.push(`- Producer/Distillery: "${hints.producer}" (confirmed by manager — treat as fact)`);
+  if (hints.category)  hintLines.push(`- Category: "${hints.category}" (confirmed by manager — treat as fact)`);
+  const hintBlock = hintLines.length > 0
+    ? `\nThe restaurant manager has confirmed the following:\n${hintLines.join('\n')}\n`
+    : '';
   const prompt = `You are a spirits expert. I need accurate information about this spirit for a restaurant premium pours menu.
 
-Spirit: "${pourName}"
+Spirit: "${pourName}"${hintBlock}
 
 Respond in JSON only (no other text):
 {
@@ -1948,7 +1969,7 @@ exports.reenrichItem = functions
     if (req.method === 'OPTIONS') return res.status(204).send('');
 
     try {
-      const { itemId, itemType, itemName } = req.body;
+      const { itemId, itemType, itemName, hints = {} } = req.body;
       if (!itemId || !itemType || !itemName) {
         return res.status(400).json({ error: 'itemId, itemType, and itemName required' });
       }
@@ -1961,63 +1982,63 @@ exports.reenrichItem = functions
       if (itemType === 'wine') {
         enrichPath = `wineEnrichment/${itemId}`;
         const vintage = parseVintage(itemName);
-        enrichment = await enrichWineWithClaude(itemName, vintage);
+        enrichment = await enrichWineWithClaude(itemName, vintage, hints);
         if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
         enrichData = {
           sourceName: itemName,
-          correctedName: enrichment.correctedName || itemName,
+          correctedName: hints.correctedName || enrichment.correctedName || itemName,
           uncertain: enrichment.uncertain || false,
           uncertainReason: enrichment.uncertainReason || null,
-          varietal: enrichment.varietal || null,
-          region: enrichment.region || null,
+          varietal: hints.varietal || enrichment.varietal || null,
+          region: hints.region || enrichment.region || null,
           description: enrichment.description || null,
           reviews: enrichment.reviews || null,
           labelImageQuery: enrichment.labelImageQuery || null,
           vintage,
           enrichedAt: Date.now(),
           reEnrichedAt: Date.now(),
-          manuallyEdited: false,  // clear any previous manual edits so fresh data shows
-          approved: false,        // reset approval so uncertain items surface in review
+          manuallyEdited: Object.keys(hints).length > 0,
+          approved: false,
         };
 
       } else if (itemType === 'beer') {
         enrichPath = `beerEnrichment/${itemId}`;
-        enrichment = await enrichBeerWithClaude(itemName);
+        enrichment = await enrichBeerWithClaude(itemName, hints);
         if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
         enrichData = {
           sourceName: itemName,
-          correctedName: enrichment.correctedName || itemName,
+          correctedName: hints.correctedName || enrichment.correctedName || itemName,
           uncertain: enrichment.uncertain || false,
           uncertainReason: enrichment.uncertainReason || null,
-          style: enrichment.style || null,
-          brewery: enrichment.brewery || null,
-          abv: enrichment.abv || null,
+          style: hints.style || enrichment.style || null,
+          brewery: hints.brewery || enrichment.brewery || null,
+          abv: hints.abv || enrichment.abv || null,
           description: enrichment.description || null,
           imageQuery: enrichment.imageQuery || null,
           enrichedAt: Date.now(),
           reEnrichedAt: Date.now(),
-          manuallyEdited: false,
+          manuallyEdited: Object.keys(hints).length > 0,
           approved: false,
         };
 
       } else if (itemType === 'pour') {
         enrichPath = `poursEnrichment/${itemId}`;
-        enrichment = await enrichPourWithClaude(itemName);
+        enrichment = await enrichPourWithClaude(itemName, hints);
         if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
         enrichData = {
           sourceName: itemName,
-          correctedName: enrichment.correctedName || itemName,
+          correctedName: hints.correctedName || enrichment.correctedName || itemName,
           uncertain: enrichment.uncertain || false,
           uncertainReason: enrichment.uncertainReason || null,
-          category: enrichment.category || null,
-          producer: enrichment.producer || null,
-          abv: enrichment.abv || null,
-          age: enrichment.age || null,
+          category: hints.category || enrichment.category || null,
+          producer: hints.producer || enrichment.producer || null,
+          abv: hints.abv || enrichment.abv || null,
+          age: hints.age || enrichment.age || null,
           description: enrichment.description || null,
           imageQuery: enrichment.imageQuery || null,
           enrichedAt: Date.now(),
           reEnrichedAt: Date.now(),
-          manuallyEdited: false,
+          manuallyEdited: Object.keys(hints).length > 0,
           approved: false,
         };
 
