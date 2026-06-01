@@ -2444,11 +2444,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 ))}
 
                 {!pairingLoading && hasResults && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ color: "#9a8060", fontSize: 11, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
-                      If suggestions repeat, it reflects the limits of our current wine selection for this dish.
-                    </div>
-                  </div>
+                  <div style={{ marginBottom: 8 }} />
                 )}
 
                 {isEmpty && <div style={{ color: "#9a8060", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
@@ -2463,13 +2459,16 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   ✦ Chat with Our<br/>Virtual Sommelier
                 </button>
                 <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
-                  Instant Pairing<br/>Suggestions
+                  Get Different<br/>Pairings
                 </button>
               </div>
               <button onClick={onShowShortlist}
-                style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+                style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 6 }}>
                 ★ Go to My Menu
               </button>
+              <div style={{ color: "#6a5040", fontSize: 10, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+                If suggestions repeat, it reflects the limits of our current wine selection for this dish.
+              </div>
             </div>
           )}
         </div>
