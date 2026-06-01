@@ -2576,7 +2576,6 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const [chatOpen, setChatOpen]           = useState(false);
   const [chatContext, setChatContext]      = useState(null);
   const [toast, setToast]                 = useState(null);
-  const [chatContext, setChatContext]      = useState(null);
   useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
 
   function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
