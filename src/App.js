@@ -2263,9 +2263,23 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 </div>
               ))}
             </div>
-            <button onClick={handleGetPairings}
-              style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
-              Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"}{[...new Set(selectedFoods.map(f => f.courseRole))].length > 1 ? ` · ${[...new Set(selectedFoods.map(f => f.courseRole))].length} Courses` : ""} →
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleGetPairings}
+                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+                Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"}{[...new Set(selectedFoods.map(f => f.courseRole))].length > 1 ? ` · ${[...new Set(selectedFoods.map(f => f.courseRole))].length} Courses` : ""} →
+              </button>
+              <button onClick={() => setChatOpen(true)}
+                style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "14px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
+                ✦ Ask
+              </button>
+            </div>
+          </div>
+        )}
+        {selectedFoods.length === 0 && (
+          <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 14px", textAlign: "center" }}>
+            <button onClick={() => setChatOpen(true)}
+              style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+              ✦ Ask the Sommelier Instead
             </button>
           </div>
         )}
