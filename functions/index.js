@@ -14,6 +14,64 @@ const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
 const BEER_MENU_GUID = 'ae7ea1cf-e85d-497a-a210-9a7271daa0ac';
 const POURS_MENU_GUID = 'c07d9143-a7c5-497a-8434-2ab85d44ea48';
 
+// ─── Settings Loader ──────────────────────────────────────────────────────────
+// Reads app settings from Firebase. Falls back to hardcoded GUIDs if settings
+// haven't been configured yet, so existing behavior is preserved on first deploy.
+
+async function getAppSettings() {
+  try {
+    const db = admin.database();
+    const snap = await db.ref('appSettings').once('value');
+    return snap.val() || {};
+  } catch (e) {
+    console.log('Could not load appSettings:', e.message);
+    return {};
+  }
+}
+
+// Returns menus of a given menuType from settings, with fallback to hardcoded defaults.
+function getMenusOfType(settings, menuType) {
+  const configured = (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
+  if (configured.length > 0) return configured;
+  // Fallback defaults — used until admin configures settings
+  const defaults = {
+    wine:         [{ guid: WINE_MENU_GUID,     label: 'Wine List' }],
+    beer_pours:   [{ guid: BEER_MENU_GUID,     label: 'Beer List' }, { guid: POURS_MENU_GUID, label: 'Premium Pours' }],
+    cocktails_na: [{ guid: COCKTAILS_MENU_GUID, label: 'Specialty Cocktails' }, { guid: NAB_MENU_GUID, label: 'Non-Alcoholic Beverages' }],
+    food:         [],
+  };
+  return defaults[menuType] || [];
+}
+
+// Returns true if a menu is currently available based on the Toast-sourced availability
+// cached in appSettings.toastAvailability. If no cached data exists, assumes available.
+function isMenuAvailableNow(menu, toastAvailabilityCache) {
+  const ta = toastAvailabilityCache && toastAvailabilityCache[menu.guid];
+  if (!ta) return true; // no data fetched yet — don't block anything
+
+  const now = new Date();
+  // Toast days come back as full names e.g. "MONDAY" or abbreviated — normalize both
+  const dayFull = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'][now.getDay()];
+  const dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()];
+
+  if (ta.toastDays && ta.toastDays.length > 0) {
+    const upperDays = ta.toastDays.map(d => d.toUpperCase());
+    if (!upperDays.includes(dayFull) && !upperDays.includes(dayAbbr.toUpperCase())) return false;
+  }
+
+  if (ta.toastHours && ta.toastHours.open && ta.toastHours.close) {
+    // Parse HH:MM or HH:MM:SS
+    const parseTime = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const openMins = parseTime(ta.toastHours.open);
+    let closeMins = parseTime(ta.toastHours.close);
+    if (closeMins <= openMins) closeMins += 24 * 60; // midnight crossover
+    if (nowMins < openMins || nowMins >= closeMins) return false;
+  }
+
+  return true;
+}
+
 const EXCLUDE_KEYWORDS = ['cooking', 'cook wine', 'cork fee', 'wine dinner', 'liter'];
 
 function shouldExclude(name) {
@@ -170,6 +228,34 @@ function extractWines(menus, stockData) {
   const wines = [];
   const wineMenu = menus.menus.find(m => m.guid === WINE_MENU_GUID);
   if (!wineMenu) { console.log('Wine menu not found'); return wines; }
+  const stockMap = {};
+  if (Array.isArray(stockData)) {
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
+  }
+  if (wineMenu.menuGroups) {
+    wineMenu.menuGroups.forEach(g => extractItemsFromGroup(g, stockMap, g.name, wines));
+  }
+  return wines;
+}
+
+// Settings-aware version: accepts any GUID instead of the hardcoded constant
+function extractWinesFromGuid(menus, menuGuid, stockData) {
+  const wines = [];
+  const wineMenu = menus.menus.find(m => m.guid === menuGuid);
+  if (!wineMenu) {
+    // Also search as a group inside any menu
+    for (const m of menus.menus) {
+      const group = findGroupByGuid(m.menuGroups || [], menuGuid);
+      if (group) {
+        const stockMap = {};
+        if (Array.isArray(stockData)) stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
+        extractItemsFromGroup(group, stockMap, group.name, wines);
+        return wines;
+      }
+    }
+    console.log(`Wine menu/group ${menuGuid} not found`);
+    return wines;
+  }
   const stockMap = {};
   if (Array.isArray(stockData)) {
     stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
@@ -402,11 +488,21 @@ exports.syncWineMenu = functions
   .onRun(async (context) => {
     try {
       console.log('Starting Toast API sync...');
+      const settings = await getAppSettings();
+      const wineMenus = getMenusOfType(settings, 'wine');
+      if (wineMenus.length === 0) { console.log('No wine menus configured'); return null; }
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const rawWines = extractWines(menus, stockData);
-      const freshWines = mergeGlassBottle(rawWines);
+
+      // Merge wines across all configured wine menu GUIDs
+      let allRawWines = [];
+      for (const wm of wineMenus) {
+        const raw = extractWinesFromGuid(menus, wm.guid, stockData);
+        allRawWines = [...allRawWines, ...raw];
+      }
+      const freshWines = mergeGlassBottle(allRawWines);
 
       const db = admin.database();
       const enrichmentSnap = await db.ref('wineEnrichment').once('value');
@@ -471,10 +567,20 @@ exports.syncBeerMenu = functions
   .onRun(async (context) => {
     try {
       console.log('Starting Beer menu sync...');
+      const settings = await getAppSettings();
+      // beer_pours menus: only sync the ones labelled as beer (first GUID by convention, or all if only one)
+      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
+      // Separate beer from pours by looking for "beer" in the label (case-insensitive), else use first
+      const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
+      const toSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : [{ guid: BEER_MENU_GUID, label: 'Beer List' }]);
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshBeers = extractItemsFromMenu(menus, BEER_MENU_GUID, stockData);
+      let freshBeers = [];
+      for (const bm of toSync) {
+        freshBeers = [...freshBeers, ...extractItemsFromMenu(menus, bm.guid, stockData)];
+      }
 
       const db = admin.database();
       const enrichmentSnap = await db.ref('beerEnrichment').once('value');
@@ -533,10 +639,18 @@ exports.syncPoursMenu = functions
   .onRun(async (context) => {
     try {
       console.log('Starting Premium Pours sync...');
+      const settings = await getAppSettings();
+      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
+      const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
+      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [{ guid: POURS_MENU_GUID, label: 'Premium Pours' }]);
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshPours = extractItemsFromMenu(menus, POURS_MENU_GUID, stockData);
+      let freshPours = [];
+      for (const pm of toSync) {
+        freshPours = [...freshPours, ...extractItemsFromMenu(menus, pm.guid, stockData)];
+      }
 
       const db = admin.database();
       const enrichmentSnap = await db.ref('poursEnrichment').once('value');
@@ -862,18 +976,60 @@ function extractFoodItems(menus, stockData) {
   return allItems;
 }
 
-// ─── Food Menu Sync ───────────────────────────────────────────────────────────
+// Settings-aware version: accepts a dynamic groups array instead of hardcoded FOOD_GROUPS
+function extractFoodItemsFromGroups(menus, stockData, groups) {
+  const stockMap = {};
+  if (Array.isArray(stockData)) {
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
+  }
+  const allItems = [];
+  for (const { name: courseName, guid } of groups) {
+    let group = null;
+    for (const menu of menus.menus) {
+      group = findGroupByGuid(menu.menuGroups || [], guid);
+      if (group) break;
+    }
+    if (!group) { console.log(`Food group "${courseName}" (${guid}) not found`); continue; }
+    function collectItems(g) {
+      if (g.menuItems && g.menuItems.length > 0) {
+        g.menuItems.forEach(item => {
+          const price = item.price || null;
+          if (!price || price === 0) return;
+          const stockInfo = stockMap[item.guid];
+          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
+          if (allItems.find(i => i.id === item.guid)) return;
+          allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
+        });
+      }
+      if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub));
+    }
+    collectItems(group);
+    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
+  }
+  return allItems;
+}
 
+// ─── Food Menu Sync ───────────────────────────────────────────────────────────
 exports.syncFoodMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
   .pubsub.schedule('9,39 * * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Food menu sync...');
+      const settings = await getAppSettings();
+      const foodMenuConfigs = getMenusOfType(settings, 'food');
+
+      // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
+      let dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid }));
+      if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshItems = extractFoodItems(menus, stockData);
+
+      // Temporarily override FOOD_GROUPS for this sync run
+      const freshItems = extractFoodItemsFromGroups(menus, stockData, dynamicFoodGroups);
 
       const db = admin.database();
       const foodById = {};
@@ -1244,10 +1400,16 @@ exports.syncCocktailsMenu = functions
   .onRun(async (context) => {
     try {
       console.log('Starting Specialty Cocktails sync...');
+      const settings = await getAppSettings();
+      const cnMenus = getMenusOfType(settings, 'cocktails_na');
+      const cocktailMenus = cnMenus.filter(m => /cocktail/i.test(m.label));
+      const toSync = cocktailMenus.length > 0 ? cocktailMenus : (cnMenus.length > 0 ? [cnMenus[0]] : [{ guid: COCKTAILS_MENU_GUID }]);
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshItems = extractItemsFromMenu(menus, COCKTAILS_MENU_GUID, stockData);
+      let freshItems = [];
+      for (const cm of toSync) freshItems = [...freshItems, ...extractItemsFromMenu(menus, cm.guid, stockData)];
 
       const db = admin.database();
       const itemsById = {};
@@ -1289,10 +1451,16 @@ exports.syncNABMenu = functions
   .onRun(async (context) => {
     try {
       console.log('Starting Non-Alcoholic Beverages sync...');
+      const settings = await getAppSettings();
+      const cnMenus = getMenusOfType(settings, 'cocktails_na');
+      const nabMenus = cnMenus.filter(m => /non.?alc|nab|beverage|juice|soda|water/i.test(m.label));
+      const toSync = nabMenus.length > 0 ? nabMenus : (cnMenus.length > 1 ? [cnMenus[1]] : [{ guid: NAB_MENU_GUID }]);
+
       const token = await getToastToken();
       const menus = await getMenus(token);
       const stockData = await getStockData(token);
-      const freshItems = extractItemsFromMenu(menus, NAB_MENU_GUID, stockData);
+      let freshItems = [];
+      for (const nm of toSync) freshItems = [...freshItems, ...extractItemsFromMenu(menus, nm.guid, stockData)];
 
       const db = admin.database();
       const itemsById = {};
@@ -1524,7 +1692,7 @@ exports.sommelierChat = functions
         return res.status(400).json({ error: 'messages array required' });
       }
 
-      // Load live menu data from Firebase
+      // Load live menu data from Firebase (including settings for availability filtering)
       const db = admin.database();
       const [
         winesSnap, wineEnrichSnap, wineOrderSnap,
@@ -1533,6 +1701,7 @@ exports.sommelierChat = functions
         foodSnap, foodOrderSnap, exclusionsSnap,
         cocktailsSnap, cocktailsOrderSnap,
         nabSnap, nabOrderSnap,
+        appSettingsSnap,
       ] = await Promise.all([
         db.ref('wines').once('value'),
         db.ref('wineEnrichment').once('value'),
@@ -1550,7 +1719,22 @@ exports.sommelierChat = functions
         db.ref('cocktailsOrder').once('value'),
         db.ref('nab').once('value'),
         db.ref('nabOrder').once('value'),
+        db.ref('appSettings').once('value'),
       ]);
+
+      // Check which menu types are currently available per Toast-sourced schedule
+      const appSettings = appSettingsSnap.val() || {};
+      const configuredMenus = appSettings.menus || [];
+      const toastAvailCache = appSettings.toastAvailability || {};
+      function isTypeAvailableNow(menuType) {
+        const menusOfType = configuredMenus.filter(m => m.menuType === menuType);
+        if (menusOfType.length === 0) return true; // not configured — assume available
+        return menusOfType.some(m => isMenuAvailableNow(m, toastAvailCache));
+      }
+      const wineAvailable     = isTypeAvailableNow('wine');
+      const beerPoursAvailable = isTypeAvailableNow('beer_pours');
+      const cocktailsNAAvailable = isTypeAvailableNow('cocktails_na');
+      const foodAvailable     = isTypeAvailableNow('food');
 
       // Build wine list
       const winesById = winesSnap.val() || {};
@@ -1647,14 +1831,14 @@ exports.sommelierChat = functions
         ).join('\n')
       ).join('\n');
 
-      // Assemble the full menu block
+      // Assemble the full menu block — only include sections whose menu type is currently available
       const menuBlock = [
-        wineLines.length     ? `WINES:\n${wineLines.join('\n')}` : null,
-        beerLines.length     ? `BEERS:\n${beerLines.join('\n')}` : null,
-        pourLines.length     ? `PREMIUM POURS:\n${pourLines.join('\n')}` : null,
-        cocktailLines.length ? `SPECIALTY COCKTAILS:\n${cocktailLines.join('\n')}` : null,
-        nabLines.length      ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
-        foodSection          ? `FOOD MENU:\n${foodSection}` : null,
+        (wineAvailable && wineLines.length)          ? `WINES:\n${wineLines.join('\n')}` : null,
+        (beerPoursAvailable && beerLines.length)      ? `BEERS:\n${beerLines.join('\n')}` : null,
+        (beerPoursAvailable && pourLines.length)      ? `PREMIUM POURS:\n${pourLines.join('\n')}` : null,
+        (cocktailsNAAvailable && cocktailLines.length) ? `SPECIALTY COCKTAILS:\n${cocktailLines.join('\n')}` : null,
+        (cocktailsNAAvailable && nabLines.length)     ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
+        (foodAvailable && foodSection)                ? `FOOD MENU:\n${foodSection}` : null,
       ].filter(Boolean).join('\n\n');
 
       let contextLine;
@@ -1750,6 +1934,218 @@ The "recommended" array must contain the [id:...] values of every food dish or w
       return res.status(500).json({ error: error.message });
     }
   });
+
+// ─── Re-enrich Single Item ────────────────────────────────────────────────────
+// Clears existing enrichment for one item and re-runs it through Claude fresh.
+// This catches items enriched before the uncertain/review system was added.
+
+exports.reenrichItem = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+
+    try {
+      const { itemId, itemType, itemName } = req.body;
+      if (!itemId || !itemType || !itemName) {
+        return res.status(400).json({ error: 'itemId, itemType, and itemName required' });
+      }
+
+      const db = admin.database();
+      let enrichment = null;
+      let enrichPath = null;
+      let enrichData = null;
+
+      if (itemType === 'wine') {
+        enrichPath = `wineEnrichment/${itemId}`;
+        const vintage = parseVintage(itemName);
+        enrichment = await enrichWineWithClaude(itemName, vintage);
+        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
+        enrichData = {
+          sourceName: itemName,
+          correctedName: enrichment.correctedName || itemName,
+          uncertain: enrichment.uncertain || false,
+          uncertainReason: enrichment.uncertainReason || null,
+          varietal: enrichment.varietal || null,
+          region: enrichment.region || null,
+          description: enrichment.description || null,
+          reviews: enrichment.reviews || null,
+          labelImageQuery: enrichment.labelImageQuery || null,
+          vintage,
+          enrichedAt: Date.now(),
+          reEnrichedAt: Date.now(),
+          manuallyEdited: false,  // clear any previous manual edits so fresh data shows
+          approved: false,        // reset approval so uncertain items surface in review
+        };
+
+      } else if (itemType === 'beer') {
+        enrichPath = `beerEnrichment/${itemId}`;
+        enrichment = await enrichBeerWithClaude(itemName);
+        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
+        enrichData = {
+          sourceName: itemName,
+          correctedName: enrichment.correctedName || itemName,
+          uncertain: enrichment.uncertain || false,
+          uncertainReason: enrichment.uncertainReason || null,
+          style: enrichment.style || null,
+          brewery: enrichment.brewery || null,
+          abv: enrichment.abv || null,
+          description: enrichment.description || null,
+          imageQuery: enrichment.imageQuery || null,
+          enrichedAt: Date.now(),
+          reEnrichedAt: Date.now(),
+          manuallyEdited: false,
+          approved: false,
+        };
+
+      } else if (itemType === 'pour') {
+        enrichPath = `poursEnrichment/${itemId}`;
+        enrichment = await enrichPourWithClaude(itemName);
+        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
+        enrichData = {
+          sourceName: itemName,
+          correctedName: enrichment.correctedName || itemName,
+          uncertain: enrichment.uncertain || false,
+          uncertainReason: enrichment.uncertainReason || null,
+          category: enrichment.category || null,
+          producer: enrichment.producer || null,
+          abv: enrichment.abv || null,
+          age: enrichment.age || null,
+          description: enrichment.description || null,
+          imageQuery: enrichment.imageQuery || null,
+          enrichedAt: Date.now(),
+          reEnrichedAt: Date.now(),
+          manuallyEdited: false,
+          approved: false,
+        };
+
+      } else {
+        return res.status(400).json({ error: `itemType "${itemType}" does not support enrichment` });
+      }
+
+      await db.ref(enrichPath).set(enrichData);
+      console.log(`Re-enriched ${itemType} "${itemName}" (${itemId}) — uncertain: ${enrichData.uncertain}`);
+
+      res.json({
+        ok: true,
+        uncertain: enrichData.uncertain,
+        uncertainReason: enrichData.uncertainReason || null,
+        enrichment: enrichData,
+      });
+
+    } catch (error) {
+      console.error('reenrichItem error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+// ─── Get App Settings ─────────────────────────────────────────────────────────
+
+exports.getSettings = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const db = admin.database();
+    const snap = await db.ref('appSettings').once('value');
+    res.json({ settings: snap.val() || { menus: [] } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Save App Settings ────────────────────────────────────────────────────────
+
+exports.saveSettings = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+
+  try {
+    const { action, settings, guid } = req.body;
+
+    // ── Fetch Toast availability for a single GUID (used by Settings "Check" button) ──
+    if (action === 'fetchAvailability') {
+      if (!guid) return res.status(400).json({ error: 'guid required' });
+      try {
+        const token = await getToastToken();
+        const menus = await getMenus(token);
+        // Find menu or group matching this GUID
+        let found = menus.menus.find(m => m.guid === guid);
+        let itemCount = 0;
+        let menuName = null;
+        let availSchedule = null;
+
+        if (found) {
+          menuName = found.name;
+          availSchedule = found.availabilitySchedules || null;
+          // Count all items recursively
+          function countItems(group) {
+            let c = (group.menuItems || []).length;
+            (group.menuGroups || []).forEach(sg => { c += countItems(sg); });
+            return c;
+          }
+          (found.menuGroups || []).forEach(g => { itemCount += countItems(g); });
+        } else {
+          // Search as a group
+          for (const m of menus.menus) {
+            const group = findGroupByGuid(m.menuGroups || [], guid);
+            if (group) {
+              found = group;
+              menuName = group.name;
+              availSchedule = group.availabilitySchedules || null;
+              function countGrpItems(g) {
+                let c = (g.menuItems || []).length;
+                (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
+                return c;
+              }
+              itemCount = countGrpItems(group);
+              break;
+            }
+          }
+        }
+
+        if (!found) return res.json({ availability: null, error: 'GUID not found in Toast' });
+
+        // Parse Toast availability schedule if present
+        let toastDays = null;
+        let toastHours = null;
+        if (availSchedule && Array.isArray(availSchedule) && availSchedule.length > 0) {
+          const sched = availSchedule[0];
+          toastDays = sched.availableDays || null;
+          if (sched.timeRanges && sched.timeRanges.length > 0) {
+            toastHours = { open: sched.timeRanges[0].startTime, close: sched.timeRanges[0].endTime };
+          }
+        }
+
+        return res.json({
+          availability: {
+            name: menuName,
+            itemCount,
+            toastDays,
+            toastHours,
+            guid,
+            checkedAt: Date.now()
+          }
+        });
+      } catch (e) {
+        return res.json({ availability: null, error: e.message });
+      }
+    }
+
+    // ── Save full settings ──
+    if (!settings) return res.status(400).json({ error: 'settings required' });
+    const db = admin.database();
+    await db.ref('appSettings').set({ ...settings, updatedAt: Date.now() });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ─── Cleanup Expired Menus (runs daily at 3 AM) ───────────────────────────────
 exports.cleanupExpiredMenus = functions
