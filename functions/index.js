@@ -1519,7 +1519,7 @@ exports.sommelierChat = functions
     if (req.method === 'OPTIONS') return res.status(204).send('');
 
     try {
-      const { messages, contextItem } = req.body;
+      const { messages, contextItem, selectedFoods } = req.body;
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'messages array required' });
       }
@@ -1568,7 +1568,7 @@ exports.sommelierChat = functions
         if (w.glassPrice) prices.push(`$${Math.round(w.glassPrice)} glass`);
         if (w.bottlePrice) prices.push(`$${Math.round(w.bottlePrice)} bottle`);
         const meta = [e.varietal, e.region].filter(Boolean).join(', ');
-        return `  - ${name}${meta ? ` (${meta})` : ''}${prices.length ? ' -- ' + prices.join(', ') : ''}${e.description ? ' | ' + e.description : ''}`;
+        return `  - [id:${w.id}] ${name}${meta ? ` (${meta})` : ''}${prices.length ? ' -- ' + prices.join(', ') : ''}${e.description ? ' | ' + e.description : ''}`;
       });
 
       // Build beer list
@@ -1643,7 +1643,7 @@ exports.sommelierChat = functions
       });
       const foodSection = Object.entries(foodByCourse).map(([course, items]) =>
         `  ${course}:\n` + items.map(f =>
-          `    - ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ''}${f.description ? ': ' + f.description : ''}`
+          `    - [id:${f.id}] ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ''}${f.description ? ': ' + f.description : ''}`
         ).join('\n')
       ).join('\n');
 
@@ -1657,10 +1657,29 @@ exports.sommelierChat = functions
         foodSection          ? `FOOD MENU:\n${foodSection}` : null,
       ].filter(Boolean).join('\n\n');
 
-      const contextLine = contextItem
-        ? `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Use that as your starting point.`
-        : 'The guest opened this chat from the main menu.';
+      let contextLine;
+      if (selectedFoods && selectedFoods.length > 0) {
+        const foodNames = selectedFoods.map(f => f.name).join(', ');
+        contextLine = `The guest has selected the following dishes and wants wine pairing recommendations: ${foodNames}. Use these as your starting point and recommend wines from the menu that pair well with this specific selection.`;
+      } else if (contextItem) {
+        contextLine = `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Use that as your starting point.`;
+      } else {
+        contextLine = 'The guest opened this chat from the main menu.';
+      }
 
+      // Build lookup maps keyed by Firebase ID -- names are display-only
+      const wineById = {};
+      orderedWines.forEach(w => {
+        const e = wineEnrich[w.id] || {};
+        wineById[w.id] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
+      });
+      const foodById2 = {};
+      orderedFood.forEach(f => {
+        foodById2[f.id] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
+      });
+
+      // System prompt instructs Claude to return structured JSON so we can
+      // surface every recommendation as an actionable chip -- no fuzzy matching needed
       const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
 
 ${contextLine}
@@ -1675,25 +1694,20 @@ STRICT RULES -- never break these under any circumstances:
 2. NEVER discuss topics outside food and beverage -- sports, news, weather, travel, politics, entertainment, or anything else unrelated to tonight's dining. Politely redirect: "I'm best at helping you find something delicious tonight -- what can I help you with?"
 3. ONLY recommend items that appear in the menu above. Do not invent dishes or beverages.
 4. Keep responses concise and conversational -- 2-4 sentences is right. Guests are at the table.
-5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.`;
+5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.
 
-      // Build lookup maps so we can match names mentioned in the reply to real menu items
-      const wineByName = {};
-      orderedWines.forEach(w => {
-        const e = wineEnrich[w.id] || {};
-        const name = (e.correctedName || w.name).toLowerCase();
-        wineByName[name] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
-      });
-      const foodByName = {};
-      orderedFood.forEach(f => {
-        foodByName[f.name.toLowerCase()] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
-      });
+RESPONSE FORMAT -- you MUST always respond with valid JSON in this exact shape and nothing else:
+{
+  "reply": "Your warm conversational response to the guest here",
+  "recommended": ["id:wine-abc123", "id:food-xyz456"]
+}
+The "recommended" array must contain the [id:...] values of every food dish or wine you mention as a recommendation in this turn, taken exactly from the menu above (e.g. if the menu shows "[id:wine-abc123] Opus One 2021", put "wine-abc123" in the array). If you are not recommending specific items this turn (e.g. asking a clarifying question), use an empty array.`;
 
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
         {
           model: 'claude-sonnet-4-6',
-          max_tokens: 500,
+          max_tokens: 600,
           system: systemPrompt,
           messages: messages.map(m => ({ role: m.role, content: m.content })),
         },
@@ -1706,23 +1720,25 @@ STRICT RULES -- never break these under any circumstances:
         }
       );
 
-      const reply = response.data.content[0].text;
-
-      // Scan the reply text for menu item names and return them as actionable suggestions
-      const suggestions = [];
-      const replyLower = reply.toLowerCase();
-
-      // Check wines
-      for (const [nameLower, wine] of Object.entries(wineByName)) {
-        if (replyLower.includes(nameLower)) {
-          suggestions.push({ type: 'wine', ...wine });
+      // Parse the structured JSON response
+      let reply = '';
+      let suggestions = [];
+      try {
+        const parsed = JSON.parse(response.data.content[0].text.replace(/```json|```/g, '').trim());
+        reply = parsed.reply || '';
+        // Resolve each recommended ID to its full menu item object
+        const recommended = parsed.recommended || [];
+        for (const id of recommended) {
+          if (wineById[id]) {
+            suggestions.push({ type: 'wine', ...wineById[id] });
+          } else if (foodById2[id]) {
+            suggestions.push({ type: 'food', ...foodById2[id] });
+          }
         }
-      }
-      // Check food
-      for (const [nameLower, food] of Object.entries(foodByName)) {
-        if (nameLower.length > 4 && replyLower.includes(nameLower)) {
-          suggestions.push({ type: 'food', ...food });
-        }
+      } catch (e) {
+        // If JSON parse fails, fall back to plain text with no chips
+        reply = response.data.content[0].text;
+        suggestions = [];
       }
 
       return res.json({ reply, suggestions });
