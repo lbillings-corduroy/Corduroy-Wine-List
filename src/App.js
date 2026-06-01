@@ -1528,8 +1528,8 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
           {wines.length} total wines · {isAdmin ? "Admin access" : "Manager access"} · Tap AK logo 5× to access this screen
         </div>
       </div>
-      </div> {/* end inner panel */}
-    </div>   {/* end backdrop */}
+      </div>
+    </div>
   );
 }
 
