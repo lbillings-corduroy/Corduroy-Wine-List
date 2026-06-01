@@ -362,13 +362,15 @@ function SettingsTab() {
   }
 
   const inputStyle = {
-    background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200",
+    background: "rgba(255,255,255,0.08)", border: "0.5px solid #5a3a1a",
     color: "#f0e8d8", padding: "8px 12px", borderRadius: 6,
     fontFamily: "Georgia, serif", fontSize: 12, width: "100%",
     boxSizing: "border-box", outline: "none"
   };
-  const labelStyle = { color: "#6a5040", fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
+  const labelStyle = { color: "#9a7050", fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
   const selectStyle = { ...inputStyle, cursor: "pointer" };
+  const bodyText = { color: "#c8b090", fontSize: 12, lineHeight: 1.5 };
+  const hintText = { color: "#7a5540", fontSize: 10, marginTop: 4, fontStyle: "italic" };
 
   function MenuTypeTag({ value }) {
     const t = MENU_TYPES.find(m => m.value === value);
@@ -411,11 +413,11 @@ function SettingsTab() {
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 10, color: "#4a3020", fontStyle: "italic" }}>
+          <span style={{ fontSize: 10, color: "#7a5540", fontStyle: "italic" }}>
             Tap ⟳ Check to pull availability from Toast
           </span>
         )}
-        <span style={{ fontSize: 10, color: "#6a5040", background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "2px 8px" }}>
+        <span style={{ fontSize: 10, color: "#9a7050", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 10, padding: "2px 8px" }}>
           📍 {locStr}
         </span>
       </div>
@@ -440,7 +442,7 @@ function SettingsTab() {
           <label style={labelStyle}>Toast Menu / Group GUID</label>
           <input style={inputStyle} placeholder="e.g. 2d490bef-759b-447f-9af4-5bf0971948ba"
             value={draft.guid} onChange={e => setDraft(p => ({ ...p, guid: e.target.value.trim() }))} />
-          <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+          <div style={{ ...hintText }}>
             Found in Toast → Menus → select menu → the GUID appears in the URL or menu details
           </div>
         </div>
@@ -455,7 +457,7 @@ function SettingsTab() {
             ))}
           </select>
           {draft.menuType && (
-            <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+            <div style={{ ...hintText }}>
               {MENU_TYPES.find(t => t.value === draft.menuType)?.description}
             </div>
           )}
@@ -465,7 +467,7 @@ function SettingsTab() {
         <div>
           <label style={labelStyle}>Availability (from Toast)</label>
           {ta ? (
-            <div style={{ background: "rgba(76,175,125,0.06)", border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
                 {ta.toastDays && ta.toastDays.length > 0 ? (
                   <span style={{ fontSize: 11, color: "#4caf7d" }}>📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}</span>
@@ -478,15 +480,15 @@ function SettingsTab() {
               ) : (
                 <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 No time restriction in Toast</div>
               )}
-              <div style={{ fontSize: 10, color: "#4a6040", marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: "#7a9070", marginTop: 4 }}>
                 {ta.itemCount || "?"} items found · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
               </div>
-              <div style={{ color: "#3a4020", fontSize: 10, marginTop: 6, fontStyle: "italic" }}>
+              <div style={{ ...hintText, marginTop: 6 }}>
                 Availability is set in Toast → Menus → select menu → Availability. Tap ⟳ Check to refresh.
               </div>
             </div>
           ) : (
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px dashed #3c2200", borderRadius: 8, padding: "10px 12px", color: "#4a3020", fontSize: 11, fontStyle: "italic" }}>
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px dashed #5a3a1a", borderRadius: 8, padding: "10px 12px", color: "#7a5540", fontSize: 11, fontStyle: "italic" }}>
               {draft.guid ? "Tap ⟳ Check on the menu card to pull availability from Toast." : "Enter a GUID first, then use ⟳ Check to fetch availability."}
             </div>
           )}
@@ -501,9 +503,9 @@ function SettingsTab() {
               return (
                 <button key={loc.id} onClick={() => toggleLocation(draft, setDraft, loc.id)} style={{
                   flex: 1, padding: "10px 8px", borderRadius: 8,
-                  border: `0.5px solid ${active ? "#c9a96e" : "#3c2200"}`,
-                  background: active ? "rgba(201,169,110,0.15)" : "transparent",
-                  color: active ? "#f0e8d8" : "#4a3020", fontSize: 12, cursor: "pointer",
+                  border: `0.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
+                  background: active ? "rgba(201,169,110,0.15)" : "rgba(255,255,255,0.04)",
+                  color: active ? "#f0e8d8" : "#9a7050", fontSize: 12, cursor: "pointer",
                   fontFamily: "Georgia, serif", textAlign: "center", transition: "all 0.12s"
                 }}>
                   <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.id === "bar" ? "🍸" : "🍽"}</div>
@@ -513,7 +515,7 @@ function SettingsTab() {
               );
             })}
           </div>
-          <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+          <div style={{ ...hintText }}>
             Leave both unchecked to show in all locations. Check one or both to restrict by location.
           </div>
         </div>
@@ -541,19 +543,19 @@ function SettingsTab() {
   return (
     <div>
       {/* ── Location Names ── */}
-      <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid #3c2200", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #5a3a1a", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingLocations ? 14 : 0 }}>
           <div>
             <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Location Names</div>
             {!editingLocations && (
-              <div style={{ color: "#8a7060", fontSize: 12 }}>
+              <div style={{ color: "#c8b090", fontSize: 12 }}>
                 {locationNames.bar} &nbsp;·&nbsp; {locationNames.dining}
               </div>
             )}
           </div>
           {!editingLocations && (
             <button onClick={() => { setLocationDraft({ ...locationNames }); setEditingLocations(true); }}
-              style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
               Edit
             </button>
           )}
@@ -572,7 +574,7 @@ function SettingsTab() {
                   onChange={e => setLocationDraft(p => ({ ...p, dining: e.target.value }))} />
               </div>
             </div>
-            <div style={{ color: "#4a3020", fontSize: 10, fontStyle: "italic" }}>
+            <div style={{ ...hintText }}>
               These names appear on menu location checkboxes throughout settings.
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -581,7 +583,7 @@ function SettingsTab() {
                 Save Names
               </button>
               <button onClick={() => setEditingLocations(false)}
-                style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
                 Cancel
               </button>
             </div>
@@ -595,7 +597,7 @@ function SettingsTab() {
       </div>
 
       {menus.length === 0 && !addingMenu && (
-        <div style={{ color: "#4a3020", fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
+        <div style={{ color: "#7a5540", fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
           No menus configured yet. Add your first menu below.
         </div>
       )}
@@ -604,7 +606,7 @@ function SettingsTab() {
         const isExpanded = expandedMenu === idx;
         const ta = toastAvailability[menu.guid];
         return (
-          <div key={menu.id || idx} style={{ background: "rgba(255,255,255,0.03)", border: `0.5px solid ${isExpanded ? "#c9a96e" : "#3c2200"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+          <div key={menu.id || idx} style={{ background: "rgba(255,255,255,0.05)", border: `0.5px solid ${isExpanded ? "#c9a96e" : "#5a3a1a"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
             {/* Collapsed row */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}
               onClick={() => setExpandedMenu(isExpanded ? null : idx)}>
@@ -613,23 +615,23 @@ function SettingsTab() {
                   <span style={{ color: "#f0e8d8", fontSize: 13, fontWeight: 500 }}>{menu.label || "Unnamed Menu"}</span>
                   <MenuTypeTag value={menu.menuType} />
                 </div>
-                <div style={{ color: "#4a3020", fontSize: 10, fontFamily: "monospace", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
+                <div style={{ color: "#7a5540", fontSize: 10, fontFamily: "monospace", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
                 <AvailabilitySummary menu={menu} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                 <button onClick={e => { e.stopPropagation(); syncMenuPreview(menu, idx); }}
                   disabled={syncingMenu === idx}
-                  style={{ background: "rgba(76,175,125,0.1)", border: "0.5px solid rgba(76,175,125,0.3)", color: "#4caf7d", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 10, whiteSpace: "nowrap" }}>
+                  style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid rgba(76,175,125,0.35)", color: "#4caf7d", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 10, whiteSpace: "nowrap" }}>
                   {syncingMenu === idx ? "…" : "⟳ Check"}
                 </button>
                 <button onClick={e => { e.stopPropagation(); deleteMenu(idx); }}
-                  style={{ background: "none", border: "none", color: "#5a3020", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+                  style={{ background: "none", border: "none", color: "#7a5040", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
               </div>
             </div>
 
             {/* Expanded edit form */}
             {isExpanded && (
-              <div style={{ borderTop: "0.5px solid #2a1400", padding: "16px 14px", background: "rgba(0,0,0,0.1)" }}>
+              <div style={{ borderTop: "0.5px solid #5a3a1a", padding: "16px 14px", background: "rgba(255,255,255,0.03)" }}>
                 <MenuForm
                   draft={menus[idx]}
                   setDraft={(updater) => {
@@ -648,7 +650,7 @@ function SettingsTab() {
 
       {/* ── Add New Menu ── */}
       {addingMenu ? (
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid #c9a96e", borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
+        <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #c9a96e", borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
           <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 14 }}>Add New Menu</div>
           <MenuForm
             draft={newMenu}
@@ -673,14 +675,14 @@ function SettingsTab() {
       )}
 
       {/* ── Legend ── */}
-      <div style={{ marginTop: 24, borderTop: "0.5px solid #2a1400", paddingTop: 16 }}>
-        <div style={{ color: "#4a3020", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
+      <div style={{ marginTop: 24, borderTop: "0.5px solid #5a3a1a", paddingTop: 16 }}>
+        <div style={{ color: "#9a7050", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
         {MENU_TYPES.map(t => {
           const colors = { wine: "#c9a96e", food: "#7ab87a", beer_pours: "#c8860a", cocktails_na: "#6090a0" };
           return (
             <div key={t.value} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
               <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${colors[t.value]}`, color: colors[t.value], whiteSpace: "nowrap", marginTop: 1, flexShrink: 0 }}>{t.label}</span>
-              <span style={{ color: "#4a3020", fontSize: 11 }}>{t.description}</span>
+              <span style={{ color: "#c8b090", fontSize: 11 }}>{t.description}</span>
             </div>
           );
         })}
