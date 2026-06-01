@@ -972,7 +972,14 @@ Respond in JSON only (no other text):
         );
         const text = response.data.content[0].text;
         const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        return res.json(result);
+        // Enrich pairings with food item IDs so the frontend can add them to My Menu
+        const foodByName = {};
+        foodItems.forEach(f => { foodByName[f.name.toLowerCase()] = f; });
+        const enrichedPairings = (result.pairings || []).map(p => {
+          const match = foodByName[p.name.toLowerCase()];
+          return match ? { ...p, id: match.id, price: match.price || null } : p;
+        });
+        return res.json({ pairings: enrichedPairings });
       }
 
       // ── Food → Wine ───────────────────────────────────────────────────────
@@ -1190,7 +1197,14 @@ Respond in JSON only (no other text):
         );
         const text = response.data.content[0].text;
         const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        return res.json(result);
+        // Enrich pairings with food item IDs so the frontend can add them to My Menu
+        const drinkFoodByName = {};
+        foodItems.forEach(f => { drinkFoodByName[f.name.toLowerCase()] = f; });
+        const enrichedDrinkPairings = (result.pairings || []).map(p => {
+          const match = drinkFoodByName[p.name.toLowerCase()];
+          return match ? { ...p, id: match.id, price: match.price || null } : p;
+        });
+        return res.json({ pairings: enrichedDrinkPairings });
       }
 
       return res.status(400).json({ error: 'Invalid type' });
