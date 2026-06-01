@@ -905,7 +905,19 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
           style={{ background: editingItem?.id === item.id ? "rgba(201,169,110,0.08)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${editingItem?.id === item.id ? "rgba(201,169,110,0.4)" : "#3c2200"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
           {item.imageUrl && <div style={{ width: 32, height: 44, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
+              <div style={{ color: "#f0e8d8", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {item.sourceName || item.name}
+              </div>
+              {item.sourceName && item.name && item.sourceName !== item.name && (
+                <span style={{ flexShrink: 0, fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px", letterSpacing: "0.5px" }}>AI renamed</span>
+              )}
+            </div>
+            {item.sourceName && item.name && item.sourceName !== item.name && (
+              <div style={{ color: "#c9a96e", fontSize: 10, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                → {item.name}
+              </div>
+            )}
             <div style={{ color: "#6a5040", fontSize: 10 }}>
               {category === "wines" && [item.varietal, item.region].filter(Boolean).join(" · ")}
               {category === "beer" && [item.style, item.brewery].filter(Boolean).join(" · ")}
@@ -914,6 +926,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
               {item.manuallyEdited && <span style={{ color: "#4caf7d", marginLeft: 6 }}>✎ edited</span>}
               {item.excluded && <span style={{ color: "#e85050", marginLeft: 6 }}>hidden</span>}
             </div>
+            <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
           </div>
           <div style={{ color: "#4a3020", fontSize: 18 }}>›</div>
         </div>
@@ -922,9 +935,21 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
       {/* Edit panel */}
       {editingItem && (
         <div style={{ position: "sticky", bottom: 0, background: "#4d2e00", border: "0.5px solid #3c2200", borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "1px", textTransform: "uppercase" }}>Edit · {editingItem.name}</div>
-            <button onClick={() => setEditingItem(null)} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0 }}>×</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+              <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 2 }}>Toast Name</div>
+              <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: editingItem.sourceName && editingItem.name !== editingItem.sourceName ? 4 : 0 }}>
+                {editingItem.sourceName || editingItem.name}
+              </div>
+              {editingItem.sourceName && editingItem.name !== editingItem.sourceName && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px" }}>AI renamed to</span>
+                  <span style={{ color: "#c9a96e", fontSize: 12 }}>{editingItem.name}</span>
+                </div>
+              )}
+              <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>{editingItem.id}</div>
+            </div>
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
           </div>
 
           {editingItem._type !== "food" && (
@@ -1352,7 +1377,18 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                   {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 2 }}>{wine.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
+                    <div style={{ color: "#f0e8d8", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {wine.sourceName || wine.name}
+                    </div>
+                    {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
+                      <span style={{ flexShrink: 0, fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px" }}>AI renamed</span>
+                    )}
+                  </div>
+                  {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
+                    <div style={{ color: "#c9a96e", fontSize: 10, marginBottom: 2 }}>→ {wine.name}</div>
+                  )}
+                  <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
                   <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
                     {itemType === "beer" ? [wine.style, wine.brewery].filter(Boolean).join(" · ")
                       : itemType === "pour" ? [wine.category, wine.producer].filter(Boolean).join(" · ")
