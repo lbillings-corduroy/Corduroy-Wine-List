@@ -936,6 +936,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   const [zoomedLabel, setZoomedLabel] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContext, setChatContext] = useState(null);
+  const [toast, setToast] = useState(null);
 
   function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
 
@@ -1132,7 +1133,8 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
       })()}
 
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
   );
@@ -1580,25 +1582,35 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 //   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
 //                  used to personalise the opening message; null for generic open
 
-function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleFavorite }) {
-  const OPENER = contextItem
-    ? `I see you're looking at the ${contextItem.name}. Before I start searching, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or anything else?`
-    : "Before I start my search, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or budget?";
+function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist }) {
+  function buildOpener() {
+    if (selectedFoods.length > 0) {
+      const names = selectedFoods.map(f => f.name).join(", ");
+      return `I can see you're considering ${names}. Before I find wine pairings, is there anything I should know about your preferences — a style you love, something you'd like to avoid, or a budget in mind?`;
+    }
+    if (contextItem) {
+      return `I see you're looking at the ${contextItem.name}. Before I start searching, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or anything else?`;
+    }
+    return "Before I start my search, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or budget?";
+  }
 
-  // Each message: { role, text, suggestions? }
-  const [messages, setMessages]   = useState([]);
-  const [input, setInput]         = useState("");
-  const [sending, setSending]     = useState(false);
-  const bottomRef                 = useRef(null);
-  const inputRef                  = useRef(null);
+  const [messages, setMessages]       = useState([]);
+  const [input, setInput]             = useState("");
+  const [sending, setSending]         = useState(false);
+  const [addedThisSession, setAddedThisSession] = useState([]);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
+  const bottomRef                     = useRef(null);
+  const inputRef                      = useRef(null);
 
+  // Reset session state when drawer opens
   useEffect(() => {
     if (isOpen) {
-      setMessages([{ role: "assistant", text: OPENER, suggestions: [] }]);
+      setMessages([{ role: "assistant", text: buildOpener(), suggestions: [] }]);
       setInput("");
+      setAddedThisSession([]);
       setTimeout(() => inputRef.current?.focus(), 300);
     }
-  }, [isOpen, contextItem?.name]); // intentional: only re-seed when item or open state changes
+  }, [isOpen, contextItem?.name, selectedFoods.map(f=>f.id).join(',')]); // intentional: re-seed when item/foods change
 
   useEffect(() => {
     if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1607,12 +1619,10 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
-
     const newMessages = [...messages, { role: "user", text, suggestions: [] }];
     setMessages(newMessages);
     setInput("");
     setSending(true);
-
     try {
       const res = await fetch(CHAT_URL, {
         method: "POST",
@@ -1620,6 +1630,7 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.text })),
           contextItem: contextItem || null,
+          selectedFoods: selectedFoods.length > 0 ? selectedFoods.map(f => ({ id: f.id, name: f.name, courseRole: f.courseRole })) : [],
         }),
       });
       const data = await res.json();
@@ -1640,50 +1651,43 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
 
   function handleAddToMenu(suggestion) {
     if (!onToggleFavorite) return;
+    const alreadyAdded = favorites.some(f => f.id === suggestion.id);
     if (suggestion.type === "wine") {
-      onToggleFavorite({
-        id: suggestion.id,
-        name: suggestion.name,
-        varietal: suggestion.varietal || null,
-        region: suggestion.region || null,
-        glassPrice: suggestion.glassPrice || null,
-        bottlePrice: suggestion.bottlePrice || null,
-        imageUrl: suggestion.imageUrl || null,
-        fromPairing: false,
-      }, "wine");
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, varietal: suggestion.varietal || null, region: suggestion.region || null, glassPrice: suggestion.glassPrice || null, bottlePrice: suggestion.bottlePrice || null, imageUrl: suggestion.imageUrl || null, fromPairing: false }, "wine");
     } else if (suggestion.type === "food") {
-      onToggleFavorite({
-        id: suggestion.id,
-        name: suggestion.name,
-        price: suggestion.price || null,
-        course: suggestion.course || null,
-        description: suggestion.description || null,
-        courseRole: "main",
-      }, "food");
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, price: suggestion.price || null, course: suggestion.course || null, description: suggestion.description || null, courseRole: "main" }, "food");
     }
+    // Track what was added this session (only additions, not removals)
+    if (!alreadyAdded) {
+      setAddedThisSession(prev => prev.some(a => a.id === suggestion.id) ? prev : [...prev, suggestion]);
+    }
+  }
+
+  // When closing, fire toast if anything was added
+  function handleClose() {
+    onClose(addedThisSession.length > 0 ? addedThisSession : null);
   }
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: "Georgia, serif" }}
-      >
-        {/* Header */}
+  const hasAdded = addedThisSession.length > 0;
+  let lastSuggestionMsgIndex = -1;
+  messages.forEach((m, i) => { if (m.role === "assistant" && m.suggestions?.length > 0) lastSuggestionMsgIndex = i; });
+
+  return <>
+    <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: "Georgia, serif" }}>
+
+        {/* Header — X becomes "Done ✓" once something has been added */}
         <div style={{ background: "#472a00", borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
             <div style={{ color: "#f0e8d8", fontSize: 13 }}>Appalachia Kitchen</div>
           </div>
           <button
-            onClick={onClose}
-            style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", fontSize: 18, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-          >×</button>
+            onClick={handleClose}
+            style={{ background: hasAdded ? "#c9a96e" : "rgba(201,169,110,0.15)", border: hasAdded ? "none" : "0.5px solid rgba(201,169,110,0.4)", color: hasAdded ? "#0d0800" : "#c9a96e", height: 32, borderRadius: hasAdded ? 8 : "50%", width: hasAdded ? "auto" : 32, padding: hasAdded ? "0 12px" : 0, cursor: "pointer", fontSize: hasAdded ? 12 : 18, fontFamily: "Georgia, serif", fontWeight: hasAdded ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", whiteSpace: "nowrap" }}
+          >{hasAdded ? "Done ✓" : "×"}</button>
         </div>
 
         {/* Message list */}
@@ -1691,45 +1695,53 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{
-                  maxWidth: "85%",
-                  background: m.role === "user" ? "#472a00" : "#faf5ec",
-                  color: m.role === "user" ? "#f0e8d8" : "#3d2000",
-                  border: m.role === "user" ? "none" : "0.5px solid #e8dcc8",
-                  borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                  padding: "10px 14px",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? "#472a00" : "#faf5ec", color: m.role === "user" ? "#f0e8d8" : "#3d2000", border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
                   {m.text}
                 </div>
               </div>
 
-              {/* Suggestion chips — shown below assistant messages that mention menu items */}
+              {/* Suggestion chips */}
               {m.role === "assistant" && m.suggestions && m.suggestions.length > 0 && (
                 <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4 }}>
                   {m.suggestions.map((s, si) => {
                     const isAdded = favorites.some(f => f.id === s.id);
-                    const icon = s.type === "wine" ? "🍷" : "🍽";
-                    const sub = s.type === "wine"
-                      ? [s.varietal, s.region].filter(Boolean).join(" · ")
-                      : s.course;
+                    const sub = s.type === "wine" ? [s.varietal, s.region].filter(Boolean).join(" · ") : s.course;
+                    const hasImage = s.type === "wine" && s.imageUrl;
                     return (
                       <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? "rgba(76,175,125,0.08)" : "rgba(201,169,110,0.07)", border: `0.5px solid ${isAdded ? "#4caf7d" : "rgba(201,169,110,0.4)"}`, borderRadius: 10, padding: "8px 12px" }}>
-                        <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+                        {/* Label thumbnail or emoji fallback */}
+                        <div
+                          onClick={hasImage ? () => setZoomedLabel(s) : undefined}
+                          style={{ width: 36, height: 50, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${hasImage ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: hasImage ? "zoom-in" : "default" }}
+                        >
+                          {hasImage
+                            ? <img src={s.imageUrl} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : (s.type === "wine" ? "🍷" : "🍽")}
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: "#3d2000", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                           {sub && <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
+                          {hasImage && <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
                         </div>
-                        <button
-                          onClick={() => handleAddToMenu(s)}
-                          style={{ background: isAdded ? "rgba(76,175,125,0.15)" : "#472a00", border: isAdded ? "0.5px solid #4caf7d" : "none", color: isAdded ? "#4caf7d" : "#c9a96e", fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap", flexShrink: 0 }}
-                        >
+                        <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? "rgba(76,175,125,0.15)" : "#472a00", border: isAdded ? "0.5px solid #4caf7d" : "none", color: isAdded ? "#4caf7d" : "#c9a96e", fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap", flexShrink: 0 }}>
                           {isAdded ? "★ Added" : "☆ Add to My Menu"}
                         </button>
                       </div>
                     );
                   })}
+
+                  {/* Hint text — only on the last message with suggestions, only if not yet added anything */}
+                  {i === lastSuggestionMsgIndex && !hasAdded && (
+                    <div style={{ color: "#9a7855", fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                      Tap ☆ Add to My Menu to save, or keep chatting below.
+                    </div>
+                  )}
+                  {/* Hint text — once something added, encourage close */}
+                  {i === lastSuggestionMsgIndex && hasAdded && (
+                    <div style={{ color: "#7a9a6e", fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                      Saved! Tap <strong>Done ✓</strong> when you're finished, or keep chatting.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1746,24 +1758,51 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
 
         {/* Input bar */}
         <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid #e8e0d0", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder="Type your reply…"
-            rows={1}
-            style={{ flex: 1, background: "#faf8f4", border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: "Georgia, serif", fontSize: 13, color: "#3d2000", outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-            style={{ background: input.trim() && !sending ? "#c9a96e" : "rgba(201,169,110,0.2)", border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}
-          >
+          <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
+            style={{ flex: 1, background: "#faf8f4", border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: "Georgia, serif", fontSize: 13, color: "#3d2000", outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
+          <button onClick={handleSend} disabled={!input.trim() || sending}
+            style={{ background: input.trim() && !sending ? "#c9a96e" : "rgba(201,169,110,0.2)", border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
             <span style={{ color: input.trim() && !sending ? "#0d0800" : "#c9a96e", fontSize: 16, lineHeight: 1 }}>›</span>
           </button>
         </div>
       </div>
+    </div>
+    {zoomedLabel && (
+      <div onClick={() => setZoomedLabel(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, cursor: "pointer" }}>
+        <img src={zoomedLabel.imageUrl} alt={zoomedLabel.name} style={{ maxHeight: "72vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 48px rgba(0,0,0,0.7)" }} onClick={e => e.stopPropagation()} />
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <div style={{ color: "#f0e8d8", fontSize: 16, fontFamily: "Georgia, serif", marginBottom: 4 }}>{zoomedLabel.name}</div>
+          {(zoomedLabel.varietal || zoomedLabel.region) && (
+            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>
+              {[zoomedLabel.varietal, zoomedLabel.region].filter(Boolean).join(" · ")}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </>;
+}
+
+// ─── Sommelier Toast ──────────────────────────────────────────────────────────
+function SommelierToast({ items, onViewMenu, onDismiss }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!items || items.length === 0) return null;
+  const label = items.length === 1
+    ? `★ "${items[0].name}" added to My Menu`
+    : `★ ${items.length} items added to My Menu`;
+
+  return (
+    <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1000, display: "flex", alignItems: "center", gap: 12, background: "#2a1800", border: "0.5px solid #c9a96e", borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", fontFamily: "Georgia, serif", maxWidth: "90vw", animation: "toastIn 0.3s ease" }}>
+      <style>{`@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
+      <span style={{ color: "#f0e8d8", fontSize: 13, flex: 1 }}>{label}</span>
+      <button onClick={onViewMenu} style={{ background: "#c9a96e", border: "none", color: "#0d0800", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
+        View →
+      </button>
+      <button onClick={onDismiss} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
     </div>
   );
 }
@@ -1819,14 +1858,13 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
     <div>
       {!loading && (
         <div style={{ display: "flex", gap: 8, marginBottom: result ? 12 : 0 }}>
-          <button onClick={handlePairing}
-            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
-            {result ? "Give Me Different Options" : "Suggested Food Pairing"}
-          </button>
           <button onClick={() => onOpenChat && onOpenChat({ name: item.name, type: item.style || item.category || "beverage" })}
-            style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
-            title="Ask the Sommelier">
-            ✦ Ask
+            style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            ✦ Chat with Our<br/>Virtual Sommelier
+          </button>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            Instant Pairing<br/>Suggestions
           </button>
         </div>
       )}
@@ -1986,14 +2024,13 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 
       {!pairingLoading && (
         <div style={{ display: "flex", gap: 8, marginBottom: pairingResult ? 14 : 0 }}>
-          <button onClick={handlePairing}
-            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
-            Suggested Food Pairing
-          </button>
           <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine" })}
-            style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}
-            title="Ask the Sommelier">
-            ✦ Ask
+            style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            ✦ Chat with Our<br/>Virtual Sommelier
+          </button>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            Instant Pairing<br/>Suggestions
           </button>
         </div>
       )}
@@ -2041,6 +2078,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [pairingLoading, setPairingLoading] = useState(false);
   const [view, setView] = useState("pick");
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatFoods, setChatFoods] = useState([]);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     fetch(FOOD_URL).then(r => r.json())
@@ -2264,22 +2303,22 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleGetPairings}
-                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
-                Find Wine Pairings for {selectedFoods.length} {selectedFoods.length === 1 ? "Dish" : "Dishes"}{[...new Set(selectedFoods.map(f => f.courseRole))].length > 1 ? ` · ${[...new Set(selectedFoods.map(f => f.courseRole))].length} Courses` : ""} →
+              <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }}
+                style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, lineHeight: 1.3, textAlign: "center" }}>
+                ✦ Chat with Our<br/>Virtual Sommelier
               </button>
-              <button onClick={() => setChatOpen(true)}
-                style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "14px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
-                ✦ Ask
+              <button onClick={handleGetPairings}
+                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600, lineHeight: 1.3, textAlign: "center" }}>
+                Instant Pairing Suggestions →
               </button>
             </div>
           </div>
         )}
         {selectedFoods.length === 0 && (
           <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 14px", textAlign: "center" }}>
-            <button onClick={() => setChatOpen(true)}
+            <button onClick={() => { setChatFoods([]); setChatOpen(true); }}
               style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
-              ✦ Ask the Sommelier Instead
+              ✦ Chat with Our Virtual Sommelier Instead
             </button>
           </div>
         )}
@@ -2393,11 +2432,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           {!pairingLoading && pairingResult && (
             <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", letterSpacing: "0.5px" }}>
-                  Different Options
+                <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+                  ✦ Chat with Our<br/>Virtual Sommelier
                 </button>
-                <button onClick={() => setChatOpen(true)} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
-                  ✦ Ask
+                <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+                  Instant Pairing<br/>Suggestions
                 </button>
               </div>
               <button onClick={onShowShortlist}
@@ -2409,7 +2448,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         </div>
       )}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={null} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
     </div>
   );
 }
@@ -2535,6 +2575,8 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const [zoomedLabel, setZoomedLabel]     = useState(null);
   const [chatOpen, setChatOpen]           = useState(false);
   const [chatContext, setChatContext]      = useState(null);
+  const [toast, setToast]                 = useState(null);
+  const [chatContext, setChatContext]      = useState(null);
   useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
 
   function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
@@ -2649,7 +2691,8 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 
       {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
   );
