@@ -1724,7 +1724,10 @@ The "recommended" array must contain the [id:...] values of every food dish or w
       let reply = '';
       let suggestions = [];
       try {
-        const parsed = JSON.parse(response.data.content[0].text.replace(/```json|```/g, '').trim());
+        const raw = response.data.content[0].text;
+        const jsonStart = raw.indexOf('{');
+        const jsonEnd = raw.lastIndexOf('}');
+        const parsed = JSON.parse(jsonStart !== -1 && jsonEnd !== -1 ? raw.slice(jsonStart, jsonEnd + 1) : raw);
         reply = parsed.reply || '';
         // Resolve each recommended ID to its full menu item object
         const recommended = parsed.recommended || [];
