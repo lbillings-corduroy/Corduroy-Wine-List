@@ -1126,7 +1126,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 {item.description}
               </div>
             )}
-            <ItemPairingButton item={item} onOpenChat={handleOpenChat} />
+            <ItemPairingButton item={item} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} />
           </div>
         );
       })()}
@@ -1770,7 +1770,7 @@ function SommelierChat({ isOpen, onClose, contextItem, favorites = [], onToggleF
 
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
-function ItemPairingButton({ item, onOpenChat }) {
+function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [shownDishes, setShownDishes] = useState([]);
@@ -1835,14 +1835,20 @@ function ItemPairingButton({ item, onOpenChat }) {
         <div style={{ marginTop: 2 }}>
           <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
           {result.map((p, i) => {
+            const isStarred = favorites.some(f => f.id === p.id);
             return (
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
                   <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
-                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
-
+                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  {p.id && onToggleFavorite && (
+                    <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
+                      style={{ background: isStarred ? "rgba(201,169,110,0.15)" : "rgba(201,169,110,0.08)", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.4)"}`, color: "#c9a96e", fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                      {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -1895,7 +1901,7 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose, onOpenChat }) {
+function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
@@ -1996,16 +2002,25 @@ function WineDetailPanel({ wine, onClose, onOpenChat }) {
       {pairingResult && pairingResult.length > 0 && (
         <div>
           <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Pairs beautifully with</div>
-          {pairingResult.map((p, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
-              <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
-              <div>
-                <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
-                <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
-                <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5 }}>{p.reason}</div>
+          {pairingResult.map((p, i) => {
+            const isStarred = favorites.some(f => f.id === p.id);
+            return (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+                <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
+                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  {p.id && onToggleFavorite && (
+                    <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
+                      style={{ background: isStarred ? "rgba(201,169,110,0.15)" : "rgba(201,169,110,0.08)", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.4)"}`, color: "#c9a96e", fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                      {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {pairingResult && pairingResult.length === 0 && (
@@ -2618,7 +2633,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <SommelierChat isOpen={chatOpen} onClose={() => setChatOpen(false)} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       <div style={{ height: 32 }} />
