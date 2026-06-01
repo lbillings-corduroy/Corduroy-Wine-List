@@ -821,15 +821,29 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
     if (!editingItem || editingItem._type === "food") return;
     setReEnriching(true);
     setReEnrichResult(null);
+    // Pass current edit fields as hints so Claude respects manager corrections
+    const hints = {};
+    if (editingItem._type === "wine") {
+      if (editFields.region)        hints.region = editFields.region;
+      if (editFields.varietal)      hints.varietal = editFields.varietal;
+      if (editFields.correctedName) hints.correctedName = editFields.correctedName;
+    } else if (editingItem._type === "beer") {
+      if (editFields.brewery) hints.brewery = editFields.brewery;
+      if (editFields.style)   hints.style = editFields.style;
+      if (editFields.abv)     hints.abv = editFields.abv;
+    } else if (editingItem._type === "pour") {
+      if (editFields.producer)  hints.producer = editFields.producer;
+      if (editFields.category)  hints.category = editFields.category;
+      if (editFields.abv)       hints.abv = editFields.abv;
+    }
     try {
       const res = await fetch(REENRICH_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, itemName: editingItem.name })
+        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, itemName: editingItem.name, hints })
       });
       const data = await res.json();
       if (data.ok) {
         setReEnrichResult({ ok: true, message: data.uncertain ? `⚠️ Re-enriched — flagged for review: ${data.uncertainReason}` : `✓ Re-enriched successfully` });
-        // Update local state so the panel reflects new data immediately
         const e = data.enrichment;
         if (editingItem._type === "wine") {
           const updates = { correctedName: e.correctedName, varietal: e.varietal, region: e.region, description: e.description, reviews: e.reviews };
@@ -1101,6 +1115,79 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
   const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
 
   const [reviewSubTab, setReviewSubTab] = useState("pending");
+  const [reviewEditingId, setReviewEditingId] = useState(null);
+  const [reviewEditFields, setReviewEditFields] = useState({});
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewReEnriching, setReviewReEnriching] = useState(false);
+  const [reviewEditResult, setReviewEditResult] = useState(null);
+
+  function openReviewEdit(wine) {
+    if (reviewEditingId === wine.id) { setReviewEditingId(null); return; }
+    setReviewEditingId(wine.id);
+    setReviewEditResult(null);
+    const t = wine._type || "wine";
+    if (t === "wine") setReviewEditFields({ correctedName: wine.name || "", varietal: wine.varietal || "", region: wine.region || "", description: wine.description || "", reviews: wine.reviews || "" });
+    else if (t === "beer") setReviewEditFields({ correctedName: wine.name || "", style: wine.style || "", brewery: wine.brewery || "", abv: wine.abv || "", description: wine.description || "" });
+    else if (t === "pour") setReviewEditFields({ correctedName: wine.name || "", category: wine.category || "", producer: wine.producer || "", abv: wine.abv || "", description: wine.description || "" });
+  }
+
+  async function handleReviewSave(wine) {
+    setReviewSaving(true);
+    const itemType = wine._type || "wine";
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: wine.id, itemType, updates: reviewEditFields })
+      });
+      if (itemType === "wine") handleWineUpdate(wine.id, { ...reviewEditFields, name: reviewEditFields.correctedName });
+      else setAllItems(prev => prev.map(i => i.id === wine.id ? { ...i, ...reviewEditFields, name: reviewEditFields.correctedName } : i));
+      setReviewEditResult({ ok: true, message: "✓ Saved" });
+    } catch (e) { setReviewEditResult({ ok: false, message: e.message }); }
+    setReviewSaving(false);
+  }
+
+  async function handleReviewReEnrich(wine) {
+    setReviewReEnriching(true);
+    setReviewEditResult(null);
+    const itemType = wine._type || "wine";
+    const hints = {};
+    if (itemType === "wine") {
+      if (reviewEditFields.region)        hints.region = reviewEditFields.region;
+      if (reviewEditFields.varietal)      hints.varietal = reviewEditFields.varietal;
+      if (reviewEditFields.correctedName) hints.correctedName = reviewEditFields.correctedName;
+    } else if (itemType === "beer") {
+      if (reviewEditFields.brewery) hints.brewery = reviewEditFields.brewery;
+      if (reviewEditFields.style)   hints.style = reviewEditFields.style;
+    } else if (itemType === "pour") {
+      if (reviewEditFields.producer)  hints.producer = reviewEditFields.producer;
+      if (reviewEditFields.category)  hints.category = reviewEditFields.category;
+    }
+    try {
+      const res = await fetch(REENRICH_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: wine.id, itemType, itemName: wine.name, hints })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const e = data.enrichment;
+        if (itemType === "wine") {
+          const updates = { correctedName: e.correctedName, varietal: e.varietal, region: e.region, description: e.description, reviews: e.reviews };
+          setReviewEditFields(p => ({ ...p, ...updates }));
+          handleWineUpdate(wine.id, { ...updates, name: e.correctedName, uncertain: e.uncertain });
+        } else {
+          const updates = itemType === "beer"
+            ? { correctedName: e.correctedName, style: e.style, brewery: e.brewery, abv: e.abv, description: e.description }
+            : { correctedName: e.correctedName, category: e.category, producer: e.producer, abv: e.abv, description: e.description };
+          setReviewEditFields(p => ({ ...p, ...updates }));
+          setAllItems(prev => prev.map(i => i.id === wine.id ? { ...i, ...updates, name: e.correctedName, uncertain: e.uncertain } : i));
+        }
+        setReviewEditResult({ ok: true, message: e.uncertain ? `⚠️ Still uncertain: ${e.uncertainReason || "needs further review"}` : "✓ Re-enriched — no longer flagged" });
+      } else {
+        setReviewEditResult({ ok: false, message: data.error || "Re-enrichment failed" });
+      }
+    } catch (e) { setReviewEditResult({ ok: false, message: e.message }); }
+    setReviewReEnriching(false);
+  }
 
   const uncertainWines = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
   const uncertainOther = q ? allItems.filter(i => i.uncertain && !i.approved && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.uncertain && !i.approved);
@@ -1132,7 +1219,8 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
   const current = lists[activeTab] || [];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#3d2200", zIndex: 1000, display: "flex", flexDirection: "column", fontFamily: "Georgia, serif" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "stretch", justifyContent: "center", fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#3d2200", display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: "1px solid #5a3a1a", borderRight: "1px solid #5a3a1a" }}>
       {/* Header */}
       <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1250,77 +1338,151 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
             <div style={{ fontSize: 14 }}>All clear</div>
           </div>
         ) : (
-          (activeTab === "uncertain" ? (reviewSubTab === "pending" ? uncertain : reviewed) : current).map(wine => (
-            <div key={wine.id} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                {/* Image or placeholder */}
+          (activeTab === "uncertain" ? (reviewSubTab === "pending" ? uncertain : reviewed) : current).map(wine => {
+            const isEditingThis = reviewEditingId === wine.id;
+            const itemType = wine._type || "wine";
+            const riInputStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.08)", border: "0.5px solid #5a3a1a", color: "#f0e8d8", padding: "7px 10px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", marginBottom: 8 };
+            const riLabelStyle = { color: "#9a7050", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+            return (
+            <div key={wine.id} style={{ background: isEditingThis ? "rgba(201,169,110,0.06)" : "rgba(255,255,255,0.04)", border: `0.5px solid ${isEditingThis ? "#c9a96e" : "#2a1400"}`, borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+              {/* Main row */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", cursor: activeTab === "uncertain" ? "pointer" : "default" }}
+                onClick={() => activeTab === "uncertain" && openReviewEdit(wine)}>
                 <div style={{ width: 36, height: 50, borderRadius: 3, background: "#502e00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
                   {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 2 }}>{wine.name}</div>
                   <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
-                    {wine.subgroup} · {wine.tier}
+                    {itemType === "beer" ? [wine.style, wine.brewery].filter(Boolean).join(" · ")
+                      : itemType === "pour" ? [wine.category, wine.producer].filter(Boolean).join(" · ")
+                      : [wine.varietal, wine.region].filter(Boolean).join(" · ") || [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
                   </div>
                   {activeTab === "uncertain" && reviewSubTab === "reviewed" && (
-                    <div style={{ marginTop: 6 }}>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(76,175,125,0.1)", border: "0.5px solid #4caf7d", borderRadius: 6, padding: "4px 10px" }}>
-                        <span style={{ color: "#4caf7d", fontSize: 11 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved by manager"}</span>
-                      </div>
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ color: "#4caf7d", fontSize: 10 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved"}</span>
                     </div>
                   )}
-                  {activeTab === "uncertain" && reviewSubTab === "pending" && (
-                    <div style={{ marginTop: 6 }}>
-                      {(wine.uncertainReason || wine.uncertain_reason) && (
-                        <div style={{ color: "#e8a050", fontSize: 11, marginBottom: 6, fontStyle: "italic" }}>
-                          {wine.uncertainReason || wine.uncertain_reason}
-                        </div>
-                      )}
-                      {wine.correctedName && wine.correctedName !== wine.name ? (
-                        <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
-                          <div style={{ color: "#9a8060", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
-                          <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8 }}>{wine.correctedName}</div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <CopyButton text={wine.correctedName} />
-                            <span style={{ color: "#6a5040", fontSize: 10 }}>Copy, then paste into Toast to fix</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>
-                          Fix the name in Toast — it will update on next sync
-                        </div>
-                      )}
-                      <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
-                        style={{ background: "rgba(76,175,125,0.15)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                        Looks Good ✓ — Mark as Reviewed
-                      </button>
-                    </div>
+                  {activeTab === "uncertain" && reviewSubTab === "pending" && wine.uncertainReason && (
+                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{wine.uncertainReason}</div>
                   )}
-                  {activeTab === "noprice" && (
-                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4 }}>
-                      No price in Toast — update menu item
-                    </div>
-                  )}
-                  {activeTab === "noimage" && (
-                    <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>
-                      {wine._type === "beer" || wine._type === "pour"
-                        ? "Upload image in Toast → item → Image to display here"
-                        : "Upload label image in Toast to display here"}
-                    </div>
-                  )}
-                  {activeTab === "unenriched" && (
-                    <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>
-                      Pending AI enrichment — will auto-populate next sync
-                    </div>
-                  )}
+                  {activeTab === "noprice" && <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4 }}>No price in Toast — update menu item</div>}
+                  {activeTab === "noimage" && <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>{wine._type === "beer" || wine._type === "pour" ? "Upload image in Toast → item → Image" : "Upload label image in Toast"}</div>}
+                  {activeTab === "unenriched" && <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>Pending AI enrichment — will auto-populate next sync</div>}
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
-                  {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                  <div style={{ textAlign: "right" }}>
+                    {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                    {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                  </div>
+                  {activeTab === "uncertain" && (
+                    <div style={{ color: "#6a5040", fontSize: 10 }}>{isEditingThis ? "▲ close" : "✎ edit"}</div>
+                  )}
                 </div>
               </div>
+
+              {/* Inline edit panel — only on Review tab */}
+              {activeTab === "uncertain" && isEditingThis && (
+                <div style={{ borderTop: "0.5px solid #5a3a1a", padding: "14px 14px 16px", background: "rgba(0,0,0,0.15)" }}>
+                  {/* Fields by type */}
+                  {itemType !== "food" && (
+                    <>
+                      <label style={riLabelStyle}>Name</label>
+                      <input style={riInputStyle} value={reviewEditFields.correctedName || ""} onChange={e => setReviewEditFields(p => ({ ...p, correctedName: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "wine" && (
+                    <>
+                      <label style={riLabelStyle}>Varietal</label>
+                      <input style={riInputStyle} value={reviewEditFields.varietal || ""} onChange={e => setReviewEditFields(p => ({ ...p, varietal: e.target.value }))} />
+                      <label style={riLabelStyle}>Region</label>
+                      <input style={riInputStyle} value={reviewEditFields.region || ""} onChange={e => setReviewEditFields(p => ({ ...p, region: e.target.value }))} />
+                      <label style={riLabelStyle}>Reviews & Ratings</label>
+                      <input style={riInputStyle} value={reviewEditFields.reviews || ""} onChange={e => setReviewEditFields(p => ({ ...p, reviews: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "beer" && (
+                    <>
+                      <label style={riLabelStyle}>Style</label>
+                      <input style={riInputStyle} value={reviewEditFields.style || ""} onChange={e => setReviewEditFields(p => ({ ...p, style: e.target.value }))} />
+                      <label style={riLabelStyle}>Brewery</label>
+                      <input style={riInputStyle} value={reviewEditFields.brewery || ""} onChange={e => setReviewEditFields(p => ({ ...p, brewery: e.target.value }))} />
+                      <label style={riLabelStyle}>ABV</label>
+                      <input style={riInputStyle} value={reviewEditFields.abv || ""} onChange={e => setReviewEditFields(p => ({ ...p, abv: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "pour" && (
+                    <>
+                      <label style={riLabelStyle}>Category</label>
+                      <input style={riInputStyle} value={reviewEditFields.category || ""} onChange={e => setReviewEditFields(p => ({ ...p, category: e.target.value }))} />
+                      <label style={riLabelStyle}>Producer</label>
+                      <input style={riInputStyle} value={reviewEditFields.producer || ""} onChange={e => setReviewEditFields(p => ({ ...p, producer: e.target.value }))} />
+                      <label style={riLabelStyle}>ABV</label>
+                      <input style={riInputStyle} value={reviewEditFields.abv || ""} onChange={e => setReviewEditFields(p => ({ ...p, abv: e.target.value }))} />
+                    </>
+                  )}
+                  <label style={riLabelStyle}>Tasting Notes</label>
+                  <textarea style={{ ...riInputStyle, height: 64, resize: "vertical", marginBottom: 10 }} value={reviewEditFields.description || ""} onChange={e => setReviewEditFields(p => ({ ...p, description: e.target.value }))} />
+
+                  {/* Re-enrich hint */}
+                  <div style={{ color: "#7a5540", fontSize: 10, fontStyle: "italic", marginBottom: 10, lineHeight: 1.5 }}>
+                    Fill in Region (and any other known fields) above, then tap ✦ Re-enrich — Claude will use your corrections as facts and write a fresh description.
+                  </div>
+
+                  {/* Result message */}
+                  {reviewEditResult && (
+                    <div style={{ marginBottom: 10, background: reviewEditResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${reviewEditResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 6, padding: "7px 12px" }}>
+                      <div style={{ color: reviewEditResult.ok ? "#4caf7d" : "#e85050", fontSize: 11 }}>{reviewEditResult.message}</div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => handleReviewSave(wine)} disabled={reviewSaving || reviewReEnriching}
+                      style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                      {reviewSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button onClick={() => handleReviewReEnrich(wine)} disabled={reviewReEnriching || reviewSaving}
+                      style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      {reviewReEnriching ? "Re-enriching…" : "✦ Re-enrich"}
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      ✓ Approve
+                    </button>
+                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); }}
+                      style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Approve button on collapsed pending items */}
+              {activeTab === "uncertain" && reviewSubTab === "pending" && !isEditingThis && (
+                <div style={{ padding: "0 14px 12px" }}>
+                  {wine.correctedName && wine.correctedName !== wine.name && (
+                    <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                      <div style={{ color: "#9a8060", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
+                      <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 6 }}>{wine.correctedName}</div>
+                      <CopyButton text={wine.correctedName} />
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => openReviewEdit(wine)}
+                      style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      ✎ Edit & Re-enrich
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      Looks Good ✓
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -1330,7 +1492,8 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
           {wines.length} total wines · {isAdmin ? "Admin access" : "Manager access"} · Tap AK logo 5× to access this screen
         </div>
       </div>
-    </div>
+      </div> {/* end inner panel */}
+    </div>   {/* end backdrop */}
   );
 }
 
