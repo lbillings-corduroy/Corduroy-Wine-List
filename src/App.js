@@ -1807,6 +1807,32 @@ function SommelierToast({ items, onViewMenu, onDismiss }) {
   );
 }
 
+// ─── Sommelier Done Modal ─────────────────────────────────────────────────────
+// Shown when chat closes with additions AND food is already selected —
+// strong signal the guest has finished building their menu.
+
+function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", textAlign: "center" }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>★</div>
+        <div style={{ color: "#472a00", fontSize: 20, fontWeight: 600, marginBottom: 10 }}>You're all set!</div>
+        <div style={{ color: "#6a5040", fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
+          You've selected <strong>{foodCount}</strong> {foodCount === 1 ? "dish" : "dishes"} and added <strong>{wineCount}</strong> {wineCount === 1 ? "wine" : "wines"} to your menu.<br/>Ready to review your evening's selections?
+        </div>
+        <button onClick={onViewMenu}
+          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 10 }}>
+          View My Menu →
+        </button>
+        <button onClick={onKeepBrowsing}
+          style={{ width: "100%", background: "none", border: "0.5px solid #d8cfc0", color: "#9a7855", padding: "12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "Georgia, serif" }}>
+          Keep Browsing
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
 function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite }) {
@@ -2080,6 +2106,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatFoods, setChatFoods] = useState([]);
   const [toast, setToast] = useState(null);
+  const [doneModal, setDoneModal] = useState(null);
 
   useEffect(() => {
     fetch(FOOD_URL).then(r => r.json())
@@ -2448,8 +2475,26 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         </div>
       )}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => {
+          setChatOpen(false);
+          if (added) {
+            if (selectedFoods.length > 0) {
+              // Guest has food selected + just added wines — strong signal they're done
+              setDoneModal({ wineCount: added.length });
+            } else {
+              setToast(added);
+            }
+          }
+        }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
+      {doneModal && (
+        <SommelierDoneModal
+          foodCount={selectedFoods.length}
+          wineCount={doneModal.wineCount}
+          onViewMenu={() => { setDoneModal(null); onShowShortlist(); }}
+          onKeepBrowsing={() => setDoneModal(null)}
+        />
+      )}
     </div>
   );
 }
