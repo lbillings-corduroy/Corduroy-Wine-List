@@ -4,6 +4,7 @@ const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/
 const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getBeers";
 const POURS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPours";
 const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
+const ADMIN_PIN = process.env.REACT_APP_ADMIN_PIN || "9999";
 const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getFoodItems";
 const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getCocktails";
 const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
@@ -15,6 +16,9 @@ const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net
 const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
 const RESERVATION_URL = "https://www.appalachiakitchen.com/";
 const CHAT_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sommelierChat";
+const SETTINGS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getSettings";
+const SAVE_SETTINGS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveSettings";
+const REENRICH_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/reenrichItem";
 
 // Tiers and subgroups are derived dynamically from Toast data in arrival order.
 // TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
@@ -230,6 +234,461 @@ function LoadingMessages({ messages, onAllShown }) {
   );
 }
 
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
+
+const MENU_TYPES = [
+  { value: "wine",         label: "Wine List",           description: "AI enrichment · glass/bottle merge · bidirectional pairing" },
+  { value: "food",         label: "Food Menu",           description: "Course-grouped · pairing source · no enrichment" },
+  { value: "beer_pours",   label: "Beer & Premium Pours", description: "AI enrichment · labels · food→drink pairing" },
+  { value: "cocktails_na", label: "Cocktails & NA Beverages", description: "No enrichment · labels · food→drink pairing" },
+];
+
+const EMPTY_MENU = {
+  id: null, label: "", guid: "", menuType: "wine", locations: [],
+};
+
+function SettingsTab() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState(null);
+  const [expandedMenu, setExpandedMenu] = useState(null);
+  const [addingMenu, setAddingMenu] = useState(false);
+  const [newMenu, setNewMenu] = useState({ ...EMPTY_MENU });
+  const [syncingMenu, setSyncingMenu] = useState(null);
+  const [toastAvailability, setToastAvailability] = useState({});
+
+  // Location names — editable
+  const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
+  const [editingLocations, setEditingLocations] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({ bar: "Bar", dining: "Dining Room" });
+
+  useEffect(() => {
+    fetch(SETTINGS_URL)
+      .then(r => r.json())
+      .then(data => {
+        setSettings(data.settings || { menus: [] });
+        if (data.settings?.locationNames) {
+          setLocationNames(data.settings.locationNames);
+          setLocationDraft(data.settings.locationNames);
+        }
+        // Load any cached Toast availability data
+        if (data.settings?.toastAvailability) {
+          setToastAvailability(data.settings.toastAvailability);
+        }
+        setLoading(false);
+      })
+      .catch(() => { setSettings({ menus: [] }); setLoading(false); });
+  }, []);
+
+  async function saveSettings(updated) {
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch(SAVE_SETTINGS_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updated })
+      });
+      const data = await res.json();
+      setSaveResult({ ok: data.ok, message: data.ok ? "Settings saved." : (data.error || "Save failed.") });
+      if (data.ok) setSettings(updated);
+    } catch (e) {
+      setSaveResult({ ok: false, message: e.message });
+    }
+    setSaving(false);
+    setTimeout(() => setSaveResult(null), 4000);
+  }
+
+  function updateMenu(idx, fields) {
+    const updated = { ...settings, menus: settings.menus.map((m, i) => i === idx ? { ...m, ...fields } : m) };
+    setSettings(updated);
+  }
+
+  function deleteMenu(idx) {
+    if (!window.confirm("Remove this menu?")) return;
+    const updated = { ...settings, menus: settings.menus.filter((_, i) => i !== idx) };
+    saveSettings(updated);
+  }
+
+  function addMenu() {
+    if (!newMenu.guid.trim() || !newMenu.label.trim()) return;
+    const entry = { ...newMenu, id: Date.now().toString(), guid: newMenu.guid.trim() };
+    const updated = { ...settings, menus: [...(settings.menus || []), entry] };
+    setAddingMenu(false);
+    setNewMenu({ ...EMPTY_MENU });
+    saveSettings(updated);
+  }
+
+  function saveEdited() {
+    saveSettings(settings);
+    setExpandedMenu(null);
+  }
+
+  function saveLocationNames() {
+    const updated = { ...settings, locationNames: locationDraft };
+    setLocationNames(locationDraft);
+    setEditingLocations(false);
+    saveSettings(updated);
+  }
+
+  async function syncMenuPreview(menu, idx) {
+    setSyncingMenu(idx);
+    try {
+      const res = await fetch(SAVE_SETTINGS_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "fetchAvailability", guid: menu.guid })
+      });
+      const data = await res.json();
+      if (data.availability) {
+        setToastAvailability(prev => ({ ...prev, [menu.guid]: data.availability }));
+        // Persist it back into settings
+        const updated = {
+          ...settings,
+          toastAvailability: { ...(settings.toastAvailability || {}), [menu.guid]: data.availability }
+        };
+        setSettings(updated);
+        saveSettings(updated);
+      }
+    } catch (e) {}
+    setSyncingMenu(null);
+  }
+
+  function toggleLocation(menuDraft, setDraft, loc) {
+    const locs = menuDraft.locations || [];
+    setDraft(prev => ({
+      ...prev,
+      locations: locs.includes(loc) ? locs.filter(l => l !== loc) : [...locs, loc]
+    }));
+  }
+
+  const inputStyle = {
+    background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200",
+    color: "#f0e8d8", padding: "8px 12px", borderRadius: 6,
+    fontFamily: "Georgia, serif", fontSize: 12, width: "100%",
+    boxSizing: "border-box", outline: "none"
+  };
+  const labelStyle = { color: "#6a5040", fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
+  const selectStyle = { ...inputStyle, cursor: "pointer" };
+
+  function MenuTypeTag({ value }) {
+    const t = MENU_TYPES.find(m => m.value === value);
+    const colors = { wine: "#c9a96e", food: "#7ab87a", beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+    const color = colors[value] || "#6a5040";
+    return (
+      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${color}`, color, letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
+        {t ? t.label : value}
+      </span>
+    );
+  }
+
+  function AvailabilitySummary({ menu }) {
+    const ta = toastAvailability[menu.guid];
+    const locs = menu.locations || [];
+    const locStr = locs.length === 0 ? "All locations" :
+      locs.map(l => l === "bar" ? locationNames.bar : l === "dining" ? locationNames.dining : l).join(" & ");
+
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+        {ta ? (
+          <>
+            {ta.toastDays && ta.toastDays.length > 0 && (
+              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}
+              </span>
+            )}
+            {ta.toastHours && (
+              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                🕐 {ta.toastHours.open} – {ta.toastHours.close}
+              </span>
+            )}
+            {!ta.toastDays && !ta.toastHours && (
+              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                📅 Always available (no schedule in Toast)
+              </span>
+            )}
+            <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+              {ta.itemCount || "?"} items · synced {ta.checkedAt ? timeAgo(ta.checkedAt) : ""}
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 10, color: "#4a3020", fontStyle: "italic" }}>
+            Tap ⟳ Check to pull availability from Toast
+          </span>
+        )}
+        <span style={{ fontSize: 10, color: "#6a5040", background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 10, padding: "2px 8px" }}>
+          📍 {locStr}
+        </span>
+      </div>
+    );
+  }
+
+  function MenuForm({ draft, setDraft, onSave, onCancel, saveLabel = "Save Menu" }) {
+    const ta = toastAvailability[draft.guid];
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Label */}
+        <div>
+          <label style={labelStyle}>Display Name</label>
+          <input style={inputStyle} placeholder="e.g. Wine List" value={draft.label}
+            onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
+        </div>
+
+        {/* GUID */}
+        <div>
+          <label style={labelStyle}>Toast Menu / Group GUID</label>
+          <input style={inputStyle} placeholder="e.g. 2d490bef-759b-447f-9af4-5bf0971948ba"
+            value={draft.guid} onChange={e => setDraft(p => ({ ...p, guid: e.target.value.trim() }))} />
+          <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+            Found in Toast → Menus → select menu → the GUID appears in the URL or menu details
+          </div>
+        </div>
+
+        {/* Menu Type */}
+        <div>
+          <label style={labelStyle}>Menu Type</label>
+          <select style={selectStyle} value={draft.menuType}
+            onChange={e => setDraft(p => ({ ...p, menuType: e.target.value }))}>
+            {MENU_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          {draft.menuType && (
+            <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+              {MENU_TYPES.find(t => t.value === draft.menuType)?.description}
+            </div>
+          )}
+        </div>
+
+        {/* Toast Availability — read-only display */}
+        <div>
+          <label style={labelStyle}>Availability (from Toast)</label>
+          {ta ? (
+            <div style={{ background: "rgba(76,175,125,0.06)", border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                {ta.toastDays && ta.toastDays.length > 0 ? (
+                  <span style={{ fontSize: 11, color: "#4caf7d" }}>📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}</span>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#4caf7d" }}>📅 No day restriction in Toast</span>
+                )}
+              </div>
+              {ta.toastHours ? (
+                <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 {ta.toastHours.open} – {ta.toastHours.close}</div>
+              ) : (
+                <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 No time restriction in Toast</div>
+              )}
+              <div style={{ fontSize: 10, color: "#4a6040", marginTop: 4 }}>
+                {ta.itemCount || "?"} items found · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
+              </div>
+              <div style={{ color: "#3a4020", fontSize: 10, marginTop: 6, fontStyle: "italic" }}>
+                Availability is set in Toast → Menus → select menu → Availability. Tap ⟳ Check to refresh.
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px dashed #3c2200", borderRadius: 8, padding: "10px 12px", color: "#4a3020", fontSize: 11, fontStyle: "italic" }}>
+              {draft.guid ? "Tap ⟳ Check on the menu card to pull availability from Toast." : "Enter a GUID first, then use ⟳ Check to fetch availability."}
+            </div>
+          )}
+        </div>
+
+        {/* Locations */}
+        <div>
+          <label style={labelStyle}>Available Locations</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[{ id: "bar", name: locationNames.bar }, { id: "dining", name: locationNames.dining }].map(loc => {
+              const active = (draft.locations || []).includes(loc.id);
+              return (
+                <button key={loc.id} onClick={() => toggleLocation(draft, setDraft, loc.id)} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: 8,
+                  border: `0.5px solid ${active ? "#c9a96e" : "#3c2200"}`,
+                  background: active ? "rgba(201,169,110,0.15)" : "transparent",
+                  color: active ? "#f0e8d8" : "#4a3020", fontSize: 12, cursor: "pointer",
+                  fontFamily: "Georgia, serif", textAlign: "center", transition: "all 0.12s"
+                }}>
+                  <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.id === "bar" ? "🍸" : "🍽"}</div>
+                  <div style={{ fontSize: 11 }}>{loc.name}</div>
+                  {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 2 }}>✓ included</div>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ color: "#4a3020", fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+            Leave both unchecked to show in all locations. Check one or both to restrict by location.
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
+          <button onClick={onSave}
+            disabled={!draft.guid.trim() || !draft.label.trim() || saving}
+            style={{ flex: 1, background: (!draft.guid.trim() || !draft.label.trim()) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || !draft.label.trim()) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+            {saving ? "Saving…" : saveLabel}
+          </button>
+          <button onClick={onCancel}
+            style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "11px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading settings…</div>;
+
+  const menus = settings?.menus || [];
+
+  return (
+    <div>
+      {/* ── Location Names ── */}
+      <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid #3c2200", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingLocations ? 14 : 0 }}>
+          <div>
+            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Location Names</div>
+            {!editingLocations && (
+              <div style={{ color: "#8a7060", fontSize: 12 }}>
+                {locationNames.bar} &nbsp;·&nbsp; {locationNames.dining}
+              </div>
+            )}
+          </div>
+          {!editingLocations && (
+            <button onClick={() => { setLocationDraft({ ...locationNames }); setEditingLocations(true); }}
+              style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              Edit
+            </button>
+          )}
+        </div>
+        {editingLocations && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>🍸 Location 1 Name</label>
+                <input style={inputStyle} value={locationDraft.bar}
+                  onChange={e => setLocationDraft(p => ({ ...p, bar: e.target.value }))} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>🍽 Location 2 Name</label>
+                <input style={inputStyle} value={locationDraft.dining}
+                  onChange={e => setLocationDraft(p => ({ ...p, dining: e.target.value }))} />
+              </div>
+            </div>
+            <div style={{ color: "#4a3020", fontSize: 10, fontStyle: "italic" }}>
+              These names appear on menu location checkboxes throughout settings.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveLocationNames}
+                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                Save Names
+              </button>
+              <button onClick={() => setEditingLocations(false)}
+                style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Menu List ── */}
+      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>
+        Toast Menus ({menus.length})
+      </div>
+
+      {menus.length === 0 && !addingMenu && (
+        <div style={{ color: "#4a3020", fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
+          No menus configured yet. Add your first menu below.
+        </div>
+      )}
+
+      {menus.map((menu, idx) => {
+        const isExpanded = expandedMenu === idx;
+        const ta = toastAvailability[menu.guid];
+        return (
+          <div key={menu.id || idx} style={{ background: "rgba(255,255,255,0.03)", border: `0.5px solid ${isExpanded ? "#c9a96e" : "#3c2200"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+            {/* Collapsed row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}
+              onClick={() => setExpandedMenu(isExpanded ? null : idx)}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ color: "#f0e8d8", fontSize: 13, fontWeight: 500 }}>{menu.label || "Unnamed Menu"}</span>
+                  <MenuTypeTag value={menu.menuType} />
+                </div>
+                <div style={{ color: "#4a3020", fontSize: 10, fontFamily: "monospace", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
+                <AvailabilitySummary menu={menu} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                <button onClick={e => { e.stopPropagation(); syncMenuPreview(menu, idx); }}
+                  disabled={syncingMenu === idx}
+                  style={{ background: "rgba(76,175,125,0.1)", border: "0.5px solid rgba(76,175,125,0.3)", color: "#4caf7d", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 10, whiteSpace: "nowrap" }}>
+                  {syncingMenu === idx ? "…" : "⟳ Check"}
+                </button>
+                <button onClick={e => { e.stopPropagation(); deleteMenu(idx); }}
+                  style={{ background: "none", border: "none", color: "#5a3020", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+            </div>
+
+            {/* Expanded edit form */}
+            {isExpanded && (
+              <div style={{ borderTop: "0.5px solid #2a1400", padding: "16px 14px", background: "rgba(0,0,0,0.1)" }}>
+                <MenuForm
+                  draft={menus[idx]}
+                  setDraft={(updater) => {
+                    const updated = typeof updater === "function" ? updater(menus[idx]) : updater;
+                    updateMenu(idx, updated);
+                  }}
+                  onSave={saveEdited}
+                  onCancel={() => setExpandedMenu(null)}
+                  saveLabel="Save Changes"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Add New Menu ── */}
+      {addingMenu ? (
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid #c9a96e", borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
+          <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 14 }}>Add New Menu</div>
+          <MenuForm
+            draft={newMenu}
+            setDraft={setNewMenu}
+            onSave={addMenu}
+            onCancel={() => { setAddingMenu(false); setNewMenu({ ...EMPTY_MENU }); }}
+            saveLabel="Add Menu"
+          />
+        </div>
+      ) : (
+        <button onClick={() => setAddingMenu(true)}
+          style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px dashed rgba(201,169,110,0.4)", color: "#c9a96e", padding: "13px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "0.5px" }}>
+          + Add Menu
+        </button>
+      )}
+
+      {/* ── Save feedback ── */}
+      {saveResult && (
+        <div style={{ marginTop: 14, background: saveResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${saveResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "10px 14px" }}>
+          <div style={{ color: saveResult.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif" }}>{saveResult.message}</div>
+        </div>
+      )}
+
+      {/* ── Legend ── */}
+      <div style={{ marginTop: 24, borderTop: "0.5px solid #2a1400", paddingTop: 16 }}>
+        <div style={{ color: "#4a3020", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
+        {MENU_TYPES.map(t => {
+          const colors = { wine: "#c9a96e", food: "#7ab87a", beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+          return (
+            <div key={t.value} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${colors[t.value]}`, color: colors[t.value], whiteSpace: "nowrap", marginTop: 1, flexShrink: 0 }}>{t.label}</span>
+              <span style={{ color: "#4a3020", fontSize: 11 }}>{t.description}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Sync Tab ─────────────────────────────────────────────────────────────────
 
 function SyncTab() {
@@ -314,6 +773,8 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editFields, setEditFields] = useState({});
   const [saving, setSaving] = useState(false);
+  const [reEnriching, setReEnriching] = useState(false);
+  const [reEnrichResult, setReEnrichResult] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -352,6 +813,42 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
       setEditingItem(null);
     } catch (e) { console.error(e); }
     setSaving(false);
+  }
+
+  async function handleReEnrich() {
+    if (!editingItem || editingItem._type === "food") return;
+    setReEnriching(true);
+    setReEnrichResult(null);
+    try {
+      const res = await fetch(REENRICH_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, itemName: editingItem.name })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setReEnrichResult({ ok: true, message: data.uncertain ? `⚠️ Re-enriched — flagged for review: ${data.uncertainReason}` : `✓ Re-enriched successfully` });
+        // Update local state so the panel reflects new data immediately
+        const e = data.enrichment;
+        if (editingItem._type === "wine") {
+          const updates = { correctedName: e.correctedName, varietal: e.varietal, region: e.region, description: e.description, reviews: e.reviews };
+          setEditFields(p => ({ ...p, ...updates }));
+          onWineUpdate(editingItem.id, { ...updates, name: e.correctedName, uncertain: e.uncertain });
+        } else if (editingItem._type === "beer") {
+          const updates = { correctedName: e.correctedName, style: e.style, brewery: e.brewery, abv: e.abv, description: e.description };
+          setEditFields(p => ({ ...p, ...updates }));
+          setBeers(prev => prev.map(b => b.id === editingItem.id ? { ...b, ...updates, name: e.correctedName } : b));
+        } else if (editingItem._type === "pour") {
+          const updates = { correctedName: e.correctedName, category: e.category, producer: e.producer, abv: e.abv, description: e.description };
+          setEditFields(p => ({ ...p, ...updates }));
+          setPours(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...updates, name: e.correctedName } : p));
+        }
+      } else {
+        setReEnrichResult({ ok: false, message: data.error || "Re-enrichment failed" });
+      }
+    } catch (e) {
+      setReEnrichResult({ ok: false, message: e.message });
+    }
+    setReEnriching(false);
   }
 
   const q = managerSearch.toLowerCase();
@@ -472,11 +969,24 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
           {editingItem._type !== "food" && (
             <div style={{ color: "#4a3020", fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
           )}
+          {/* Re-enrich result message */}
+          {reEnrichResult && (
+            <div style={{ marginBottom: 10, background: reEnrichResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${reEnrichResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 6, padding: "8px 12px" }}>
+              <div style={{ color: reEnrichResult.ok ? "#4caf7d" : "#e85050", fontSize: 11, fontFamily: "Georgia, serif" }}>{reEnrichResult.message}</div>
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? "rgba(201,169,110,0.1)" : "#c9a96e", color: saving ? "#6a5040" : "#0d0800", border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
               {saving ? "Saving…" : "Save Changes"}
             </button>
-            <button onClick={() => setEditingItem(null)} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>Cancel</button>
+            {editingItem._type !== "food" && (
+              <button onClick={handleReEnrich} disabled={reEnriching || saving}
+                title="Clear existing AI enrichment and re-run from scratch through Claude"
+                style={{ background: reEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reEnriching ? "#6070a0" : "#8090c0"}`, color: reEnriching ? "#6070a0" : "#a0b0e0", padding: "10px 12px", borderRadius: 6, cursor: reEnriching ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                {reEnriching ? "Re-enriching…" : "✦ Re-enrich"}
+              </button>
+            )}
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       )}
@@ -545,7 +1055,7 @@ function FoodManagerTab() {
   );
 }
 
-function ManagerScreen({ wines, onClose }) {
+function ManagerScreen({ wines, onClose, isAdmin }) {
   const [activeTab, setActiveTab] = useState("uncertain");
   const [search, setSearch] = useState("");
   const [localWines, setLocalWines] = useState(wines);
@@ -613,6 +1123,7 @@ function ManagerScreen({ wines, onClose }) {
     { id: "food", label: "🍽 Food Menu", count: null },
     { id: "all", label: "✎ All Items", count: null },
     { id: "sync", label: "⟳ Sync", count: null },
+    ...(isAdmin ? [{ id: "settings", label: "⚙ Settings", count: null }] : []),
   ];
 
   const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
@@ -674,6 +1185,8 @@ function ManagerScreen({ wines, onClose }) {
         )}
         {activeTab === "sync" ? (
           <SyncTab />
+        ) : activeTab === "settings" ? (
+          <SettingsTab />
         ) : activeTab === "all" ? (
           <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
         ) : activeTab === "food" ? (
@@ -812,7 +1325,7 @@ function ManagerScreen({ wines, onClose }) {
       {/* Footer */}
       <div style={{ background: "#4d2e00", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
         <div style={{ color: "#4e3020", fontSize: 10, letterSpacing: "1px" }}>
-          {wines.length} total wines · Tap AK logo 5× to access this screen
+          {wines.length} total wines · {isAdmin ? "Admin access" : "Manager access"} · Tap AK logo 5× to access this screen
         </div>
       </div>
     </div>
@@ -831,8 +1344,10 @@ function PinScreen({ onSuccess, onCancel }) {
     setPin(next);
     setError(false);
     if (next.length === 4) {
-      if (next === MANAGER_PIN) {
-        onSuccess();
+      if (next === ADMIN_PIN) {
+        onSuccess("admin");
+      } else if (next === MANAGER_PIN) {
+        onSuccess("manager");
       } else {
         setTimeout(() => { setPin(""); setError(true); }, 300);
       }
@@ -844,7 +1359,7 @@ function PinScreen({ onSuccess, onCancel }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
       <div style={{ background: "#4d2e00", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
-        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Manager Access</div>
+        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Staff Access</div>
         <div style={{ color: "#f0e8d8", fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
 
         {/* PIN dots */}
@@ -2751,6 +3266,7 @@ function AppContent() {
   const [error, setError] = useState(null);
   const [showPin, setShowPin] = useState(false);
   const [showManager, setShowManager] = useState(false);
+  const [accessLevel, setAccessLevel] = useState(null); // "manager" | "admin"
   const idleTimer = useRef(null);
   const [favorites, setFavorites] = useState([]);
   const [showShortlist, setShowShortlist] = useState(false);
@@ -2811,8 +3327,8 @@ function AppContent() {
   const shortlistOverlay = (
     <>
       {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
-      {showPin && <PinScreen onSuccess={() => { setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
-      {showManager && <ManagerScreen wines={wines} onClose={() => setShowManager(false)} />}
+      {showPin && <PinScreen onSuccess={(level) => { setAccessLevel(level); setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
+      {showManager && <ManagerScreen wines={wines} isAdmin={accessLevel === "admin"} onClose={() => { setShowManager(false); setAccessLevel(null); }} />}
     </>
   );
 
