@@ -2102,9 +2102,9 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
         let availSchedule = null;
 
         if (found) {
-          // GUID matched a top-level menu directly
           menuName = found.name;
           availSchedule = found.availabilitySchedules || null;
+          // Count all items recursively
           function countItems(group) {
             let c = (group.menuItems || []).length;
             (group.menuGroups || []).forEach(sg => { c += countItems(sg); });
@@ -2112,16 +2112,13 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
           }
           (found.menuGroups || []).forEach(g => { itemCount += countItems(g); });
         } else {
-          // GUID matched a menu group — inherit availability from its parent menu
+          // Search as a group
           for (const m of menus.menus) {
             const group = findGroupByGuid(m.menuGroups || [], guid);
             if (group) {
               found = group;
               menuName = group.name;
-              // Groups don't have their own availability in Toast — inherit from parent menu
-              availSchedule = (group.availabilitySchedules && group.availabilitySchedules.length > 0)
-                ? group.availabilitySchedules
-                : (m.availabilitySchedules || null);
+              availSchedule = group.availabilitySchedules || null;
               function countGrpItems(g) {
                 let c = (g.menuItems || []).length;
                 (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
