@@ -263,6 +263,11 @@ function SettingsTab() {
   const [editingLocations, setEditingLocations] = useState(false);
   const [locationDraft, setLocationDraft] = useState({ bar: "Bar", dining: "Dining Room" });
 
+  // Device setup — default location and logos
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [editingDeviceSetup, setEditingDeviceSetup] = useState(false);
+  const [deviceSetupDraft, setDeviceSetupDraft] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+
   useEffect(() => {
     fetch(SETTINGS_URL)
       .then(r => r.json())
@@ -271,6 +276,10 @@ function SettingsTab() {
         if (data.settings?.locationNames) {
           setLocationNames(data.settings.locationNames);
           setLocationDraft(data.settings.locationNames);
+        }
+        if (data.settings?.deviceSetup) {
+          setDeviceSetup(data.settings.deviceSetup);
+          setDeviceSetupDraft(data.settings.deviceSetup);
         }
         // Load any cached Toast availability data
         if (data.settings?.toastAvailability) {
@@ -331,6 +340,13 @@ function SettingsTab() {
     const updated = { ...settings, locationNames: locationDraft };
     setLocationNames(locationDraft);
     setEditingLocations(false);
+    saveSettings(updated);
+  }
+
+  function saveDeviceSetup() {
+    const updated = { ...settings, deviceSetup: deviceSetupDraft };
+    setDeviceSetup(deviceSetupDraft);
+    setEditingDeviceSetup(false);
     saveSettings(updated);
   }
 
@@ -413,7 +429,7 @@ function SettingsTab() {
               </span>
             )}
             <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
-              {ta.itemCount || "?"} items · synced {ta.checkedAt ? timeAgo(ta.checkedAt) : ""}
+              {ta.itemCount || "?"} items in Toast · checked {ta.checkedAt ? timeAgo(ta.checkedAt) : ""}
             </span>
           </>
         ) : (
@@ -547,7 +563,7 @@ function SettingsTab() {
                 <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 No time restriction in Toast</div>
               )}
               <div style={{ fontSize: 10, color: "#7a9070", marginTop: 4 }}>
-                {ta.itemCount || "?"} items found · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
+                {ta.itemCount || "?"} items found in Toast · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
               </div>
               <div style={{ ...hintText, marginTop: 6 }}>
                 Availability is set in Toast → Menus → select menu → Availability. Tap ⟳ Check to refresh.
@@ -649,6 +665,102 @@ function SettingsTab() {
                 Save Names
               </button>
               <button onClick={() => setEditingLocations(false)}
+                style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Device Setup ── */}
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #5a3a1a", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingDeviceSetup ? 14 : 0 }}>
+          <div>
+            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Device Setup</div>
+            {!editingDeviceSetup && (
+              <div style={{ color: "#c8b090", fontSize: 12 }}>
+                Default: <span style={{ color: "#f0e8d8" }}>{deviceSetup.defaultLocation === "bar" ? locationNames.bar : locationNames.dining}</span>
+                {(deviceSetup.barLogo || deviceSetup.diningLogo) && <span style={{ color: "#6a5040" }}> · logos configured</span>}
+              </div>
+            )}
+          </div>
+          {!editingDeviceSetup && (
+            <button onClick={() => { setDeviceSetupDraft({ ...deviceSetup }); setEditingDeviceSetup(true); }}
+              style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              Edit
+            </button>
+          )}
+        </div>
+        {editingDeviceSetup && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Default Location */}
+            <div>
+              <label style={labelStyle}>Default Location for New Devices</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{ id: "bar", icon: "🍸" }, { id: "dining", icon: "🍽" }].map(loc => {
+                  const active = deviceSetupDraft.defaultLocation === loc.id;
+                  return (
+                    <button key={loc.id} onClick={() => setDeviceSetupDraft(p => ({ ...p, defaultLocation: loc.id }))} style={{
+                      flex: 1, padding: "10px 8px", borderRadius: 8,
+                      border: `0.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
+                      background: active ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
+                      color: active ? "#f0e8d8" : "#7a5540",
+                      fontFamily: "Georgia, serif", fontSize: 12, cursor: "pointer", textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.icon}</div>
+                      <div>{loc.id === "bar" ? locationNames.bar : locationNames.dining}</div>
+                      {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 2, letterSpacing: "1px" }}>DEFAULT</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ ...hintText }}>
+                Used on any device that hasn't been assigned a location yet. Set it to your most common room.
+              </div>
+            </div>
+            {/* Logo filenames */}
+            <div>
+              <label style={labelStyle}>{locationNames.bar} Logo Filename</label>
+              <input style={inputStyle} placeholder="e.g. tuques-logo.png"
+                value={deviceSetupDraft.barLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, barLogo: e.target.value.trim() }))} />
+              <div style={{ ...hintText }}>Place the file in the /public folder of the repo. Leave blank to use the default logo.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>{locationNames.dining} Logo Filename</label>
+              <input style={inputStyle} placeholder="e.g. appalachia-kitchen-logo.png"
+                value={deviceSetupDraft.diningLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningLogo: e.target.value.trim() }))} />
+              <div style={{ ...hintText }}>Leave blank to use the default logo.</div>
+            </div>
+            {/* Preview */}
+            {(deviceSetupDraft.barLogo || deviceSetupDraft.diningLogo) && (
+              <div style={{ display: "flex", gap: 10 }}>
+                {deviceSetupDraft.barLogo && (
+                  <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                    <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.bar.toUpperCase()}</div>
+                    <img src={`/${deviceSetupDraft.barLogo}`} alt="Bar logo preview"
+                      style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
+                      onError={e => { e.target.style.display = "none"; }} />
+                  </div>
+                )}
+                {deviceSetupDraft.diningLogo && (
+                  <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                    <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.dining.toUpperCase()}</div>
+                    <img src={`/${deviceSetupDraft.diningLogo}`} alt="Dining logo preview"
+                      style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
+                      onError={e => { e.target.style.display = "none"; }} />
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveDeviceSetup}
+                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                Save Device Setup
+              </button>
+              <button onClick={() => setEditingDeviceSetup(false)}
                 style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
                 Cancel
               </button>
@@ -773,6 +885,21 @@ function SyncTab() {
   const [selected, setSelected] = useState(categories.map(c => c.id));
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanResult, setCleanResult] = useState(null);
+
+  async function handleCleanup() {
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const res = await fetch(CLEANUP_URL, { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      setCleanResult({ ok: data.ok, message: data.ok ? `✓ ${data.message}` : (data.error || "Cleanup failed") });
+    } catch (e) {
+      setCleanResult({ ok: false, message: e.message });
+    }
+    setCleaning(false);
+  }
 
   function toggleCat(id) {
     setSelected(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
@@ -828,6 +955,23 @@ function SyncTab() {
           <div style={{ color: result.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{result.message}</div>
         </div>
       )}
+
+      {/* Cleanup section */}
+      <div style={{ marginTop: 24, borderTop: "0.5px solid #2a1400", paddingTop: 20 }}>
+        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Data Cleanup</div>
+        <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
+          Removes enrichment records for items that are no longer in any configured menu. Run this after correcting a miscategorised menu or deleting a menu from Settings.
+        </div>
+        <button onClick={handleCleanup} disabled={cleaning}
+          style={{ width: "100%", background: cleaning ? "rgba(232,80,80,0.06)" : "rgba(232,80,80,0.12)", color: cleaning ? "#6a5040" : "#e85050", border: "0.5px solid rgba(232,80,80,0.4)", padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
+          {cleaning ? "Cleaning…" : "🗑 Remove Orphaned Data"}
+        </button>
+        {cleanResult && (
+          <div style={{ marginTop: 10, background: cleanResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${cleanResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "10px 14px" }}>
+            <div style={{ color: cleanResult.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{cleanResult.message}</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1164,7 +1308,7 @@ function FoodManagerTab() {
   );
 }
 
-function ManagerScreen({ wines, onClose, isAdmin }) {
+function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetLocation, locationNames = { bar: "Bar", dining: "Dining Room" } }) {
   const [activeTab, setActiveTab] = useState("uncertain");
   const [search, setSearch] = useState("");
   const [localWines, setLocalWines] = useState(wines);
@@ -1324,6 +1468,36 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
           <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
             Close
           </button>
+        </div>
+
+        {/* Tablet Location Toggle */}
+        <div style={{ marginTop: 14, background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>This Tablet Is In</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { id: "bar", label: locationNames.bar, icon: "🍸" },
+              { id: "dining", label: locationNames.dining, icon: "🍽" },
+            ].map(loc => {
+              const active = tabletLocation === loc.id;
+              return (
+                <button key={loc.id} onClick={() => onSetLocation && onSetLocation(loc.id)} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: 8,
+                  border: `1.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
+                  background: active ? "rgba(201,169,110,0.25)" : "rgba(255,255,255,0.04)",
+                  color: active ? "#f0e8d8" : "#7a5540",
+                  fontFamily: "Georgia, serif", fontSize: 12, cursor: "pointer",
+                  transition: "all 0.15s", textAlign: "center"
+                }}>
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{loc.icon}</div>
+                  <div style={{ fontWeight: active ? 600 : 400 }}>{loc.label}</div>
+                  {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 3, letterSpacing: "1px" }}>✓ THIS DEVICE</div>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ color: "#6a5040", fontSize: 10, marginTop: 8, fontStyle: "italic" }}>
+            Sets which menus and food items the AI uses for pairing on this device. Persists across restarts.
+          </div>
         </div>
 
         {/* Summary row */}
@@ -3284,7 +3458,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   );
 }
 
-function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {} }) {
+function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {}, tabletLocation = "bar", deviceSetup = {}, locationNames = {} }) {
   const [visible, setVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const tapTimer = useRef(null);
@@ -3328,11 +3502,17 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
       {/* Logo — tap 5x for manager access */}
       <div onClick={handleLogoTap} style={{ marginBottom: 40, textAlign: "center", cursor: "default", userSelect: "none" }}>
-        <img
-          src="/Appalachia Kitchen Logo White App.png"
-          alt="Appalachia Kitchen"
-          style={{ width: "min(340px, 80vw)", opacity: 0.95, filter: "brightness(1.5) contrast(1.05)" }}
-        />
+        {(() => {
+          const barLogo = deviceSetup.barLogo;
+          const diningLogo = deviceSetup.diningLogo;
+          const src = tabletLocation === "bar" && barLogo ? `/${barLogo}`
+            : tabletLocation === "dining" && diningLogo ? `/${diningLogo}`
+            : "/Appalachia Kitchen Logo White App.png";
+          const alt = tabletLocation === "bar" ? (locationNames.bar || "Bar")
+            : tabletLocation === "dining" ? (locationNames.dining || "Dining Room")
+            : "Appalachia Kitchen";
+          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: 0.95, filter: "brightness(1.5) contrast(1.05)" }} />;
+        })()}
       </div>
 
       {/* Menu buttons */}
@@ -3532,8 +3712,9 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 function AppContent() {
   const [screen, setScreen] = useState("home");
   const [wines, setWines] = useState([]);
-  const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || "all");
+  const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || null);
   const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
   function setTabletLocationPersist(loc) { localStorage.setItem("tabletLocation", loc); setTabletLocationState(loc); }
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -3548,7 +3729,20 @@ function AppContent() {
   useEffect(() => {
     fetch(SETTINGS_URL).then(r => r.json()).then(data => {
       if (data.settings?.locationNames) setLocationNames(data.settings.locationNames);
-    }).catch(() => {});
+      const ds = data.settings?.deviceSetup || { defaultLocation: "bar", barLogo: "", diningLogo: "" };
+      setDeviceSetup(ds);
+      // If this device has never been assigned a location, apply the configured default
+      if (!localStorage.getItem("tabletLocation")) {
+        const def = ds.defaultLocation || "bar";
+        localStorage.setItem("tabletLocation", def);
+        setTabletLocationState(def);
+      }
+    }).catch(() => {
+      if (!localStorage.getItem("tabletLocation")) {
+        localStorage.setItem("tabletLocation", "bar");
+        setTabletLocationState("bar");
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -3608,7 +3802,7 @@ function AppContent() {
     <>
       {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
       {showPin && <PinScreen onSuccess={(level) => { setAccessLevel(level); setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
-      {showManager && <ManagerScreen wines={wines} isAdmin={accessLevel === "admin"} onClose={() => { setShowManager(false); setAccessLevel(null); }} />}
+      {showManager && <ManagerScreen wines={wines} isAdmin={accessLevel === "admin"} onClose={() => { setShowManager(false); setAccessLevel(null); }} tabletLocation={tabletLocation} onSetLocation={setTabletLocationPersist} locationNames={locationNames} />}
     </>
   );
 
