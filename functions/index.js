@@ -2182,6 +2182,13 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
             if (group) {
               found = group;
               menuName = group.name;
+              // Debug: log everything availability-related on the parent menu
+              console.log(`[avail-debug] Group "${group.name}" found in parent "${m.name}"`);
+              console.log(`[avail-debug] Parent keys: ${Object.keys(m).join(', ')}`);
+              console.log(`[avail-debug] availabilitySchedules: ${JSON.stringify(m.availabilitySchedules)}`);
+              console.log(`[avail-debug] availability: ${JSON.stringify(m.availability)}`);
+              console.log(`[avail-debug] schedule: ${JSON.stringify(m.schedule)}`);
+              console.log(`[avail-debug] timeSpecific: ${JSON.stringify(m.timeSpecific)}`);
               // Groups never have their own schedule in Toast — always inherit from parent menu
               availSchedule = (m.availabilitySchedules && m.availabilitySchedules.length > 0)
                 ? m.availabilitySchedules
