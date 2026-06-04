@@ -2166,7 +2166,17 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
 
         if (found) {
           menuName = found.name;
-          availSchedule = found.availabilitySchedules || null;
+          // Handle both Toast field name variants
+          if (found.availabilitySchedules && found.availabilitySchedules.length > 0) {
+            availSchedule = found.availabilitySchedules;
+          } else if (found.availability && found.availability.schedule && found.availability.schedule.length > 0) {
+            availSchedule = found.availability.schedule.map(s => ({
+              availableDays: s.days || null,
+              timeRanges: (s.timeRanges || []).map(tr => ({ startTime: tr.start, endTime: tr.end }))
+            }));
+          } else {
+            availSchedule = null;
+          }
           // Count all items recursively
           function countItems(group) {
             let c = (group.menuItems || []).length;
@@ -2182,17 +2192,23 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
             if (group) {
               found = group;
               menuName = group.name;
-              // Debug: log everything availability-related on the parent menu
-              console.log(`[avail-debug] Group "${group.name}" found in parent "${m.name}"`);
-              console.log(`[avail-debug] Parent keys: ${Object.keys(m).join(', ')}`);
-              console.log(`[avail-debug] availabilitySchedules: ${JSON.stringify(m.availabilitySchedules)}`);
-              console.log(`[avail-debug] availability: ${JSON.stringify(m.availability)}`);
-              console.log(`[avail-debug] schedule: ${JSON.stringify(m.schedule)}`);
-              console.log(`[avail-debug] timeSpecific: ${JSON.stringify(m.timeSpecific)}`);
-              // Groups never have their own schedule in Toast — always inherit from parent menu
-              availSchedule = (m.availabilitySchedules && m.availabilitySchedules.length > 0)
-                ? m.availabilitySchedules
-                : null;
+              // Inherit availability from parent menu — Toast uses different field names
+              // depending on whether it's a top-level menu (availabilitySchedules) or
+              // returned via the availability field with a different structure
+              if (m.availabilitySchedules && m.availabilitySchedules.length > 0) {
+                availSchedule = m.availabilitySchedules;
+              } else if (m.availability && m.availability.schedule && m.availability.schedule.length > 0) {
+                // Convert to the same shape our parser expects
+                availSchedule = m.availability.schedule.map(s => ({
+                  availableDays: s.days || null,
+                  timeRanges: (s.timeRanges || []).map(tr => ({
+                    startTime: tr.start,
+                    endTime: tr.end
+                  }))
+                }));
+              } else {
+                availSchedule = null;
+              }
               function countGrpItems(g) {
                 let c = (g.menuItems || []).length;
                 (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
