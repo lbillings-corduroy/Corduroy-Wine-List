@@ -1122,18 +1122,26 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
 
   async function handleApprove(item) {
     const itemType = item._type || "wine";
+    setApprovingId(item.id);
+    setApproveError(null);
     try {
-      await fetch(MANAGER_UPDATE_URL, {
+      const res = await fetch(MANAGER_UPDATE_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId: item.id, itemType, updates: { uncertain: false, approved: true } })
       });
+      const data = await res.json();
+      if (!data.ok && !res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (itemType === "wine") {
         setLocalWines(prev => prev.map(w => w.id === item.id ? { ...w, uncertain: false, approved: true } : w));
       } else {
-        // For beer/pours in allItems — just remove from uncertain list on approval
         setAllItems(prev => prev.map(i => i.id === item.id ? { ...i, uncertain: false, approved: true } : i));
       }
-    } catch (e) { console.error(e); }
+      setReviewEditingId(null);
+    } catch (e) {
+      console.error("Approve failed:", e);
+      setApproveError({ id: item.id, message: e.message || "Approval failed — check console" });
+    }
+    setApprovingId(null);
   }
 
   const q = search.toLowerCase();
@@ -1145,6 +1153,8 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewReEnriching, setReviewReEnriching] = useState(false);
   const [reviewEditResult, setReviewEditResult] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
+  const [approveError, setApproveError] = useState(null);
 
   function openReviewEdit(wine) {
     if (reviewEditingId === wine.id) { setReviewEditingId(null); return; }
@@ -1482,15 +1492,20 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                       style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
                       {reviewReEnriching ? "Re-enriching…" : "✦ Re-enrich"}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
-                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
-                      ✓ Approve
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }} disabled={approvingId === wine.id || reviewSaving || reviewReEnriching}
+                      style={{ background: approvingId === wine.id ? "rgba(76,175,125,0.06)" : "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: approvingId === wine.id ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      {approvingId === wine.id ? "Approving…" : "✓ Approve"}
                     </button>
-                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); }}
+                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); setApproveError(null); }}
                       style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
                       Cancel
                     </button>
                   </div>
+                  {approveError?.id === wine.id && (
+                    <div style={{ marginTop: 8, background: "rgba(232,80,80,0.1)", border: "0.5px solid #e85050", borderRadius: 6, padding: "7px 12px", color: "#e85050", fontSize: 11 }}>
+                      ⚠ Approval failed: {approveError.message}. The item was not saved to Firebase — please try again or check the backend.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1509,10 +1524,13 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                       style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
                       ✎ Edit & Re-enrich
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
-                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                      Looks Good ✓
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }} disabled={approvingId === wine.id}
+                      style={{ background: approvingId === wine.id ? "rgba(76,175,125,0.06)" : "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: approvingId === wine.id ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      {approvingId === wine.id ? "Approving…" : "Looks Good ✓"}
                     </button>
+                    {approveError?.id === wine.id && (
+                      <div style={{ color: "#e85050", fontSize: 10, marginTop: 4 }}>⚠ {approveError.message}</div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2681,7 +2699,7 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, onZoomLabel }) {
+function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
@@ -2721,9 +2739,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
   return (
     <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-        <div
-          onClick={wine.imageUrl && onZoomLabel ? (e) => { e.stopPropagation(); onZoomLabel(); } : undefined}
-          style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: `0.5px solid ${wine.imageUrl && onZoomLabel ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: wine.imageUrl && onZoomLabel ? "zoom-in" : "default" }}>
+        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3450,7 +3466,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} onZoomLabel={wine.imageUrl ? () => setZoomedLabel(wine) : null} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
