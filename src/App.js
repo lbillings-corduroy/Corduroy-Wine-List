@@ -314,7 +314,7 @@ function SettingsTab() {
     if (!newMenu.guid.trim()) return;
     const ta = toastAvailability[newMenu.guid.trim()];
     const menuTypeLabel = MENU_TYPES.find(t => t.value === newMenu.menuType)?.label || "Menu";
-    const resolvedLabel = newMenu.label.trim() || ta?.menuName || menuTypeLabel;
+    const resolvedLabel = newMenu.label.trim() || ta?.name || menuTypeLabel;
     const entry = { ...newMenu, label: resolvedLabel, id: Date.now().toString(), guid: newMenu.guid.trim() };
     const updated = { ...settings, menus: [...(settings.menus || []), entry] };
     setAddingMenu(false);
@@ -446,8 +446,8 @@ function SettingsTab() {
         if (data.availability) {
           setToastAvailability(prev => ({ ...prev, [guid]: data.availability }));
           // Auto-populate label from Toast if not already set
-          if (data.availability.menuName && !draft.label.trim()) {
-            setDraft(p => ({ ...p, label: data.availability.menuName }));
+          if (data.availability.name && !draft.label.trim()) {
+            setDraft(p => ({ ...p, label: data.availability.name }));
           }
         } else {
           setGuidError("GUID not found in Toast — double-check it");
@@ -491,7 +491,7 @@ function SettingsTab() {
         {/* Label — auto-populated from Toast if available, otherwise from menu type */}
         {(() => {
           const menuTypeLabel = MENU_TYPES.find(t => t.value === draft.menuType)?.label || "Menu";
-          const effectiveLabel = draft.label.trim() || ta?.menuName || menuTypeLabel;
+          const effectiveLabel = draft.label.trim() || ta?.name || menuTypeLabel;
           const isAutoLabel = !draft.label.trim() && ta;
           return (
             <div>
@@ -499,14 +499,14 @@ function SettingsTab() {
                 {isAutoLabel && <span style={{ color: "#4caf7d", fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> — using "{effectiveLabel}"</span>}
               </label>
               <input style={inputStyle}
-                placeholder={guidLookingUp ? "Looking up…" : ta?.menuName || menuTypeLabel}
+                placeholder={guidLookingUp ? "Looking up…" : ta?.name || menuTypeLabel}
                 value={draft.label}
                 onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
               {isAutoLabel && (
                 <div style={{ ...hintText }}>Leave blank to use the name above, or type to override.</div>
               )}
-              {ta?.menuName && draft.label && draft.label !== ta.menuName && (
-                <div style={{ ...hintText }}>Toast name: {ta.menuName} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.menuName }))}>Use Toast name</span></div>
+              {ta?.name && draft.label && draft.label !== ta.name && (
+                <div style={{ ...hintText }}>Toast name: {ta.name} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.name }))}>Use Toast name</span></div>
               )}
             </div>
           );
@@ -991,7 +991,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
               {item.manuallyEdited && <span style={{ color: "#4caf7d", marginLeft: 6 }}>✎ edited</span>}
               {item.excluded && <span style={{ color: "#e85050", marginLeft: 6 }}>hidden</span>}
             </div>
-            <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
+            <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
           </div>
           <div style={{ color: "#4a3020", fontSize: 18 }}>›</div>
         </div>
@@ -1012,7 +1012,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
                   <span style={{ color: "#c9a96e", fontSize: 12 }}>{editingItem.name}</span>
                 </div>
               )}
-              <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>{editingItem.id}</div>
+              <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>{editingItem.id}</div>
             </div>
             <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
           </div>
@@ -1453,7 +1453,7 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                   {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
                     <div style={{ color: "#c9a96e", fontSize: 10, marginBottom: 2 }}>→ {wine.name}</div>
                   )}
-                  <div style={{ color: "#3a2810", fontSize: 9, fontFamily: "monospace", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
+                  <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
                   <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
                     {itemType === "beer" ? [wine.style, wine.brewery].filter(Boolean).join(" · ")
                       : itemType === "pour" ? [wine.category, wine.producer].filter(Boolean).join(" · ")
