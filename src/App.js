@@ -11,6 +11,7 @@ const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNA
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
 const FORCE_SYNC_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/forceSync";
+const CLEANUP_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/cleanupOrphanedData";
 const SAVE_MENU_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveMenu";
 const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getMenu";
 const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
@@ -241,6 +242,13 @@ const MENU_TYPES = [
   { value: "food",         label: "Food Menu",           description: "Course-grouped · pairing source · no enrichment" },
   { value: "beer_pours",   label: "Beer & Premium Pours", description: "AI enrichment · labels · food→drink pairing" },
   { value: "cocktails_na", label: "Cocktails & NA Beverages", description: "No enrichment · labels · food→drink pairing" },
+];
+
+// Logo files available in /public — add new filenames here when uploading to the repo
+const AVAILABLE_LOGOS = [
+  { value: "", label: "— Default logo —" },
+  { value: "Appalachia Kitchen Logo White App.png", label: "Appalachia Kitchen (default)" },
+  { value: "Tuques Logo White App.png", label: "Tuque's Bar" },
 ];
 
 const EMPTY_MENU = {
@@ -719,28 +727,33 @@ function SettingsTab() {
                 Used on any device that hasn't been assigned a location yet. Set it to your most common room.
               </div>
             </div>
-            {/* Logo filenames */}
+            {/* Logo selectors */}
             <div>
-              <label style={labelStyle}>{locationNames.bar} Logo Filename</label>
-              <input style={inputStyle} placeholder="e.g. tuques-logo.png"
-                value={deviceSetupDraft.barLogo}
-                onChange={e => setDeviceSetupDraft(p => ({ ...p, barLogo: e.target.value.trim() }))} />
-              <div style={{ ...hintText }}>Place the file in the /public folder of the repo. Leave blank to use the default logo.</div>
+              <label style={labelStyle}>{locationNames.bar} Logo</label>
+              <select style={selectStyle} value={deviceSetupDraft.barLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, barLogo: e.target.value }))}>
+                {AVAILABLE_LOGOS.map(l => (
+                  <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label style={labelStyle}>{locationNames.dining} Logo Filename</label>
-              <input style={inputStyle} placeholder="e.g. appalachia-kitchen-logo.png"
-                value={deviceSetupDraft.diningLogo}
-                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningLogo: e.target.value.trim() }))} />
-              <div style={{ ...hintText }}>Leave blank to use the default logo.</div>
+              <label style={labelStyle}>{locationNames.dining} Logo</label>
+              <select style={selectStyle} value={deviceSetupDraft.diningLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningLogo: e.target.value }))}>
+                {AVAILABLE_LOGOS.map(l => (
+                  <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
+                ))}
+              </select>
             </div>
+            <div style={{ ...hintText }}>Add new logos by placing PNG files in the /public folder and adding them to AVAILABLE_LOGOS in App.js.</div>
             {/* Preview */}
             {(deviceSetupDraft.barLogo || deviceSetupDraft.diningLogo) && (
               <div style={{ display: "flex", gap: 10 }}>
                 {deviceSetupDraft.barLogo && (
                   <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
                     <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.bar.toUpperCase()}</div>
-                    <img src={`/${deviceSetupDraft.barLogo}`} alt="Bar logo preview"
+                    <img src={`/logos/${deviceSetupDraft.barLogo}`} alt="Bar logo preview"
                       style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
                       onError={e => { e.target.style.display = "none"; }} />
                   </div>
@@ -748,7 +761,7 @@ function SettingsTab() {
                 {deviceSetupDraft.diningLogo && (
                   <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
                     <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.dining.toUpperCase()}</div>
-                    <img src={`/${deviceSetupDraft.diningLogo}`} alt="Dining logo preview"
+                    <img src={`/logos/${deviceSetupDraft.diningLogo}`} alt="Dining logo preview"
                       style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
                       onError={e => { e.target.style.display = "none"; }} />
                   </div>
@@ -3505,9 +3518,9 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
         {(() => {
           const barLogo = deviceSetup.barLogo;
           const diningLogo = deviceSetup.diningLogo;
-          const src = tabletLocation === "bar" && barLogo ? `/${barLogo}`
-            : tabletLocation === "dining" && diningLogo ? `/${diningLogo}`
-            : "/Appalachia Kitchen Logo White App.png";
+          const src = tabletLocation === "bar" && barLogo ? `/logos/${barLogo}`
+            : tabletLocation === "dining" && diningLogo ? `/logos/${diningLogo}`
+            : "/logos/Appalachia Kitchen Logo White App.png";
           const alt = tabletLocation === "bar" ? (locationNames.bar || "Bar")
             : tabletLocation === "dining" ? (locationNames.dining || "Dining Room")
             : "Appalachia Kitchen";
