@@ -426,25 +426,74 @@ function SettingsTab() {
 
   function MenuForm({ draft, setDraft, onSave, onCancel, saveLabel = "Save Menu" }) {
     const ta = toastAvailability[draft.guid];
+    const [guidLookingUp, setGuidLookingUp] = useState(false);
+    const [guidError, setGuidError] = useState(null);
+    const guidDebounceRef = useRef(null);
+
+    async function lookupGuid(guid) {
+      if (!guid || guid.length < 10) return;
+      setGuidLookingUp(true);
+      setGuidError(null);
+      try {
+        const res = await fetch(SAVE_SETTINGS_URL, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "fetchAvailability", guid })
+        });
+        const data = await res.json();
+        if (data.availability) {
+          setToastAvailability(prev => ({ ...prev, [guid]: data.availability }));
+          // Auto-populate label from Toast if not already set
+          if (data.availability.menuName && !draft.label.trim()) {
+            setDraft(p => ({ ...p, label: data.availability.menuName }));
+          }
+        } else {
+          setGuidError("GUID not found in Toast — double-check it");
+        }
+      } catch (e) {
+        setGuidError("Could not reach Toast — check your connection");
+      }
+      setGuidLookingUp(false);
+    }
+
+    function handleGuidChange(val) {
+      const guid = val.trim();
+      setDraft(p => ({ ...p, guid }));
+      setGuidError(null);
+      if (guidDebounceRef.current) clearTimeout(guidDebounceRef.current);
+      if (guid.length > 10) {
+        guidDebounceRef.current = setTimeout(() => lookupGuid(guid), 800);
+      }
+    }
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-        {/* Label */}
-        <div>
-          <label style={labelStyle}>Display Name</label>
-          <input style={inputStyle} placeholder="e.g. Wine List" value={draft.label}
-            onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
-        </div>
-
-        {/* GUID */}
+        {/* GUID — first, since it drives the name */}
         <div>
           <label style={labelStyle}>Toast Menu / Group GUID</label>
-          <input style={inputStyle} placeholder="e.g. 2d490bef-759b-447f-9af4-5bf0971948ba"
-            value={draft.guid} onChange={e => setDraft(p => ({ ...p, guid: e.target.value.trim() }))} />
+          <div style={{ position: "relative" }}>
+            <input style={inputStyle} placeholder="e.g. 2d490bef-759b-447f-9af4-5bf0971948ba"
+              value={draft.guid} onChange={e => handleGuidChange(e.target.value)}
+              onBlur={() => { if (draft.guid && !ta) lookupGuid(draft.guid); }} />
+            {guidLookingUp && (
+              <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#c9a96e", fontSize: 11 }}>Looking up…</div>
+            )}
+          </div>
           <div style={{ ...hintText }}>
             Found in Toast → Menus → select menu → the GUID appears in the URL or menu details
           </div>
+          {guidError && <div style={{ color: "#e85050", fontSize: 11, marginTop: 4 }}>⚠ {guidError}</div>}
+        </div>
+
+        {/* Label — auto-populated from Toast, editable */}
+        <div>
+          <label style={labelStyle}>Display Name {ta?.menuName && !draft.label && <span style={{ color: "#4caf7d", fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>— pulled from Toast</span>}</label>
+          <input style={inputStyle} placeholder={guidLookingUp ? "Looking up name from Toast…" : ta?.menuName || "e.g. Wine List"}
+            value={draft.label}
+            onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
+          {ta?.menuName && draft.label && draft.label !== ta.menuName && (
+            <div style={{ ...hintText }}>Toast name: {ta.menuName} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.menuName }))}>Use Toast name</span></div>
+          )}
         </div>
 
         {/* Menu Type */}
@@ -523,9 +572,9 @@ function SettingsTab() {
         {/* Action buttons */}
         <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
           <button onClick={onSave}
-            disabled={!draft.guid.trim() || !draft.label.trim() || saving}
-            style={{ flex: 1, background: (!draft.guid.trim() || !draft.label.trim()) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || !draft.label.trim()) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
-            {saving ? "Saving…" : saveLabel}
+            disabled={!draft.guid.trim() || !draft.label.trim() || saving || guidLookingUp}
+            style={{ flex: 1, background: (!draft.guid.trim() || !draft.label.trim() || guidLookingUp) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || !draft.label.trim() || guidLookingUp) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+            {saving ? "Saving…" : guidLookingUp ? "Looking up…" : saveLabel}
           </button>
           <button onClick={onCancel}
             style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "11px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
@@ -1122,26 +1171,18 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
 
   async function handleApprove(item) {
     const itemType = item._type || "wine";
-    setApprovingId(item.id);
-    setApproveError(null);
     try {
-      const res = await fetch(MANAGER_UPDATE_URL, {
+      await fetch(MANAGER_UPDATE_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId: item.id, itemType, updates: { uncertain: false, approved: true } })
       });
-      const data = await res.json();
-      if (!data.ok && !res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (itemType === "wine") {
         setLocalWines(prev => prev.map(w => w.id === item.id ? { ...w, uncertain: false, approved: true } : w));
       } else {
+        // For beer/pours in allItems — just remove from uncertain list on approval
         setAllItems(prev => prev.map(i => i.id === item.id ? { ...i, uncertain: false, approved: true } : i));
       }
-      setReviewEditingId(null);
-    } catch (e) {
-      console.error("Approve failed:", e);
-      setApproveError({ id: item.id, message: e.message || "Approval failed — check console" });
-    }
-    setApprovingId(null);
+    } catch (e) { console.error(e); }
   }
 
   const q = search.toLowerCase();
@@ -1153,8 +1194,6 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewReEnriching, setReviewReEnriching] = useState(false);
   const [reviewEditResult, setReviewEditResult] = useState(null);
-  const [approvingId, setApprovingId] = useState(null);
-  const [approveError, setApproveError] = useState(null);
 
   function openReviewEdit(wine) {
     if (reviewEditingId === wine.id) { setReviewEditingId(null); return; }
@@ -1492,20 +1531,15 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                       style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
                       {reviewReEnriching ? "Re-enriching…" : "✦ Re-enrich"}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }} disabled={approvingId === wine.id || reviewSaving || reviewReEnriching}
-                      style={{ background: approvingId === wine.id ? "rgba(76,175,125,0.06)" : "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: approvingId === wine.id ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
-                      {approvingId === wine.id ? "Approving…" : "✓ Approve"}
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      ✓ Approve
                     </button>
-                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); setApproveError(null); }}
+                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); }}
                       style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
                       Cancel
                     </button>
                   </div>
-                  {approveError?.id === wine.id && (
-                    <div style={{ marginTop: 8, background: "rgba(232,80,80,0.1)", border: "0.5px solid #e85050", borderRadius: 6, padding: "7px 12px", color: "#e85050", fontSize: 11 }}>
-                      ⚠ Approval failed: {approveError.message}. The item was not saved to Firebase — please try again or check the backend.
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1524,13 +1558,10 @@ function ManagerScreen({ wines, onClose, isAdmin }) {
                       style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
                       ✎ Edit & Re-enrich
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }} disabled={approvingId === wine.id}
-                      style={{ background: approvingId === wine.id ? "rgba(76,175,125,0.06)" : "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: approvingId === wine.id ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
-                      {approvingId === wine.id ? "Approving…" : "Looks Good ✓"}
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      Looks Good ✓
                     </button>
-                    {approveError?.id === wine.id && (
-                      <div style={{ color: "#e85050", fontSize: 10, marginTop: 4 }}>⚠ {approveError.message}</div>
-                    )}
                   </div>
                 </div>
               )}
