@@ -3819,7 +3819,7 @@ function AppContent() {
     </>
   );
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} /></>;
   if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
@@ -3829,7 +3829,7 @@ function AppContent() {
 
   // AppContent no longer renders the wine list directly
   // All screens accounted for above — return home as fallback
-  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
+  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} /></>;
 }
 
 function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZoomLabel }) {
