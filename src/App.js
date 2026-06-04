@@ -2681,7 +2681,7 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite }) {
+function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, onZoomLabel }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
@@ -2721,7 +2721,9 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
   return (
     <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+        <div
+          onClick={wine.imageUrl && onZoomLabel ? (e) => { e.stopPropagation(); onZoomLabel(); } : undefined}
+          style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: `0.5px solid ${wine.imageUrl && onZoomLabel ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: wine.imageUrl && onZoomLabel ? "zoom-in" : "default" }}>
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3448,7 +3450,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} onZoomLabel={wine.imageUrl ? () => setZoomedLabel(wine) : null} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
