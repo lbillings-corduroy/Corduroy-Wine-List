@@ -3532,6 +3532,9 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 function AppContent() {
   const [screen, setScreen] = useState("home");
   const [wines, setWines] = useState([]);
+  const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || "all");
+  const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
+  function setTabletLocationPersist(loc) { localStorage.setItem("tabletLocation", loc); setTabletLocationState(loc); }
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -3541,6 +3544,12 @@ function AppContent() {
   const idleTimer = useRef(null);
   const [favorites, setFavorites] = useState([]);
   const [showShortlist, setShowShortlist] = useState(false);
+
+  useEffect(() => {
+    fetch(SETTINGS_URL).then(r => r.json()).then(data => {
+      if (data.settings?.locationNames) setLocationNames(data.settings.locationNames);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchWines();
