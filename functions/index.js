@@ -615,6 +615,8 @@ exports.syncBeerMenu = functions
       await db.ref('beerLastUpdated').set(Date.now());
       console.log(`Saved ${freshBeers.length} beers`);
 
+      await purgeOrphanedEnrichment(db, 'beers', 'beerEnrichment', freshBeers.map(b => b.id), 'beer');
+
       const toEnrich = freshBeers.filter(b => {
         const existing = existingEnrichment[b.id];
         if (!existing) return true;
@@ -684,6 +686,8 @@ exports.syncPoursMenu = functions
       await db.ref('poursOrder').set(freshPours.map(p => p.id));
       await db.ref('poursLastUpdated').set(Date.now());
       console.log(`Saved ${freshPours.length} pours`);
+
+      await purgeOrphanedEnrichment(db, 'pours', 'poursEnrichment', freshPours.map(p => p.id), 'pours');
 
       const toEnrich = freshPours.filter(p => {
         const existing = existingEnrichment[p.id];
@@ -1606,6 +1610,65 @@ exports.forceSync = functions
     }
   });
 
+
+// ─── Manual Cleanup Endpoint ──────────────────────────────────────────────────
+// Purges orphaned enrichment/data records across all categories in one shot.
+// Called from the manager dashboard after fixing a miscategorised menu.
+exports.cleanupOrphanedData = functions
+  .runWith({ timeoutSeconds: 120, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+
+    try {
+      const db = admin.database();
+      const settings = await getAppSettings();
+      const token = await getToastToken();
+      const menus = await getMenus(token);
+      const stockData = await getStockData(token);
+
+      const results = {};
+
+      // Wine
+      const wineMenus = getMenusOfType(settings, 'wine');
+      let allWineIds = new Set();
+      for (const wm of wineMenus) {
+        const raw = extractWinesFromGuid(menus, wm.guid, stockData);
+        mergeGlassBottle(raw).forEach(w => allWineIds.add(w.id));
+      }
+      await purgeOrphanedEnrichment(db, 'wines', 'wineEnrichment', [...allWineIds], 'wine-cleanup');
+      results.wine = allWineIds.size;
+
+      // Beer
+      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
+      const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
+      const beerToSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : []);
+      let allBeerIds = new Set();
+      for (const bm of beerToSync) {
+        extractItemsFromMenu(menus, bm.guid, stockData).forEach(b => allBeerIds.add(b.id));
+      }
+      await purgeOrphanedEnrichment(db, 'beers', 'beerEnrichment', [...allBeerIds], 'beer-cleanup');
+      results.beer = allBeerIds.size;
+
+      // Pours
+      const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
+      const poursToSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : []);
+      let allPourIds = new Set();
+      for (const pm of poursToSync) {
+        extractItemsFromMenu(menus, pm.guid, stockData).forEach(p => allPourIds.add(p.id));
+      }
+      await purgeOrphanedEnrichment(db, 'pours', 'poursEnrichment', [...allPourIds], 'pours-cleanup');
+      results.pours = allPourIds.size;
+
+      return res.json({ ok: true, validCounts: results, message: 'Orphaned records purged across all categories.' });
+    } catch (e) {
+      console.error('cleanupOrphanedData error:', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
 // ─── Save Menu ────────────────────────────────────────────────────────────────
 exports.saveMenu = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
@@ -2112,13 +2175,17 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
           }
           (found.menuGroups || []).forEach(g => { itemCount += countItems(g); });
         } else {
-          // Search as a group
+          // Search as a group — inherit availability from parent menu since
+          // Toast does not set availabilitySchedules at the group level
           for (const m of menus.menus) {
             const group = findGroupByGuid(m.menuGroups || [], guid);
             if (group) {
               found = group;
               menuName = group.name;
-              availSchedule = group.availabilitySchedules || null;
+              // Groups never have their own schedule in Toast — always inherit from parent menu
+              availSchedule = (m.availabilitySchedules && m.availabilitySchedules.length > 0)
+                ? m.availabilitySchedules
+                : null;
               function countGrpItems(g) {
                 let c = (g.menuItems || []).length;
                 (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
