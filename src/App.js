@@ -244,13 +244,6 @@ const MENU_TYPES = [
   { value: "cocktails_na", label: "Cocktails & NA Beverages", description: "No enrichment · labels · food→drink pairing" },
 ];
 
-// Logo files available in /public — add new filenames here when uploading to the repo
-const AVAILABLE_LOGOS = [
-  { value: "", label: "— Default logo —" },
-  { value: "Appalachia Kitchen Logo White App.png", label: "Appalachia Kitchen (default)" },
-  { value: "Tuques Logo White App.png", label: "Tuque's Bar" },
-];
-
 const EMPTY_MENU = {
   id: null, label: "", guid: "", menuType: "wine", locations: [],
 };
@@ -275,6 +268,19 @@ function SettingsTab() {
   const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
   const [editingDeviceSetup, setEditingDeviceSetup] = useState(false);
   const [deviceSetupDraft, setDeviceSetupDraft] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [availableLogos, setAvailableLogos] = useState([{ value: "", label: "— Default logo —" }]);
+
+  useEffect(() => {
+    fetch("/logos/index.json")
+      .then(r => r.json())
+      .then(list => {
+        setAvailableLogos([
+          { value: "", label: "— Default logo —" },
+          ...list
+        ]);
+      })
+      .catch(() => {}); // silently ignore if index.json not present yet
+  }, []);
 
   useEffect(() => {
     fetch(SETTINGS_URL)
@@ -732,7 +738,7 @@ function SettingsTab() {
               <label style={labelStyle}>{locationNames.bar} Logo</label>
               <select style={selectStyle} value={deviceSetupDraft.barLogo}
                 onChange={e => setDeviceSetupDraft(p => ({ ...p, barLogo: e.target.value }))}>
-                {AVAILABLE_LOGOS.map(l => (
+                {availableLogos.map(l => (
                   <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
                 ))}
               </select>
@@ -741,12 +747,12 @@ function SettingsTab() {
               <label style={labelStyle}>{locationNames.dining} Logo</label>
               <select style={selectStyle} value={deviceSetupDraft.diningLogo}
                 onChange={e => setDeviceSetupDraft(p => ({ ...p, diningLogo: e.target.value }))}>
-                {AVAILABLE_LOGOS.map(l => (
+                {availableLogos.map(l => (
                   <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
                 ))}
               </select>
             </div>
-            <div style={{ ...hintText }}>Add new logos by placing PNG files in the /public folder and adding them to AVAILABLE_LOGOS in App.js.</div>
+            <div style={{ ...hintText }}>Add new logos by placing PNG files in /public/logos/ and adding an entry to /public/logos/index.json.</div>
             {/* Preview */}
             {(deviceSetupDraft.barLogo || deviceSetupDraft.diningLogo) && (
               <div style={{ display: "flex", gap: 10 }}>
