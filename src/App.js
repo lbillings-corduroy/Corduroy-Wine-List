@@ -372,6 +372,7 @@ function SettingsTab() {
   };
   const labelStyle = { color: "#9a7050", fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
   const selectStyle = { ...inputStyle, cursor: "pointer" };
+  const optionStyle = { background: "#3d2200", color: "#f0e8d8" };
   const bodyText = { color: "#c8b090", fontSize: 12, lineHeight: 1.5 };
   const hintText = { color: "#7a5540", fontSize: 10, marginTop: 4, fontStyle: "italic" };
 
@@ -518,7 +519,7 @@ function SettingsTab() {
           <select style={selectStyle} value={draft.menuType}
             onChange={e => setDraft(p => ({ ...p, menuType: e.target.value }))}>
             {MENU_TYPES.map(t => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+              <option key={t.value} value={t.value} style={optionStyle}>{t.label}</option>
             ))}
           </select>
           {draft.menuType && (
@@ -706,6 +707,7 @@ function SettingsTab() {
                   onSave={saveEdited}
                   onCancel={() => setExpandedMenu(null)}
                   saveLabel="Save Changes"
+                  onCheckAvailability={() => syncMenuPreview(menus[idx], idx)}
                 />
               </div>
             )}
@@ -723,6 +725,7 @@ function SettingsTab() {
             onSave={addMenu}
             onCancel={() => { setAddingMenu(false); setNewMenu({ ...EMPTY_MENU }); }}
             saveLabel="Add Menu"
+            onCheckAvailability={newMenu.guid ? () => syncMenuPreview(newMenu, -1) : null}
           />
         </div>
       ) : (
@@ -1706,7 +1709,7 @@ function ListCountBar({ left, right }) {
 
 // ─── Generic Item List Screen (Beer, Pours, Cocktails, NAB) ──────────────────
 
-function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
+function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1908,7 +1911,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 {item.description}
               </div>
             )}
-            <ItemPairingButton item={item} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+            <ItemPairingButton item={item} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
           </div>
         );
       })()}
@@ -2647,7 +2650,8 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
           itemStyle: item.style || null,
           itemCategory: item.category || null,
           itemABV: item.abv || null,
-          excludeDishes: shownDishes
+          excludeDishes: shownDishes,
+          location: tabletLocation !== "all" ? tabletLocation : undefined
         })
       });
       const data = await res.json();
@@ -2746,7 +2750,7 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite }) {
+function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, tabletLocation = "all" }) {
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
@@ -2770,7 +2774,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id, excludeDishes: shownDishes })
+        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id, excludeDishes: shownDishes, location: tabletLocation !== "all" ? tabletLocation : undefined })
       });
       const data = await res.json();
       const pairings = data.pairings || [];
@@ -2876,7 +2880,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 
 // ─── Sommelier Screen ─────────────────────────────────────────────────────────
 
-function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {} }) {
+function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
   const [activeCourse, setActiveCourse] = useState("All");
@@ -2890,10 +2894,11 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const [doneModal, setDoneModal] = useState(null);
 
   useEffect(() => {
-    fetch(FOOD_URL).then(r => r.json())
+    const locParam = tabletLocation !== "all" ? `?location=${tabletLocation}` : "";
+    fetch(FOOD_URL + locParam).then(r => r.json())
       .then(data => { setFoodItems(data.foodItems || []); setLoadingFood(false); })
       .catch(() => setLoadingFood(false));
-  }, []);
+  }, [tabletLocation]);
 
   const [lastShownIds, setLastShownIds] = useState({});
   const pendingPairing = useRef(null);
@@ -2964,7 +2969,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })) })
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), location: tabletLocation !== "all" ? tabletLocation : undefined })
       });
       storeResult(await res.json());
     } catch (e) {
@@ -2982,7 +2987,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
     try {
       const res = await fetch(PAIRING_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), excludeWineIds: lastShownIds })
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), excludeWineIds: lastShownIds, location: tabletLocation !== "all" ? tabletLocation : undefined })
       });
       storeResult(await res.json());
     } catch (e) {
@@ -3390,7 +3395,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
 // ─── Wine List Screen ─────────────────────────────────────────────────────────
 
-function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist }) {
+function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist, tabletLocation = "all" }) {
   const [activeTier, setActiveTier]       = useState("All");
   const [activeSubgroup, setActiveSubgroup] = useState("All");
   const [activeVarietal, setActiveVarietal] = useState("All");
@@ -3513,7 +3518,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
@@ -3599,12 +3604,12 @@ function AppContent() {
   );
 
   if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} /></>;
-  if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} /></>;
-  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} /></>;
-  if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} /></>;
-  if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} /></>;
-  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} /></>;
-  if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} /></>;
+  if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
 
   // AppContent no longer renders the wine list directly
   // All screens accounted for above — return home as fallback
