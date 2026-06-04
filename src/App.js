@@ -311,8 +311,11 @@ function SettingsTab() {
   }
 
   function addMenu() {
-    if (!newMenu.guid.trim() || !newMenu.label.trim()) return;
-    const entry = { ...newMenu, id: Date.now().toString(), guid: newMenu.guid.trim() };
+    if (!newMenu.guid.trim()) return;
+    const ta = toastAvailability[newMenu.guid.trim()];
+    const menuTypeLabel = MENU_TYPES.find(t => t.value === newMenu.menuType)?.label || "Menu";
+    const resolvedLabel = newMenu.label.trim() || ta?.menuName || menuTypeLabel;
+    const entry = { ...newMenu, label: resolvedLabel, id: Date.now().toString(), guid: newMenu.guid.trim() };
     const updated = { ...settings, menus: [...(settings.menus || []), entry] };
     setAddingMenu(false);
     setNewMenu({ ...EMPTY_MENU });
@@ -485,16 +488,29 @@ function SettingsTab() {
           {guidError && <div style={{ color: "#e85050", fontSize: 11, marginTop: 4 }}>⚠ {guidError}</div>}
         </div>
 
-        {/* Label — auto-populated from Toast, editable */}
-        <div>
-          <label style={labelStyle}>Display Name {ta?.menuName && !draft.label && <span style={{ color: "#4caf7d", fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>— pulled from Toast</span>}</label>
-          <input style={inputStyle} placeholder={guidLookingUp ? "Looking up name from Toast…" : ta?.menuName || "e.g. Wine List"}
-            value={draft.label}
-            onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
-          {ta?.menuName && draft.label && draft.label !== ta.menuName && (
-            <div style={{ ...hintText }}>Toast name: {ta.menuName} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.menuName }))}>Use Toast name</span></div>
-          )}
-        </div>
+        {/* Label — auto-populated from Toast if available, otherwise from menu type */}
+        {(() => {
+          const menuTypeLabel = MENU_TYPES.find(t => t.value === draft.menuType)?.label || "Menu";
+          const effectiveLabel = draft.label.trim() || ta?.menuName || menuTypeLabel;
+          const isAutoLabel = !draft.label.trim() && ta;
+          return (
+            <div>
+              <label style={labelStyle}>Display Name
+                {isAutoLabel && <span style={{ color: "#4caf7d", fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> — using "{effectiveLabel}"</span>}
+              </label>
+              <input style={inputStyle}
+                placeholder={guidLookingUp ? "Looking up…" : ta?.menuName || menuTypeLabel}
+                value={draft.label}
+                onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
+              {isAutoLabel && (
+                <div style={{ ...hintText }}>Leave blank to use the name above, or type to override.</div>
+              )}
+              {ta?.menuName && draft.label && draft.label !== ta.menuName && (
+                <div style={{ ...hintText }}>Toast name: {ta.menuName} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.menuName }))}>Use Toast name</span></div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Menu Type */}
         <div>
@@ -572,8 +588,8 @@ function SettingsTab() {
         {/* Action buttons */}
         <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
           <button onClick={onSave}
-            disabled={!draft.guid.trim() || !draft.label.trim() || saving || guidLookingUp}
-            style={{ flex: 1, background: (!draft.guid.trim() || !draft.label.trim() || guidLookingUp) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || !draft.label.trim() || guidLookingUp) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+            disabled={!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || saving || guidLookingUp}
+            style={{ flex: 1, background: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
             {saving ? "Saving…" : guidLookingUp ? "Looking up…" : saveLabel}
           </button>
           <button onClick={onCancel}
