@@ -2110,7 +2110,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
       })()}
 
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
@@ -2559,7 +2559,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 //   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
 //                  used to personalise the opening message; null for generic open
 
-function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist }) {
+function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null }) {
   function buildOpener() {
     if (selectedFoods.length > 0) {
       const names = selectedFoods.map(f => f.name).join(", ");
@@ -2608,6 +2608,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           messages: newMessages.map(m => ({ role: m.role, content: m.text })),
           contextItem: contextItem || null,
           selectedFoods: selectedFoods.length > 0 ? selectedFoods.map(f => ({ id: f.id, name: f.name, courseRole: f.courseRole })) : [],
+          location: tabletLocation || undefined,
         }),
       });
       const data = await res.json();
@@ -3477,7 +3478,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   );
 }
 
-function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {}, tabletLocation = "bar", deviceSetup = {}, locationNames = {} }) {
+function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {}, tabletLocation = "bar", deviceSetup = {}, locationNames = {}, settings = null }) {
   const [visible, setVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const tapTimer = useRef(null);
@@ -3495,14 +3496,30 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
     return () => { if (tapTimer.current) clearTimeout(tapTimer.current); };
   }, []);
 
-  const buttons = [
-    { id: "wine", label: "Wine List", icon: "🍷", available: true },
-    { id: "beer", label: "Beer List", icon: "🍺", available: true },
-    { id: "pours", label: "Premium Pours", icon: "🥃", available: true },
-    { id: "cocktails", label: "Specialty Cocktails", icon: "🍸", available: true },
-    { id: "nab", label: "Non-Alcoholic Beverages", icon: "🥤", available: true },
-    { id: "sommelier", label: "Get a Wine Pairing", icon: "✦", available: true },
+  // Determine which menu buttons to show based on location assignment in settings
+  const ALL_BUTTONS = [
+    { id: "wine",      label: "Wine List",                 icon: "🍷", menuType: "wine" },
+    { id: "beer",      label: "Beer List",                 icon: "🍺", menuType: "beer_pours" },
+    { id: "pours",     label: "Premium Pours",             icon: "🥃", menuType: "beer_pours" },
+    { id: "cocktails", label: "Specialty Cocktails",       icon: "🍸", menuType: "cocktails_na" },
+    { id: "nab",       label: "Non-Alcoholic Beverages",   icon: "🥤", menuType: "cocktails_na" },
+    { id: "sommelier", label: "Get a Wine Pairing",        icon: "✦", menuType: null },
   ];
+
+  function menuTypeAvailableAtLocation(menuType) {
+    if (!settings || !settings.menus || !menuType) return true; // no settings yet — show all
+    const menusOfType = settings.menus.filter(m => m.menuType === menuType);
+    if (menusOfType.length === 0) return false; // type not configured at all
+    // Check if any menu of this type is assigned to current location (or all locations)
+    return menusOfType.some(m => {
+      const locs = m.locations || [];
+      return locs.length === 0 || locs.includes(tabletLocation);
+    });
+  }
+
+  const buttons = ALL_BUTTONS
+    .filter(btn => menuTypeAvailableAtLocation(btn.menuType))
+    .map(btn => ({ ...btn, available: true }));
 
   return (
     <div style={{
@@ -3719,7 +3736,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 
       {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
@@ -3734,6 +3751,7 @@ function AppContent() {
   const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || null);
   const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
   const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [appSettings, setAppSettings] = useState(null);
   function setTabletLocationPersist(loc) { localStorage.setItem("tabletLocation", loc); setTabletLocationState(loc); }
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -3747,6 +3765,7 @@ function AppContent() {
 
   useEffect(() => {
     fetch(SETTINGS_URL).then(r => r.json()).then(data => {
+      if (data.settings) setAppSettings(data.settings);
       if (data.settings?.locationNames) setLocationNames(data.settings.locationNames);
       const ds = data.settings?.deviceSetup || { defaultLocation: "bar", barLogo: "", diningLogo: "" };
       setDeviceSetup(ds);
@@ -3825,7 +3844,7 @@ function AppContent() {
     </>
   );
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} /></>;
+  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>;
   if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
   if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
   if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
@@ -3835,7 +3854,7 @@ function AppContent() {
 
   // AppContent no longer renders the wine list directly
   // All screens accounted for above — return home as fallback
-  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} /></>;
+  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>;
 }
 
 function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZoomLabel }) {
