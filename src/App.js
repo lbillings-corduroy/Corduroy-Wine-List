@@ -4019,8 +4019,8 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZ
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       display: "flex", alignItems: "center", gap: 12,
-      background: selected ? "rgba(240,235,224,0.08)" : hovered ? "rgba(240,235,224,0.05)" : "transparent`,
-      borderLeft: selected ? `2px solid ${t.accent}` : `2px solid transparent",
+      background: selected ? "rgba(240,235,224,0.08)" : hovered ? "rgba(240,235,224,0.05)" : "transparent",
+      borderLeft: selected ? `2px solid ${t.accent}` : "2px solid transparent",
       borderRadius: 8, padding: "11px 8px", cursor: "pointer",
       transition: "all 0.15s", opacity: wine.available === false ? 0.4 : 1
     }}>
