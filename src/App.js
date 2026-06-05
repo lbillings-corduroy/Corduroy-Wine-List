@@ -2022,7 +2022,7 @@ function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children 
 function ListSectionHeading({ label, borderTop }) {
   const t = useTheme();
   return (
-    <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? "0.5px solid #e8e0d0" : "none" }}>
+    <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? `0.5px solid ${t.borderSubtle}` : "none" }}>
       <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
     </div>
   );
@@ -2155,7 +2155,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         right="☆ Star to save to My Menu"
       />
 
-      <div style={{ background: t.textPrimary }}>
+      <div style={{ background: t.bgSurface }}>
         {filteredGroupOrder.map((group, gi) => (
           <div key={group}>
             <ListSectionHeading label={group} borderTop={gi > 0} />
@@ -2880,7 +2880,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         {/* Input bar */}
         <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid #e8e0d0", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
-            style={{ flex: 1, background: t.textPrimary, border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.bgBase, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
+            style={{ flex: 1, background: t.bgCard, border: `0.5px solid ${t.borderMid}`, borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.textPrimary, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
           <button onClick={handleSend} disabled={!input.trim() || sending}
             style={{ background: input.trim() && !sending ? t.accent : t.accentDim, border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
             <span style={{ color: input.trim() && !sending ? t.bgDeep : t.accent, fontSize: 16, lineHeight: 1 }}>›</span>
@@ -3132,7 +3132,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
   return (
     <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-        <div style={{ width: 52, height: 72, borderRadius: 4, background: t.textPrimary, border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3151,7 +3151,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
       )}
 
       {wine.reviews && wine.reviews !== "null" && (
-        <div style={{ background: t.textPrimary, border: "0.5px solid #e8e0d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+        <div style={{ background: "#f5ede0", border: `0.5px solid ${t.borderSubtle}`, borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
           <div style={{ color: t.accent, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
           <div style={{ color: t.textDim, fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
         </div>
@@ -3389,7 +3389,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               For larger parties, run the sommelier a second time to capture additional guests' selections.
             </div>
           </div>
-          <div style={{ background: t.textPrimary }}>
+          <div style={{ background: t.bgSurface }}>
             {loadingFood ? (
               <div style={{ color: t.textSecondary, textAlign: "center", padding: 40 }}>Loading menu…</div>
             ) : (() => {
@@ -3714,24 +3714,24 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
             onClick={() => btn.available && onNavigate(btn.id)}
             style={{
               background: btn.id === "sommelier"
-                ? "rgba(180,120,60,0.18)"
-                : btn.available ? t.accentDimSm : "rgba(255,255,255,0.02)",
+                ? t.accentDim
+                : btn.available ? t.white06 : t.white04,
               border: btn.id === "sommelier"
-                ? "1px solid rgba(201,169,110,0.8)"
-                : `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : t.white08}`,
+                ? `1px solid ${t.accentBorder}`
+                : `0.5px solid ${btn.available ? t.accentBorderSm : t.white08}`,
               borderRadius: 8, padding: "18px 24px",
               display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: btn.available ? "pointer" : "default",
               transition: "all 0.2s", width: "100%",
               opacity: btn.available ? 1 : 0.35,
             }}
-            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.28)" : "rgba(201,169,110,0.14)"; }}
-            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.18)" : t.accentDimSm; }}
+            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? t.accentDim : t.accentDimSm; }}
+            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? t.accentDim : t.white06; }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <span style={{ fontSize: 20 }}>{btn.icon}</span>
               <span style={{
-                color: btn.id === "sommelier" ? t.accent : btn.available ? "#e8d9b8" : "#5a4a30",
+                color: btn.id === "sommelier" ? t.accent : btn.available ? t.textPrimary : t.textVeryDim,
                 fontSize: btn.id === "sommelier" ? 14 : btn.id === "nab" ? 13 : 15,
                 letterSpacing: btn.id === "sommelier" ? "1.5px" : btn.id === "nab" ? "1px" : "2px",
                 textTransform: "uppercase", fontFamily: t.fontSerif,
@@ -3743,7 +3743,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
             {btn.available ? (
               <span style={{ color: t.accent, fontSize: 18, lineHeight: 1 }}>›</span>
             ) : (
-              <span style={{ color: "#4e3e24", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
+              <span style={{ color: t.textMuted, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
             )}
           </button>
         ))}
@@ -3825,7 +3825,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const countLeft  = `${availCount} ${availCount === 1 ? "wine" : "wines"}${oosCount > 0 ? ` · ${oosCount} out of stock` : ""}${wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}`;
 
   return (
-    <div style={{ background: t.textPrimary, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Shared header — edit ListScreenHeader to change all list screens */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <ListScreenHeader title="Wine List" onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
@@ -3868,7 +3868,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 
       <ListCountBar left={countLeft} right="☆ Star to save to My Menu" />
 
-      <div style={{ background: t.textPrimary }}>
+      <div style={{ background: t.bgSurface }}>
         {groupOrder.map((group, gi) => (
           <div key={group}>
             <ListSectionHeading label={group} borderTop={gi > 0} />
