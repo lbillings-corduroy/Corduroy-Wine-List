@@ -2174,7 +2174,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                     {(item.style || item.category) && (
                       <div style={{ color: accentColor, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
                         {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
@@ -2193,7 +2193,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                     <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
                     {item.price ? (
                       <>
-                        <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
                         <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>each</div>
                       </>
                     ) : (
@@ -2226,7 +2226,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: t.bgCardHover, fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                <div style={{ color: t.textPrimary, fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
                 {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
                 {(item.brewery || item.producer) && <div style={{ color: t.textMuted, fontSize: 11 }}>{item.brewery || item.producer}</div>}
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
@@ -2235,7 +2235,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                {item.price && <div style={{ color: t.bgCardHover, fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+                {item.price && <div style={{ color: t.textPrimary, fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
               </div>
             </div>
             {item.description && (
@@ -3029,7 +3029,7 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
                   <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
                   <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
                   {p.id && onToggleFavorite && (
@@ -3136,7 +3136,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
           <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
             {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
           </div>
@@ -3161,13 +3161,13 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
         {wine.glassPrice && (
           <div>
             <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
-            <div style={{ color: t.bgCardHover, fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: t.textPrimary, fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
           </div>
         )}
         {wine.bottlePrice && (
           <div>
             <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
-            <div style={{ color: t.bgCardHover, fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: t.textPrimary, fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
           </div>
         )}
         {!wine.glassPrice && !wine.bottlePrice && (
@@ -3198,7 +3198,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
                   <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
                   <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
                   {p.id && onToggleFavorite && (
@@ -3428,7 +3428,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     return (
                           <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? t.white08 : t.textPrimary, transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: t.bgCardHover, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
                               {food.description && <div style={{ color: t.textMuted, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
                             </div>
                             <div style={{ color: t.textMuted, fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
@@ -3848,7 +3848,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
           )}
           {varietals.length > 2 && (
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-              <span style={{ color: t.textDim, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
+              <span style={{ color: t.textMuted, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
               {varietals.map(v => (
                 <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
                   active={activeVarietal === v}
@@ -4047,7 +4047,7 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZ
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
           <div style={{ color: t.accent, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
@@ -4067,15 +4067,15 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZ
         {wine.available === false ? (
           <div style={{ background: "#f5ede0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
         ) : wine.glassPrice && wine.bottlePrice ? (
-          <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: t.textSecondary }}>/</span>{Math.round(wine.bottlePrice)}</div>
+          <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: t.textSecondary }}>/</span>{Math.round(wine.bottlePrice)}</div>
         ) : wine.glassPrice ? (
           <>
-            <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
             <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>glass</div>
           </>
         ) : wine.bottlePrice ? (
           <>
-            <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
             <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>bottle</div>
           </>
         ) : (
