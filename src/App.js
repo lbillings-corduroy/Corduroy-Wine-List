@@ -3697,7 +3697,13 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
           const alt = tabletLocation === "bar" ? (locationNames.bar || "Bar")
             : tabletLocation === "dining" ? (locationNames.dining || "Dining Room")
             : "Appalachia Kitchen";
-          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: 0.95, filter: "brightness(1.5) contrast(1.05)" }} />;
+          // For light-background logos (like Tuque's) on dark backgrounds, invert to white
+          // For dark-background logos (like AK white version), boost brightness
+          const isLightLogo = tabletLocation === "bar" && barLogo;
+          const imgFilter = isLightLogo
+            ? "brightness(0) invert(1) sepia(0.15) saturate(0.8)"
+            : "brightness(1.5) contrast(1.05)";
+          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: 0.92, filter: imgFilter }} />;
         })()}
       </div>
 
