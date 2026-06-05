@@ -964,7 +964,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
   }
   const allItems = [];
 
-  function collectItems(g, courseName) {
+  function collectItems(g, courseName, locations) {
     if (g.menuItems && g.menuItems.length > 0) {
       g.menuItems.forEach(item => {
         const price = item.price || null;
@@ -973,35 +973,34 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
         if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
         if (allItems.find(i => i.id === item.guid)) return;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations });
       });
     }
-    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName));
+    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations));
   }
 
-  for (const { name: configName, guid } of groups) {
-    // Check if the GUID matches a top-level menu — if so, use its subgroups as course sections
+  for (const { name: configName, guid, locations } of groups) {
+    // locations is [] (all) or ["bar"] / ["dining"] from settings
     const topLevelMenu = menus.menus.find(m => m.guid === guid);
     if (topLevelMenu) {
       console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — pulling subgroups as sections`);
       if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
         topLevelMenu.menuGroups.forEach(subgroup => {
-          const courseName = subgroup.name; // Use subgroup name as the course/section label
-          collectItems(subgroup, courseName);
+          const courseName = subgroup.name;
+          collectItems(subgroup, courseName, locations || []);
           console.log(`  Section "${courseName}" — ${allItems.filter(i => i.course === courseName).length} items`);
         });
       }
       continue;
     }
 
-    // Otherwise look for it as a subgroup within any menu
     let group = null;
     for (const menu of menus.menus) {
       group = findGroupByGuid(menu.menuGroups || [], guid);
       if (group) break;
     }
     if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName);
+    collectItems(group, configName, locations || []);
     console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
@@ -1017,7 +1016,7 @@ exports.syncFoodMenu = functions
       const settings = await getAppSettings();
       const foodMenuConfigs = getMenusOfType(settings, 'food');
 
-      const dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid }));
+      const dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid, locations: m.locations || [] }));
       if (dynamicFoodGroups.length === 0) { console.log('No food menus configured in settings — skipping food sync'); return null; }
 
       const token = await getToastToken();
@@ -1060,10 +1059,18 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     const lastUpdated = lastUpdatedSnap.val();
     const exclusions = exclusionsSnap.val() || {};
 
+    const requestedLocation = req.query.location || req.body?.location || null;
+
     const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
       : Object.values(foodById)
-    ).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
+    ).filter(item => {
+      // If a location is requested, only return items whose menu is assigned to that location
+      // Items with empty locations array are available everywhere
+      if (!requestedLocation) return true;
+      const locs = item.locations || [];
+      return locs.length === 0 || locs.includes(requestedLocation);
+    }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
@@ -1095,7 +1102,13 @@ exports.getPairing = functions
         const wine = wineSnap.val();
         if (!wine) return res.status(404).json({ error: 'Wine not found' });
         const enrich = enrichSnap.val() || {};
-        const foodItems = Object.values(foodSnap.val() || {});
+        const requestedLocation = req.body.location || null;
+        const allFoodItems = Object.values(foodSnap.val() || {});
+        const foodItems = allFoodItems.filter(f => {
+          if (!requestedLocation) return true;
+          const locs = f.locations || [];
+          return locs.length === 0 || locs.includes(requestedLocation);
+        });
 
         const wineName = enrich.correctedName || wine.name;
         const foodList = foodItems
@@ -1742,7 +1755,7 @@ exports.sommelierChat = functions
     if (req.method === 'OPTIONS') return res.status(204).send('');
 
     try {
-      const { messages, contextItem, selectedFoods } = req.body;
+      const { messages, contextItem, selectedFoods, location: tabletLocation } = req.body;
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'messages array required' });
       }
@@ -1798,7 +1811,13 @@ exports.sommelierChat = functions
       const orderedWines = (wineOrder.length > 0
         ? wineOrder.map(id => winesById[id]).filter(Boolean)
         : Object.values(winesById)
-      ).filter(w => w.available !== false && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
+      ).filter(w => {
+        if (w.available === false) return false;
+        if (wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved) return false;
+        if (!tabletLocation) return true;
+        const menuForWine = configuredMenus.filter(m => m.menuType === 'wine');
+        return menuForWine.length === 0 || menuForWine.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
+      });
 
       const wineLines = orderedWines.map(w => {
         const e = wineEnrich[w.id] || {};
@@ -1817,7 +1836,12 @@ exports.sommelierChat = functions
       const orderedBeers = (beerOrder.length > 0
         ? beerOrder.map(id => beersById[id]).filter(Boolean)
         : Object.values(beersById)
-      ).filter(b => b.available !== false);
+      ).filter(b => {
+        if (b.available === false) return false;
+        if (!tabletLocation) return true;
+        const beerMenus = configuredMenus.filter(m => m.menuType === 'beer_pours');
+        return beerMenus.length === 0 || beerMenus.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
+      });
 
       const beerLines = orderedBeers.map(b => {
         const e = beerEnrich[b.id] || {};
@@ -1832,7 +1856,12 @@ exports.sommelierChat = functions
       const orderedPours = (poursOrder.length > 0
         ? poursOrder.map(id => poursById[id]).filter(Boolean)
         : Object.values(poursById)
-      ).filter(p => p.available !== false);
+      ).filter(p => {
+        if (p.available === false) return false;
+        if (!tabletLocation) return true;
+        const pourMenus = configuredMenus.filter(m => m.menuType === 'beer_pours');
+        return pourMenus.length === 0 || pourMenus.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
+      });
 
       const pourLines = orderedPours.map(p => {
         const e = poursEnrich[p.id] || {};
@@ -1866,14 +1895,19 @@ exports.sommelierChat = functions
         return `  - ${n.name}${n.subgroup ? ` (${n.subgroup})` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
       });
 
-      // Build food menu grouped by course
+      // Build food menu grouped by course — filtered by tablet location
       const foodById = foodSnap.val() || {};
       const foodOrder = foodOrderSnap.val() || [];
       const exclusions = exclusionsSnap.val() || {};
       const orderedFood = (foodOrder.length > 0
         ? foodOrder.map(id => foodById[id]).filter(Boolean)
         : Object.values(foodById)
-      ).filter(f => !exclusions[f.id]);
+      ).filter(f => {
+        if (exclusions[f.id]) return false;
+        if (!tabletLocation) return true;
+        const locs = f.locations || [];
+        return locs.length === 0 || locs.includes(tabletLocation);
+      });
 
       const foodByCourse = {};
       orderedFood.forEach(f => {
@@ -1895,6 +1929,15 @@ exports.sommelierChat = functions
         (cocktailsNAAvailable && nabLines.length)     ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
         (foodAvailable && foodSection)                ? `FOOD MENU:\n${foodSection}` : null,
       ].filter(Boolean).join('\n\n');
+
+      const locationName = tabletLocation === 'bar'
+        ? (appSettings.locationNames?.bar || 'the bar')
+        : tabletLocation === 'dining'
+        ? (appSettings.locationNames?.dining || 'the dining room')
+        : null;
+      const locationContext = locationName
+        ? `\n\nIMPORTANT: This tablet is located in ${locationName}. Only recommend food and beverages available in ${locationName}. Do not mention or suggest items from other areas of the restaurant.`
+        : '';
 
       let contextLine;
       if (selectedFoods && selectedFoods.length > 0) {
