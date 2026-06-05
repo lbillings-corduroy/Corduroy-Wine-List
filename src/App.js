@@ -50,45 +50,45 @@ const THEMES = {
   },
   charcoalAndMaple: {
     name: "charcoalAndMaple",
-    displayName: "Charcoal & Maple",
-    description: "Dark charcoal wood with gold and Canadian maple red accents",
-    // Backgrounds — cooler, darker charcoal-wood
-    bgDeep:       "#141008",
-    bgBase:       "#1c1410",
-    bgSurface:    "#251d14",
-    bgCard:       "#2e2318",
-    bgCardHover:  "#362b1e",
-    bgInput:      "rgba(255,255,255,0.05)",
-    bgOverlay:    "rgba(0,0,0,0.75)",
-    // Accents — Tuque's gold + maple red
-    accent:       "#c9a870",
-    accentDim:    "rgba(201,168,112,0.15)",
-    accentDimSm:  "rgba(201,168,112,0.08)",
-    accentBorder: "rgba(201,168,112,0.4)",
-    accentBorderSm:"rgba(201,168,112,0.25)",
-    accentText:   "#100c06",
-    // Borders
-    borderSubtle: "#201810",
-    borderMid:    "#3a3028",
-    borderStrong: "#4a3e2e",
-    // Text
-    textPrimary:  "#f5f0e8",
-    textSecondary:"#b8a98a",
-    textMuted:    "#7a6e5e",
-    textDim:      "#5a5048",
-    textVeryDim:  "#3e3830",
-    // Functional — maple red replaces green for Tuque's highlights
+    displayName: "Parchment & Maple",
+    description: "Warm cream parchment with rich brown ink and maple red — light theme for busy day service",
+    // Backgrounds — warm cream parchment derived from Tuque's logo white background
+    bgDeep:       "#ede6d8",
+    bgBase:       "#f5f0e6",
+    bgSurface:    "#faf7f0",
+    bgCard:       "#ffffff",
+    bgCardHover:  "#f5f0e6",
+    bgInput:      "rgba(42,30,20,0.06)",
+    bgOverlay:    "rgba(42,30,20,0.55)",
+    // Accents — Tuque's logo gold + maple red as highlight
+    accent:       "#b8860e",
+    accentDim:    "rgba(184,134,14,0.12)",
+    accentDimSm:  "rgba(184,134,14,0.07)",
+    accentBorder: "rgba(184,134,14,0.4)",
+    accentBorderSm:"rgba(184,134,14,0.22)",
+    accentText:   "#ffffff",
+    // Borders — warm tan
+    borderSubtle: "#e8e0d0",
+    borderMid:    "#d4c8b0",
+    borderStrong: "#b8a890",
+    // Text — dark brown ink (from logo letterforms)
+    textPrimary:  "#2a1e14",
+    textSecondary:"#6a5040",
+    textMuted:    "#8a7060",
+    textDim:      "#a89880",
+    textVeryDim:  "#c4b8a8",
+    // Functional — maple red for success/active, forest green for positive
     success:      "#c8202a",
-    successDim:   "rgba(200,32,42,0.12)",
-    successBorder:"rgba(200,32,42,0.35)",
+    successDim:   "rgba(200,32,42,0.1)",
+    successBorder:"rgba(200,32,42,0.3)",
     error:        "#c8202a",
-    errorDim:     "rgba(200,32,42,0.1)",
-    errorBorder:  "rgba(200,32,42,0.4)",
-    warning:      "#c9a870",
-    // White overlays
-    white04:      "rgba(255,255,255,0.04)",
-    white06:      "rgba(255,255,255,0.05)",
-    white08:      "rgba(255,255,255,0.07)",
+    errorDim:     "rgba(200,32,42,0.08)",
+    errorBorder:  "rgba(200,32,42,0.35)",
+    warning:      "#b8860e",
+    // Dark overlays (inverted from dark theme — used for modals on light bg)
+    white04:      "rgba(42,30,20,0.04)",
+    white06:      "rgba(42,30,20,0.06)",
+    white08:      "rgba(42,30,20,0.08)",
     // Fonts
     fontSerif:    "'Playfair Display', Georgia, serif",
     fontMono:     "monospace",
@@ -98,7 +98,7 @@ const THEMES = {
 // Add new themes to THEMES above, then register them here for the settings dropdown
 const THEME_CATALOGUE = [
   { value: "espressoAndGold",  label: "Espresso & Gold",   preview: "#1a1410" },
-  { value: "charcoalAndMaple", label: "Charcoal & Maple",  preview: "#1c1410" },
+  { value: "charcoalAndMaple", label: "Parchment & Maple", preview: "#f5f0e6" },
 ];
 
 const ThemeContext = createContext(THEMES.espressoAndGold);
@@ -1610,7 +1610,7 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
 
   return (
     <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 1000, display: "flex", alignItems: "stretch", justifyContent: "center", fontFamily: t.fontSerif }}>
-      <div style={{ background: t.bgBase, display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: `1px solid ${t.borderStrong}`, borderRight: "1px solid #5a3a1a" }}>
+      <div style={{ background: t.bgBase, display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: `1px solid ${t.borderStrong}`, borderRight: `1px solid ${t.borderStrong}` }}>
       {/* Header */}
       <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1954,7 +1954,7 @@ function PinScreen({ onSuccess, onCancel }) {
   function handleDelete() { setPin(p => p.slice(0, -1)); setError(false); }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
+    <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
       <div style={{ background: t.bgSurface, border: `1px solid ${t.borderSubtle}`, borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
         <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Staff Access</div>
         <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
@@ -2658,7 +2658,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
       </div>
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       {showQR && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ background: t.bgSurface, border: `1px solid ${t.borderMid}`, borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
             <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
 
@@ -2796,7 +2796,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
   messages.forEach((m, i) => { if (m.role === "assistant" && m.suggestions?.length > 0) lastSuggestionMsgIndex = i; });
 
   return <>
-    <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+    <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: t.bgOverlay, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
 
         {/* Header — X becomes "Done ✓" once something has been added */}
@@ -2816,7 +2816,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.bgSurface : "#faf5ec", color: m.role === "user" ? t.textPrimary : t.bgBase, border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.bgSurface : t.bgSurface, color: m.role === "user" ? t.textPrimary : t.bgBase, border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
                   {m.text}
                 </div>
               </div>
@@ -2869,7 +2869,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           ))}
           {sending && (
             <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 10 }}>
-              <div style={{ background: "#faf5ec", border: "0.5px solid #e8dcc8", borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
+              <div style={{ background: t.bgSurface, border: "0.5px solid #e8dcc8", borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
                 <span style={{ color: t.accent, fontSize: 18, letterSpacing: 4 }}>• • •</span>
               </div>
             </div>
@@ -2889,7 +2889,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
       </div>
     </div>
     {zoomedLabel && (
-      <div onClick={() => setZoomedLabel(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, cursor: "pointer" }}>
+      <div onClick={() => setZoomedLabel(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: t.bgOverlay, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, cursor: "pointer" }}>
         <img src={zoomedLabel.imageUrl} alt={zoomedLabel.name} style={{ maxHeight: "72vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 48px rgba(0,0,0,0.7)" }} onClick={e => e.stopPropagation()} />
         <div style={{ marginTop: 20, textAlign: "center" }}>
           <div style={{ color: t.textPrimary, fontSize: 16, fontFamily: t.fontSerif, marginBottom: 4 }}>{zoomedLabel.name}</div>
@@ -2936,7 +2936,7 @@ function SommelierToast({ items, onViewMenu, onDismiss }) {
 function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }) {
   const t = useTheme();
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: t.bgOverlay, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", textAlign: "center" }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>★</div>
         <div style={{ color: t.bgSurface, fontSize: 20, fontWeight: 600, marginBottom: 10 }}>You're all set!</div>
@@ -3059,7 +3059,7 @@ function LabelModal({ wine, onClose }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, zIndex: 800,
-      background: "rgba(0,0,0,0.92)",
+      background: t.bgOverlay,
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: 32, cursor: "pointer"
@@ -3426,7 +3426,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     );
 
                     return (
-                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "rgba(240,235,228,0.08)" : t.textPrimary, transition: "background 0.15s" }}>
+                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? t.white08 : t.textPrimary, transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ color: t.bgCardHover, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
                               {food.description && <div style={{ color: t.textMuted, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
@@ -3697,13 +3697,12 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
           const alt = tabletLocation === "bar" ? (locationNames.bar || "Bar")
             : tabletLocation === "dining" ? (locationNames.dining || "Dining Room")
             : "Appalachia Kitchen";
-          // For light-background logos (like Tuque's) on dark backgrounds, invert to white
-          // For dark-background logos (like AK white version), boost brightness
-          const isLightLogo = tabletLocation === "bar" && barLogo;
-          const imgFilter = isLightLogo
-            ? "brightness(0) invert(1) sepia(0.15) saturate(0.8)"
-            : "brightness(1.5) contrast(1.05)";
-          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: 0.92, filter: imgFilter }} />;
+          // Light theme (bar/Tuque's): logo is designed for light bg — render as-is
+          // Dark theme (dining/AK): logo is white version — boost brightness slightly
+          const isLightTheme = t.name === "charcoalAndMaple";
+          const imgFilter = isLightTheme ? "none" : "brightness(1.5) contrast(1.05)";
+          const imgOpacity = isLightTheme ? 1 : 0.95;
+          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: imgOpacity, filter: imgFilter }} />;
         })()}
       </div>
 
