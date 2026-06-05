@@ -10,9 +10,7 @@ const TOAST_CLIENT_SECRET = process.env.TOAST_CLIENT_SECRET;
 const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
-const BEER_MENU_GUID = 'ae7ea1cf-e85d-497a-a210-9a7271daa0ac';
-const POURS_MENU_GUID = 'c07d9143-a7c5-497a-8434-2ab85d44ea48';
+// GUIDs are now configured via Settings — no hardcoded defaults
 
 // ─── Settings Loader ──────────────────────────────────────────────────────────
 // Reads app settings from Firebase. Falls back to hardcoded GUIDs if settings
@@ -29,18 +27,9 @@ async function getAppSettings() {
   }
 }
 
-// Returns menus of a given menuType from settings, with fallback to hardcoded defaults.
+// Returns menus of a given menuType from settings. Returns empty array if not configured.
 function getMenusOfType(settings, menuType) {
-  const configured = (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
-  if (configured.length > 0) return configured;
-  // Fallback defaults — used until admin configures settings
-  const defaults = {
-    wine:         [{ guid: WINE_MENU_GUID,     label: 'Wine List' }],
-    beer_pours:   [{ guid: BEER_MENU_GUID,     label: 'Beer List' }, { guid: POURS_MENU_GUID, label: 'Premium Pours' }],
-    cocktails_na: [{ guid: COCKTAILS_MENU_GUID, label: 'Specialty Cocktails' }, { guid: NAB_MENU_GUID, label: 'Non-Alcoholic Beverages' }],
-    food:         [],
-  };
-  return defaults[menuType] || [];
+  return (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
 }
 
 // Returns true if a menu is currently available based on the Toast-sourced availability
@@ -226,7 +215,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
 
 function extractWines(menus, stockData) {
   const wines = [];
-  const wineMenu = menus.menus.find(m => m.guid === WINE_MENU_GUID);
+  // wineMenu lookup now uses settings-configured GUIDs only
   if (!wineMenu) { console.log('Wine menu not found'); return wines; }
   const stockMap = {};
   if (Array.isArray(stockData)) {
@@ -620,7 +609,8 @@ exports.syncBeerMenu = functions
       const beerPourMenus = getMenusOfType(settings, 'beer_pours');
       // Separate beer from pours by looking for "beer" in the label (case-insensitive), else use first
       const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
-      const toSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : [{ guid: BEER_MENU_GUID, label: 'Beer List' }]);
+      if (beerPourMenus.length === 0) { console.log('No beer/pours menus configured in settings — skipping beer sync'); return null; }
+      const toSync = beerMenus.length > 0 ? beerMenus : [beerPourMenus[0]];
 
       const token = await getToastToken();
       const menus = await getMenus(token);
@@ -692,7 +682,8 @@ exports.syncPoursMenu = functions
       const settings = await getAppSettings();
       const beerPourMenus = getMenusOfType(settings, 'beer_pours');
       const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
-      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [{ guid: POURS_MENU_GUID, label: 'Premium Pours' }]);
+      if (beerPourMenus.length === 0) { console.log('No beer/pours menus configured in settings — skipping pours sync'); return null; }
+      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [beerPourMenus[0]]);
 
       const token = await getToastToken();
       const menus = await getMenus(token);
@@ -961,72 +952,9 @@ exports.triggerEnrichment = functions
 
 // ─── Food Menu Constants ──────────────────────────────────────────────────────
 
-const FOOD_GROUPS = [
-  { name: 'Soups & Salads', guid: 'c12bef8f-e3e0-4a50-8007-7edaddd2f4a2' },
-  { name: 'Starters',       guid: '17cc57c6-8192-42bb-82a4-7a873b2dcf67' },
-  { name: 'Entrees',        guid: '05bad67c-e484-4cca-91a9-59f11ac42628' },
-  { name: 'Dessert',        guid: '3c87ad2b-a3e8-44c4-9fd1-da741d9b0501' },
-];
+// FOOD_GROUPS previously hardcoded — now driven entirely by Settings
 
 // ─── Food Extraction ──────────────────────────────────────────────────────────
-
-function extractFoodItems(menus, stockData) {
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
-
-  const allItems = [];
-
-  for (const { name: courseName, guid } of FOOD_GROUPS) {
-    // Search all menus for this group GUID
-    let group = null;
-    for (const menu of menus.menus) {
-      group = findGroupByGuid(menu.menuGroups || [], guid);
-      if (group) break;
-    }
-
-    if (!group) {
-      console.log(`Food group "${courseName}" (${guid}) not found`);
-      continue;
-    }
-
-    // Recursively collect all items from this group and its sub-groups
-    function collectItems(g) {
-      if (g.menuItems && g.menuItems.length > 0) {
-        g.menuItems.forEach(item => {
-          const price = item.price || null;
-          // Skip zero-price course markers
-          if (!price || price === 0) return;
-          // Skip out of stock — check both stock inventory API and item's own outOfStock flag
-          const stockInfo = stockMap[item.guid];
-          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-          // Toast marks out of stock by clearing visibility to []
-          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-          // Avoid duplicates
-          if (allItems.find(i => i.id === item.guid)) return;
-
-          allItems.push({
-            id: item.guid,
-            name: item.name,
-            price,
-            course: courseName,
-            description: item.description || null,
-            available: true,
-          });
-        });
-      }
-      if (g.menuGroups && g.menuGroups.length > 0) {
-        g.menuGroups.forEach(sub => collectItems(sub));
-      }
-    }
-
-    collectItems(group);
-    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
-  }
-
-  return allItems;
-}
 
 // Settings-aware version: accepts a dynamic groups array instead of hardcoded FOOD_GROUPS
 function extractFoodItemsFromGroups(menus, stockData, groups) {
@@ -1089,9 +1017,8 @@ exports.syncFoodMenu = functions
       const settings = await getAppSettings();
       const foodMenuConfigs = getMenusOfType(settings, 'food');
 
-      // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
-      let dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid }));
-      if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
+      const dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid }));
+      if (dynamicFoodGroups.length === 0) { console.log('No food menus configured in settings — skipping food sync'); return null; }
 
       const token = await getToastToken();
       const menus = await getMenus(token);
