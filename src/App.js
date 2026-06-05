@@ -155,6 +155,7 @@ function timeAgo(ts) {
 }
 
 function FilterBtn({ label, active, onClick, small }) {
+  const t = useTheme();
   return (
     <button onClick={onClick} style={{
       background: active ? t.accent : t.white08,
@@ -173,6 +174,7 @@ function FilterBtn({ label, active, onClick, small }) {
 // ─── Copy Button ─────────────────────────────────────────────────────────────
 
 function CopyButton({ text }) {
+  const t = useTheme();
   const [copied, setCopied] = useState(false);
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {
@@ -306,6 +308,7 @@ const KITCHEN_MESSAGES = [
 ];
 
 function LoadingMessages({ messages, onAllShown }) {
+  const t = useTheme();
   const [displayIdx, setDisplayIdx] = useState(0);
   const [visible, setVisible] = useState(true);
   const idxRef = useRef(0);
@@ -1398,6 +1401,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
 // ─── Food Manager Tab ─────────────────────────────────────────────────────────
 
 function FoodManagerTab() {
+  const t = useTheme();
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
@@ -1991,6 +1995,7 @@ function PinScreen({ onSuccess, onCancel }) {
 // Edit these once and changes apply to Wine, Beer, Cocktails, Pours, NAB
 
 function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children }) {
+  const t = useTheme();
   return (
     <div style={{ background: t.bgBase, padding: "0 20px" }}>
       <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
@@ -2015,6 +2020,7 @@ function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children 
 }
 
 function ListSectionHeading({ label, borderTop }) {
+  const t = useTheme();
   return (
     <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? "0.5px solid #e8e0d0" : "none" }}>
       <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
@@ -2023,6 +2029,7 @@ function ListSectionHeading({ label, borderTop }) {
 }
 
 function ListCountBar({ left, right }) {
+  const t = useTheme();
   return (
     <div style={{ background: t.bgSurface, padding: "5px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <span style={{ color: t.textDim, fontSize: 11, letterSpacing: "1px" }}>{left}</span>
@@ -2286,6 +2293,7 @@ function decodeFavorites(encoded) {
 // ─── Guest Menu Loader (fetches saved menu from DB by short code) ─────────────
 
 function GuestMenuLoader({ menuCode }) {
+  const t = useTheme();
   const [state, setState] = useState("loading"); // loading | ready | expired | error
   const [favorites, setFavorites] = useState([]);
   const [savedAt, setSavedAt] = useState(null);
@@ -2334,6 +2342,7 @@ function GuestMenuLoader({ menuCode }) {
 // ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
 
 function GuestMenuScreen({ favorites, savedAt }) {
+  const t = useTheme();
   const courseOrder  = ["first", "main", "dessert"];
   const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
 
@@ -2897,6 +2906,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
 
 // ─── Sommelier Toast ──────────────────────────────────────────────────────────
 function SommelierToast({ items, onViewMenu, onDismiss }) {
+  const t = useTheme();
   useEffect(() => {
     const t = setTimeout(onDismiss, 4500);
     return () => clearTimeout(t);
@@ -2924,6 +2934,7 @@ function SommelierToast({ items, onViewMenu, onDismiss }) {
 // strong signal the guest has finished building their menu.
 
 function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }) {
+  const t = useTheme();
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", textAlign: "center" }}>
@@ -3043,6 +3054,7 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
 // ─── Label Zoom Modal ─────────────────────────────────────────────────────────
 
 function LabelModal({ wine, onClose }) {
+  const t = useTheme();
   if (!wine) return null;
   return (
     <div onClick={onClose} style={{
