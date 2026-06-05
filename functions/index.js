@@ -501,6 +501,33 @@ Respond in JSON only (no other text):
   }
 }
 
+// ─── Enrichment Cleanup Helper ───────────────────────────────────────────────
+async function purgeOrphanedEnrichment(db, dataRef, enrichRef, currentIds, label) {
+  const [dataSnap, enrichSnap] = await Promise.all([
+    db.ref(dataRef).once('value'),
+    db.ref(enrichRef).once('value'),
+  ]);
+  const currentIdSet = new Set(currentIds);
+  const deletes = {};
+
+  const dataVal = dataSnap.val() || {};
+  for (const id of Object.keys(dataVal)) {
+    if (!currentIdSet.has(id)) deletes[`${dataRef}/${id}`] = null;
+  }
+
+  const enrichVal = enrichSnap.val() || {};
+  for (const id of Object.keys(enrichVal)) {
+    if (!currentIdSet.has(id)) deletes[`${enrichRef}/${id}`] = null;
+  }
+
+  if (Object.keys(deletes).length > 0) {
+    await db.ref('/').update(deletes);
+    console.log(`[${label}] Purged ${Object.keys(deletes).length} orphaned records`);
+  } else {
+    console.log(`[${label}] No orphaned records found`);
+  }
+}
+
 // ─── Main Wine Sync ───────────────────────────────────────────────────────────
 
 exports.syncWineMenu = functions
@@ -1008,29 +1035,46 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
     stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
   }
   const allItems = [];
-  for (const { name: courseName, guid } of groups) {
+
+  function collectItems(g, courseName) {
+    if (g.menuItems && g.menuItems.length > 0) {
+      g.menuItems.forEach(item => {
+        const price = item.price || null;
+        if (!price || price === 0) return;
+        const stockInfo = stockMap[item.guid];
+        if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+        if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
+        if (allItems.find(i => i.id === item.guid)) return;
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
+      });
+    }
+    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName));
+  }
+
+  for (const { name: configName, guid } of groups) {
+    // Check if the GUID matches a top-level menu — if so, use its subgroups as course sections
+    const topLevelMenu = menus.menus.find(m => m.guid === guid);
+    if (topLevelMenu) {
+      console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — pulling subgroups as sections`);
+      if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
+        topLevelMenu.menuGroups.forEach(subgroup => {
+          const courseName = subgroup.name; // Use subgroup name as the course/section label
+          collectItems(subgroup, courseName);
+          console.log(`  Section "${courseName}" — ${allItems.filter(i => i.course === courseName).length} items`);
+        });
+      }
+      continue;
+    }
+
+    // Otherwise look for it as a subgroup within any menu
     let group = null;
     for (const menu of menus.menus) {
       group = findGroupByGuid(menu.menuGroups || [], guid);
       if (group) break;
     }
-    if (!group) { console.log(`Food group "${courseName}" (${guid}) not found`); continue; }
-    function collectItems(g) {
-      if (g.menuItems && g.menuItems.length > 0) {
-        g.menuItems.forEach(item => {
-          const price = item.price || null;
-          if (!price || price === 0) return;
-          const stockInfo = stockMap[item.guid];
-          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-          if (allItems.find(i => i.id === item.guid)) return;
-          allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
-        });
-      }
-      if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub));
-    }
-    collectItems(group);
-    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
+    if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
+    collectItems(group, configName);
+    console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
 }
