@@ -2797,7 +2797,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
 
   return <>
     <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: t.bgOverlay, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: t.bgCard, borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
 
         {/* Header — X becomes "Done ✓" once something has been added */}
         <div style={{ background: t.bgSurface, borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -2812,11 +2812,11 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         </div>
 
         {/* Message list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", background: t.bgCard }}>
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.bgSurface : t.bgSurface, color: m.role === "user" ? t.textPrimary : t.bgBase, border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.accentDim : t.bgSurface, color: t.textPrimary, border: m.role === "user" ? `0.5px solid ${t.accentBorder}` : `0.5px solid ${t.borderMid}`, borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
                   {m.text}
                 </div>
               </div>
@@ -2840,7 +2840,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
                             : (s.type === "wine" ? "🍷" : "🍽")}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ color: t.bgBase, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          <div style={{ color: t.textPrimary, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                           {sub && <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
                           {hasImage && <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
                         </div>
@@ -2869,7 +2869,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           ))}
           {sending && (
             <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 10 }}>
-              <div style={{ background: t.bgSurface, border: "0.5px solid #e8dcc8", borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
+              <div style={{ background: t.bgSurface, border: `0.5px solid ${t.borderMid}`, borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
                 <span style={{ color: t.accent, fontSize: 18, letterSpacing: 4 }}>• • •</span>
               </div>
             </div>
@@ -2878,7 +2878,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         </div>
 
         {/* Input bar */}
-        <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid #e8e0d0", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <div style={{ padding: "8px 12px 16px", borderTop: `0.5px solid ${t.borderMid}`, background: t.bgCard, flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
             style={{ flex: 1, background: t.bgCard, border: `0.5px solid ${t.borderMid}`, borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.textPrimary, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
           <button onClick={handleSend} disabled={!input.trim() || sending}
@@ -3398,7 +3398,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
               return courseOrder.map(course => (
                 <div key={course}>
-                  <div style={{ padding: "8px 16px 6px 20px", background: t.bgCardHover, display: "flex", alignItems: "center" }}>
+                  <div style={{ padding: "8px 16px 6px 20px", background: t.bgDeep, display: "flex", alignItems: "center" }}>
                     <div style={{ flex: 1, color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
@@ -3426,7 +3426,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     );
 
                     return (
-                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? t.white08 : t.textPrimary, transition: "background 0.15s" }}>
+                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: `0.5px solid ${t.borderSubtle}`, background: anySelected ? t.accentDimSm : t.bgSurface, transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
                               {food.description && <div style={{ color: t.textMuted, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
