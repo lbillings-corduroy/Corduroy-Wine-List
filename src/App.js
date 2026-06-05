@@ -1,4 +1,109 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
+
+// ─── Theme System ─────────────────────────────────────────────────────────────
+
+const THEMES = {
+  espressoAndGold: {
+    name: "espressoAndGold",
+    displayName: "Espresso & Gold",
+    description: "Deep chocolate brown with rich antique gold — brand-accurate AK colors",
+    // Backgrounds — derived from brand brown #463228 (extracted from AK logo)
+    bgDeep:       "#0e0b09",
+    bgBase:       "#1a1410",
+    bgSurface:    "#231a13",
+    bgCard:       "#2c2018",
+    bgCardHover:  "#352618",
+    bgInput:      "rgba(255,255,255,0.05)",
+    bgOverlay:    "rgba(0,0,0,0.75)",
+    // Accents — exact brand gold #c89632 (extracted from AK logo)
+    accent:       "#c89632",
+    accentDim:    "rgba(200,150,50,0.14)",
+    accentDimSm:  "rgba(200,150,50,0.08)",
+    accentBorder: "rgba(200,150,50,0.38)",
+    accentBorderSm:"rgba(200,150,50,0.22)",
+    accentText:   "#0e0b09",
+    // Borders — derived from brand brown
+    borderSubtle: "#1e1510",
+    borderMid:    "#2e2018",
+    borderStrong: "#3e2c1e",
+    // Text
+    textPrimary:  "#ede8e0",
+    textSecondary:"#b0a090",
+    textMuted:    "#7a6858",
+    textDim:      "#564840",
+    textVeryDim:  "#3e3028",
+    // Functional
+    success:      "#5a9e6f",
+    successDim:   "rgba(90,158,111,0.12)",
+    successBorder:"rgba(90,158,111,0.35)",
+    error:        "#c85050",
+    errorDim:     "rgba(200,80,80,0.1)",
+    errorBorder:  "rgba(200,80,80,0.4)",
+    warning:      "#c89632",
+    // White overlays
+    white04:      "rgba(255,255,255,0.04)",
+    white06:      "rgba(255,255,255,0.05)",
+    white08:      "rgba(255,255,255,0.07)",
+    // Fonts
+    fontSerif:    "Georgia, serif",
+    fontMono:     "monospace",
+  },
+  charcoalAndMaple: {
+    name: "charcoalAndMaple",
+    displayName: "Charcoal & Maple",
+    description: "Dark charcoal wood with gold and Canadian maple red accents",
+    // Backgrounds — cooler, darker charcoal-wood
+    bgDeep:       "#141008",
+    bgBase:       "#1c1410",
+    bgSurface:    "#251d14",
+    bgCard:       "#2e2318",
+    bgCardHover:  "#362b1e",
+    bgInput:      "rgba(255,255,255,0.05)",
+    bgOverlay:    "rgba(0,0,0,0.75)",
+    // Accents — Tuque's gold + maple red
+    accent:       "#c9a870",
+    accentDim:    "rgba(201,168,112,0.15)",
+    accentDimSm:  "rgba(201,168,112,0.08)",
+    accentBorder: "rgba(201,168,112,0.4)",
+    accentBorderSm:"rgba(201,168,112,0.25)",
+    accentText:   "#100c06",
+    // Borders
+    borderSubtle: "#201810",
+    borderMid:    "#3a3028",
+    borderStrong: "#4a3e2e",
+    // Text
+    textPrimary:  "#f5f0e8",
+    textSecondary:"#b8a98a",
+    textMuted:    "#7a6e5e",
+    textDim:      "#5a5048",
+    textVeryDim:  "#3e3830",
+    // Functional — maple red replaces green for Tuque's highlights
+    success:      "#c8202a",
+    successDim:   "rgba(200,32,42,0.12)",
+    successBorder:"rgba(200,32,42,0.35)",
+    error:        "#c8202a",
+    errorDim:     "rgba(200,32,42,0.1)",
+    errorBorder:  "rgba(200,32,42,0.4)",
+    warning:      "#c9a870",
+    // White overlays
+    white04:      "rgba(255,255,255,0.04)",
+    white06:      "rgba(255,255,255,0.05)",
+    white08:      "rgba(255,255,255,0.07)",
+    // Fonts
+    fontSerif:    "'Playfair Display', Georgia, serif",
+    fontMono:     "monospace",
+  },
+};
+
+// Add new themes to THEMES above, then register them here for the settings dropdown
+const THEME_CATALOGUE = [
+  { value: "espressoAndGold",  label: "Espresso & Gold",   preview: "#1a1410" },
+  { value: "charcoalAndMaple", label: "Charcoal & Maple",  preview: "#1c1410" },
+];
+
+const ThemeContext = createContext(THEMES.espressoAndGold);
+const useTheme = () => useContext(ThemeContext);
+
 
 const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getWines";
 const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getBeers";
@@ -52,13 +157,13 @@ function timeAgo(ts) {
 function FilterBtn({ label, active, onClick, small }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? "#c9a96e" : "rgba(255,255,255,0.07)",
-      border: `0.5px solid ${active ? "#c9a96e" : "rgba(201,169,110,0.25)"}`,
-      color: active ? "#0f0800" : "#c8a878",
+      background: active ? t.accent : t.white08,
+      border: `0.5px solid ${active ? t.accent : t.accentBorderSm}`,
+      color: active ? t.accentText : t.accent,
       fontSize: small ? 10 : 11,
       padding: small ? "4px 11px" : "6px 15px",
       borderRadius: 20, cursor: "pointer",
-      letterSpacing: "0.5px", fontFamily: "Georgia, serif",
+      letterSpacing: "0.5px", fontFamily: t.fontSerif,
       fontWeight: active ? 600 : 400, transition: "all 0.15s",
       whiteSpace: "nowrap"
     }}>{label}</button>
@@ -77,11 +182,11 @@ function CopyButton({ text }) {
   }
   return (
     <button onClick={handleCopy} style={{
-      background: copied ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.2)",
-      border: `0.5px solid ${copied ? "#4caf7d" : "#c9a96e"}`,
-      color: copied ? "#4caf7d" : "#c9a96e",
+      background: copied ? t.successDim : t.accentDim,
+      border: `0.5px solid ${copied ? t.success : t.accent}`,
+      color: copied ? t.success : t.accent,
       fontSize: 11, padding: "4px 12px", borderRadius: 5,
-      cursor: "pointer", fontFamily: "Georgia, serif",
+      cursor: "pointer", fontFamily: t.fontSerif,
       transition: "all 0.2s", whiteSpace: "nowrap"
     }}>
       {copied ? "✓ Copied" : "Copy Name"}
@@ -228,7 +333,7 @@ function LoadingMessages({ messages, onAllShown }) {
   return (
     <div style={{ textAlign: "center", padding: "32px 16px" }}>
       <div style={{ fontSize: 28, marginBottom: 16 }}>✦</div>
-      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.45s ease", color: "#c9a96e", fontSize: 15, fontStyle: "italic", fontFamily: "Georgia, serif", letterSpacing: "0.5px", lineHeight: 1.6 }}>
+      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.45s ease", color: t.accent, fontSize: 15, fontStyle: "italic", fontFamily: t.fontSerif, letterSpacing: "0.5px", lineHeight: 1.6 }}>
         {messages[displayIdx]}
       </div>
     </div>
@@ -249,6 +354,7 @@ const EMPTY_MENU = {
 };
 
 function SettingsTab() {
+  const t = useTheme();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -265,9 +371,9 @@ function SettingsTab() {
   const [locationDraft, setLocationDraft] = useState({ bar: "Bar", dining: "Dining Room" });
 
   // Device setup — default location and logos
-  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
   const [editingDeviceSetup, setEditingDeviceSetup] = useState(false);
-  const [deviceSetupDraft, setDeviceSetupDraft] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [deviceSetupDraft, setDeviceSetupDraft] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
   const [availableLogos, setAvailableLogos] = useState([{ value: "", label: "— Default logo —" }]);
 
   useEffect(() => {
@@ -395,21 +501,21 @@ function SettingsTab() {
   }
 
   const inputStyle = {
-    background: "rgba(255,255,255,0.08)", border: "0.5px solid #5a3a1a",
-    color: "#f0e8d8", padding: "8px 12px", borderRadius: 6,
-    fontFamily: "Georgia, serif", fontSize: 12, width: "100%",
+    background: t.white08, border: `0.5px solid ${t.borderStrong}`,
+    color: t.textPrimary, padding: "8px 12px", borderRadius: 6,
+    fontFamily: t.fontSerif, fontSize: 12, width: "100%",
     boxSizing: "border-box", outline: "none"
   };
-  const labelStyle = { color: "#9a7050", fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
+  const labelStyle = { color: t.textMuted, fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
   const selectStyle = { ...inputStyle, cursor: "pointer" };
-  const optionStyle = { background: "#3d2200", color: "#f0e8d8" };
-  const bodyText = { color: "#c8b090", fontSize: 12, lineHeight: 1.5 };
-  const hintText = { color: "#7a5540", fontSize: 10, marginTop: 4, fontStyle: "italic" };
+  const optionStyle = { background: t.bgBase, color: t.textPrimary };
+  const bodyText = { color: t.accent, fontSize: 12, lineHeight: 1.5 };
+  const hintText = { color: t.textMuted, fontSize: 10, marginTop: 4, fontStyle: "italic" };
 
   function MenuTypeTag({ value }) {
     const t = MENU_TYPES.find(m => m.value === value);
-    const colors = { wine: "#c9a96e", food: "#7ab87a", beer_pours: "#c8860a", cocktails_na: "#6090a0" };
-    const color = colors[value] || "#6a5040";
+    const colors = { wine: t.accent, food: t.success, beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+    const color = colors[value] || t.textDim;
     return (
       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${color}`, color, letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
         {t ? t.label : value}
@@ -428,30 +534,30 @@ function SettingsTab() {
         {ta ? (
           <>
             {ta.toastDays && ta.toastDays.length > 0 && (
-              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
                 📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}
               </span>
             )}
             {ta.toastHours && (
-              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
                 🕐 {ta.toastHours.open} – {ta.toastHours.close}
               </span>
             )}
             {!ta.toastDays && !ta.toastHours && (
-              <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
                 📅 Always available (no schedule in Toast)
               </span>
             )}
-            <span style={{ fontSize: 10, color: "#4caf7d", background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+            <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
               {ta.itemCount || "?"} items in Toast · checked {ta.checkedAt ? timeAgo(ta.checkedAt) : ""}
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 10, color: "#7a5540", fontStyle: "italic" }}>
+          <span style={{ fontSize: 10, color: t.textMuted, fontStyle: "italic" }}>
             Tap ⟳ Check to pull availability from Toast
           </span>
         )}
-        <span style={{ fontSize: 10, color: "#9a7050", background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 10, padding: "2px 8px" }}>
+        <span style={{ fontSize: 10, color: t.textMuted, background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 10, padding: "2px 8px" }}>
           📍 {locStr}
         </span>
       </div>
@@ -459,6 +565,7 @@ function SettingsTab() {
   }
 
   function MenuForm({ draft, setDraft, onSave, onCancel, saveLabel = "Save Menu" }) {
+  const t = useTheme();
     const ta = toastAvailability[draft.guid];
     const [guidLookingUp, setGuidLookingUp] = useState(false);
     const [guidError, setGuidError] = useState(null);
@@ -510,13 +617,13 @@ function SettingsTab() {
               value={draft.guid} onChange={e => handleGuidChange(e.target.value)}
               onBlur={() => { if (draft.guid && !ta) lookupGuid(draft.guid); }} />
             {guidLookingUp && (
-              <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#c9a96e", fontSize: 11 }}>Looking up…</div>
+              <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: t.accent, fontSize: 11 }}>Looking up…</div>
             )}
           </div>
           <div style={{ ...hintText }}>
             Found in Toast → Menus → select menu → the GUID appears in the URL or menu details
           </div>
-          {guidError && <div style={{ color: "#e85050", fontSize: 11, marginTop: 4 }}>⚠ {guidError}</div>}
+          {guidError && <div style={{ color: t.error, fontSize: 11, marginTop: 4 }}>⚠ {guidError}</div>}
         </div>
 
         {/* Label — auto-populated from Toast if available, otherwise from menu type */}
@@ -527,7 +634,7 @@ function SettingsTab() {
           return (
             <div>
               <label style={labelStyle}>Display Name
-                {isAutoLabel && <span style={{ color: "#4caf7d", fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> — using "{effectiveLabel}"</span>}
+                {isAutoLabel && <span style={{ color: t.success, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> — using "{effectiveLabel}"</span>}
               </label>
               <input style={inputStyle}
                 placeholder={guidLookingUp ? "Looking up…" : ta?.name || menuTypeLabel}
@@ -537,7 +644,7 @@ function SettingsTab() {
                 <div style={{ ...hintText }}>Leave blank to use the name above, or type to override.</div>
               )}
               {ta?.name && draft.label && draft.label !== ta.name && (
-                <div style={{ ...hintText }}>Toast name: {ta.name} · <span style={{ color: "#c9a96e", cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.name }))}>Use Toast name</span></div>
+                <div style={{ ...hintText }}>Toast name: {ta.name} · <span style={{ color: t.accent, cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.name }))}>Use Toast name</span></div>
               )}
             </div>
           );
@@ -563,20 +670,20 @@ function SettingsTab() {
         <div>
           <label style={labelStyle}>Availability (from Toast)</label>
           {ta ? (
-            <div style={{ background: "rgba(76,175,125,0.08)", border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ background: t.successDim, border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
                 {ta.toastDays && ta.toastDays.length > 0 ? (
-                  <span style={{ fontSize: 11, color: "#4caf7d" }}>📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}</span>
+                  <span style={{ fontSize: 11, color: t.success }}>📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}</span>
                 ) : (
-                  <span style={{ fontSize: 11, color: "#4caf7d" }}>📅 No day restriction in Toast</span>
+                  <span style={{ fontSize: 11, color: t.success }}>📅 No day restriction in Toast</span>
                 )}
               </div>
               {ta.toastHours ? (
-                <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 {ta.toastHours.open} – {ta.toastHours.close}</div>
+                <div style={{ fontSize: 11, color: t.success, marginBottom: 4 }}>🕐 {ta.toastHours.open} – {ta.toastHours.close}</div>
               ) : (
-                <div style={{ fontSize: 11, color: "#4caf7d", marginBottom: 4 }}>🕐 No time restriction in Toast</div>
+                <div style={{ fontSize: 11, color: t.success, marginBottom: 4 }}>🕐 No time restriction in Toast</div>
               )}
-              <div style={{ fontSize: 10, color: "#7a9070", marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>
                 {ta.itemCount || "?"} items found in Toast · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
               </div>
               <div style={{ ...hintText, marginTop: 6 }}>
@@ -584,7 +691,7 @@ function SettingsTab() {
               </div>
             </div>
           ) : (
-            <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px dashed #5a3a1a", borderRadius: 8, padding: "10px 12px", color: "#7a5540", fontSize: 11, fontStyle: "italic" }}>
+            <div style={{ background: t.white04, border: `0.5px dashed ${t.borderStrong}`, borderRadius: 8, padding: "10px 12px", color: t.textMuted, fontSize: 11, fontStyle: "italic" }}>
               {draft.guid ? "Tap ⟳ Check on the menu card to pull availability from Toast." : "Enter a GUID first, then use ⟳ Check to fetch availability."}
             </div>
           )}
@@ -599,14 +706,14 @@ function SettingsTab() {
               return (
                 <button key={loc.id} onClick={() => toggleLocation(draft, setDraft, loc.id)} style={{
                   flex: 1, padding: "10px 8px", borderRadius: 8,
-                  border: `0.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
-                  background: active ? "rgba(201,169,110,0.15)" : "rgba(255,255,255,0.04)",
-                  color: active ? "#f0e8d8" : "#9a7050", fontSize: 12, cursor: "pointer",
-                  fontFamily: "Georgia, serif", textAlign: "center", transition: "all 0.12s"
+                  border: `0.5px solid ${active ? t.accent : t.borderStrong}`,
+                  background: active ? t.accentDim : t.white04,
+                  color: active ? t.textPrimary : t.textMuted, fontSize: 12, cursor: "pointer",
+                  fontFamily: t.fontSerif, textAlign: "center", transition: "all 0.12s"
                 }}>
                   <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.id === "bar" ? "🍸" : "🍽"}</div>
                   <div style={{ fontSize: 11 }}>{loc.name}</div>
-                  {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 2 }}>✓ included</div>}
+                  {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 2 }}>✓ included</div>}
                 </button>
               );
             })}
@@ -620,11 +727,11 @@ function SettingsTab() {
         <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
           <button onClick={onSave}
             disabled={!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || saving || guidLookingUp}
-            style={{ flex: 1, background: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? "rgba(201,169,110,0.1)" : "#c9a96e", color: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? "#6a5040" : "#0d0800", border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+            style={{ flex: 1, background: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? t.accentDimSm : t.accent, color: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? t.textDim : t.bgDeep, border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>
             {saving ? "Saving…" : guidLookingUp ? "Looking up…" : saveLabel}
           </button>
           <button onClick={onCancel}
-            style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "11px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+            style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "11px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>
             Cancel
           </button>
         </div>
@@ -632,26 +739,26 @@ function SettingsTab() {
     );
   }
 
-  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading settings…</div>;
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading settings…</div>;
 
   const menus = settings?.menus || [];
 
   return (
     <div>
       {/* ── Location Names ── */}
-      <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #5a3a1a", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+      <div style={{ background: t.white06, border: `0.5px solid ${t.borderStrong}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingLocations ? 14 : 0 }}>
           <div>
-            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Location Names</div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Location Names</div>
             {!editingLocations && (
-              <div style={{ color: "#c8b090", fontSize: 12 }}>
+              <div style={{ color: t.accent, fontSize: 12 }}>
                 {locationNames.bar} &nbsp;·&nbsp; {locationNames.dining}
               </div>
             )}
           </div>
           {!editingLocations && (
             <button onClick={() => { setLocationDraft({ ...locationNames }); setEditingLocations(true); }}
-              style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
               Edit
             </button>
           )}
@@ -675,11 +782,11 @@ function SettingsTab() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={saveLocationNames}
-                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
                 Save Names
               </button>
               <button onClick={() => setEditingLocations(false)}
-                style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
                 Cancel
               </button>
             </div>
@@ -688,20 +795,20 @@ function SettingsTab() {
       </div>
 
       {/* ── Device Setup ── */}
-      <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #5a3a1a", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+      <div style={{ background: t.white06, border: `0.5px solid ${t.borderStrong}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingDeviceSetup ? 14 : 0 }}>
           <div>
-            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Device Setup</div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Device Setup</div>
             {!editingDeviceSetup && (
-              <div style={{ color: "#c8b090", fontSize: 12 }}>
-                Default: <span style={{ color: "#f0e8d8" }}>{deviceSetup.defaultLocation === "bar" ? locationNames.bar : locationNames.dining}</span>
-                {(deviceSetup.barLogo || deviceSetup.diningLogo) && <span style={{ color: "#6a5040" }}> · logos configured</span>}
+              <div style={{ color: t.accent, fontSize: 12 }}>
+                Default: <span style={{ color: t.textPrimary }}>{deviceSetup.defaultLocation === "bar" ? locationNames.bar : locationNames.dining}</span>
+                {(deviceSetup.barLogo || deviceSetup.diningLogo) && <span style={{ color: t.textDim }}> · logos configured</span>}
               </div>
             )}
           </div>
           {!editingDeviceSetup && (
             <button onClick={() => { setDeviceSetupDraft({ ...deviceSetup }); setEditingDeviceSetup(true); }}
-              style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
               Edit
             </button>
           )}
@@ -717,14 +824,14 @@ function SettingsTab() {
                   return (
                     <button key={loc.id} onClick={() => setDeviceSetupDraft(p => ({ ...p, defaultLocation: loc.id }))} style={{
                       flex: 1, padding: "10px 8px", borderRadius: 8,
-                      border: `0.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
-                      background: active ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
-                      color: active ? "#f0e8d8" : "#7a5540",
-                      fontFamily: "Georgia, serif", fontSize: 12, cursor: "pointer", textAlign: "center"
+                      border: `0.5px solid ${active ? t.accent : t.borderStrong}`,
+                      background: active ? t.accentDim : t.white04,
+                      color: active ? t.textPrimary : t.textMuted,
+                      fontFamily: t.fontSerif, fontSize: 12, cursor: "pointer", textAlign: "center"
                     }}>
                       <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.icon}</div>
                       <div>{loc.id === "bar" ? locationNames.bar : locationNames.dining}</div>
-                      {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 2, letterSpacing: "1px" }}>DEFAULT</div>}
+                      {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 2, letterSpacing: "1px" }}>DEFAULT</div>}
                     </button>
                   );
                 })}
@@ -753,12 +860,32 @@ function SettingsTab() {
               </select>
             </div>
             <div style={{ ...hintText }}>Add new logos by placing PNG files in /public/logos/ and adding an entry to /public/logos/index.json.</div>
+
+            {/* Theme per location */}
+            <div>
+              <label style={labelStyle}>{locationNames.bar} Theme</label>
+              <select style={selectStyle} value={deviceSetupDraft.barTheme || "charcoalAndMaple"}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, barTheme: e.target.value }))}>
+                {THEME_CATALOGUE.map(th => (
+                  <option key={th.value} value={th.value} style={optionStyle}>{th.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{locationNames.dining} Theme</label>
+              <select style={selectStyle} value={deviceSetupDraft.diningTheme || "espressoAndGold"}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningTheme: e.target.value }))}>
+                {THEME_CATALOGUE.map(th => (
+                  <option key={th.value} value={th.value} style={optionStyle}>{th.label}</option>
+                ))}
+              </select>
+            </div>
             {/* Preview */}
             {(deviceSetupDraft.barLogo || deviceSetupDraft.diningLogo) && (
               <div style={{ display: "flex", gap: 10 }}>
                 {deviceSetupDraft.barLogo && (
                   <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
-                    <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.bar.toUpperCase()}</div>
+                    <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.bar.toUpperCase()}</div>
                     <img src={`/logos/${deviceSetupDraft.barLogo}`} alt="Bar logo preview"
                       style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
                       onError={e => { e.target.style.display = "none"; }} />
@@ -766,7 +893,7 @@ function SettingsTab() {
                 )}
                 {deviceSetupDraft.diningLogo && (
                   <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
-                    <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.dining.toUpperCase()}</div>
+                    <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.dining.toUpperCase()}</div>
                     <img src={`/logos/${deviceSetupDraft.diningLogo}`} alt="Dining logo preview"
                       style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
                       onError={e => { e.target.style.display = "none"; }} />
@@ -776,11 +903,11 @@ function SettingsTab() {
             )}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={saveDeviceSetup}
-                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
                 Save Device Setup
               </button>
               <button onClick={() => setEditingDeviceSetup(false)}
-                style={{ background: "none", border: "0.5px solid #5a3a1a", color: "#9a7050", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
                 Cancel
               </button>
             </div>
@@ -789,12 +916,12 @@ function SettingsTab() {
       </div>
 
       {/* ── Menu List ── */}
-      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>
         Toast Menus ({menus.length})
       </div>
 
       {menus.length === 0 && !addingMenu && (
-        <div style={{ color: "#7a5540", fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
+        <div style={{ color: t.textMuted, fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
           No menus configured yet. Add your first menu below.
         </div>
       )}
@@ -803,32 +930,32 @@ function SettingsTab() {
         const isExpanded = expandedMenu === idx;
         const ta = toastAvailability[menu.guid];
         return (
-          <div key={menu.id || idx} style={{ background: "rgba(255,255,255,0.05)", border: `0.5px solid ${isExpanded ? "#c9a96e" : "#5a3a1a"}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+          <div key={menu.id || idx} style={{ background: t.white06, border: `0.5px solid ${isExpanded ? t.accent : t.borderStrong}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
             {/* Collapsed row */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}
               onClick={() => setExpandedMenu(isExpanded ? null : idx)}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ color: "#f0e8d8", fontSize: 13, fontWeight: 500 }}>{menu.label || "Unnamed Menu"}</span>
+                  <span style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500 }}>{menu.label || "Unnamed Menu"}</span>
                   <MenuTypeTag value={menu.menuType} />
                 </div>
-                <div style={{ color: "#7a5540", fontSize: 10, fontFamily: "monospace", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
+                <div style={{ color: t.textMuted, fontSize: 10, fontFamily: t.fontMono, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
                 <AvailabilitySummary menu={menu} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                 <button onClick={e => { e.stopPropagation(); syncMenuPreview(menu, idx); }}
                   disabled={syncingMenu === idx}
-                  style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid rgba(76,175,125,0.35)", color: "#4caf7d", padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 10, whiteSpace: "nowrap" }}>
+                  style={{ background: t.successDim, border: "0.5px solid rgba(76,175,125,0.35)", color: t.success, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 10, whiteSpace: "nowrap" }}>
                   {syncingMenu === idx ? "…" : "⟳ Check"}
                 </button>
                 <button onClick={e => { e.stopPropagation(); deleteMenu(idx); }}
-                  style={{ background: "none", border: "none", color: "#7a5040", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+                  style={{ background: "none", border: "none", color: t.textDim, fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
               </div>
             </div>
 
             {/* Expanded edit form */}
             {isExpanded && (
-              <div style={{ borderTop: "0.5px solid #5a3a1a", padding: "16px 14px", background: "rgba(255,255,255,0.03)" }}>
+              <div style={{ borderTop: `0.5px solid ${t.borderStrong}`, padding: "16px 14px", background: t.white04 }}>
                 <MenuForm
                   draft={menus[idx]}
                   setDraft={(updater) => {
@@ -848,8 +975,8 @@ function SettingsTab() {
 
       {/* ── Add New Menu ── */}
       {addingMenu ? (
-        <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid #c9a96e", borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
-          <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 14 }}>Add New Menu</div>
+        <div style={{ background: t.white06, border: `0.5px solid ${t.accent}`, borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
+          <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 14 }}>Add New Menu</div>
           <MenuForm
             draft={newMenu}
             setDraft={setNewMenu}
@@ -861,27 +988,27 @@ function SettingsTab() {
         </div>
       ) : (
         <button onClick={() => setAddingMenu(true)}
-          style={{ width: "100%", background: "rgba(201,169,110,0.08)", border: "0.5px dashed rgba(201,169,110,0.4)", color: "#c9a96e", padding: "13px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "0.5px" }}>
+          style={{ width: "100%", background: t.accentDimSm, border: "0.5px dashed rgba(201,169,110,0.4)", color: t.accent, padding: "13px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "0.5px" }}>
           + Add Menu
         </button>
       )}
 
       {/* ── Save feedback ── */}
       {saveResult && (
-        <div style={{ marginTop: 14, background: saveResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${saveResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "10px 14px" }}>
-          <div style={{ color: saveResult.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif" }}>{saveResult.message}</div>
+        <div style={{ marginTop: 14, background: saveResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${saveResult.ok ? t.success : t.error}`, borderRadius: 8, padding: "10px 14px" }}>
+          <div style={{ color: saveResult.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif }}>{saveResult.message}</div>
         </div>
       )}
 
       {/* ── Legend ── */}
-      <div style={{ marginTop: 24, borderTop: "0.5px solid #5a3a1a", paddingTop: 16 }}>
-        <div style={{ color: "#9a7050", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
+      <div style={{ marginTop: 24, borderTop: `0.5px solid ${t.borderStrong}`, paddingTop: 16 }}>
+        <div style={{ color: t.textMuted, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
         {MENU_TYPES.map(t => {
-          const colors = { wine: "#c9a96e", food: "#7ab87a", beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+          const colors = { wine: t.accent, food: t.success, beer_pours: "#c8860a", cocktails_na: "#6090a0" };
           return (
             <div key={t.value} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
               <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${colors[t.value]}`, color: colors[t.value], whiteSpace: "nowrap", marginTop: 1, flexShrink: 0 }}>{t.label}</span>
-              <span style={{ color: "#c8b090", fontSize: 11 }}>{t.description}</span>
+              <span style={{ color: t.accent, fontSize: 11 }}>{t.description}</span>
             </div>
           );
         })}
@@ -893,6 +1020,7 @@ function SettingsTab() {
 // ─── Sync Tab ─────────────────────────────────────────────────────────────────
 
 function SyncTab() {
+  const t = useTheme();
   const categories = [
     { id: "wine", label: "Wine List" },
     { id: "beer", label: "Beer List" },
@@ -943,51 +1071,51 @@ function SyncTab() {
 
   return (
     <div>
-      <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+      <div style={{ color: t.textDim, fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
         Select the menus to sync from Toast, then tap Run Sync. Syncs run in the background — allow ~60 seconds for changes to appear in the app.
       </div>
 
       <div style={{ marginBottom: 16 }}>
         {categories.map(c => (
           <div key={c.id} onClick={() => toggleCat(c.id)}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, background: selected.includes(c.id) ? "rgba(201,169,110,0.1)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${selected.includes(c.id) ? "rgba(201,169,110,0.4)" : "#3c2200"}`, borderRadius: 8, cursor: "pointer" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: selected.includes(c.id) ? "#c9a96e" : "transparent", border: `1.5px solid ${selected.includes(c.id) ? "#c9a96e" : "#6a5040"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {selected.includes(c.id) && <span style={{ color: "#0d0800", fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, background: selected.includes(c.id) ? t.accentDimSm : t.white04, border: `0.5px solid ${selected.includes(c.id) ? t.accentBorder : t.borderMid}`, borderRadius: 8, cursor: "pointer" }}>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: selected.includes(c.id) ? t.accent : "transparent", border: `1.5px solid ${selected.includes(c.id) ? t.accent : t.textDim}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {selected.includes(c.id) && <span style={{ color: t.bgDeep, fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
             </div>
-            <span style={{ color: selected.includes(c.id) ? "#f0e8d8" : "#6a5040", fontSize: 13, fontFamily: "Georgia, serif" }}>{c.label}</span>
+            <span style={{ color: selected.includes(c.id) ? t.textPrimary : t.textDim, fontSize: 13, fontFamily: t.fontSerif }}>{c.label}</span>
           </div>
         ))}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button onClick={() => setSelected(categories.map(c => c.id))} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>Select All</button>
-        <button onClick={() => setSelected([])} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>Clear</button>
+        <button onClick={() => setSelected(categories.map(c => c.id))} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Select All</button>
+        <button onClick={() => setSelected([])} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Clear</button>
       </div>
 
       <button onClick={handleSync} disabled={syncing || selected.length === 0}
-        style={{ width: "100%", background: syncing || selected.length === 0 ? "rgba(201,169,110,0.1)" : "#c9a96e", color: syncing || selected.length === 0 ? "#6a5040" : "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: syncing || selected.length === 0 ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+        style={{ width: "100%", background: syncing || selected.length === 0 ? t.accentDimSm : t.accent, color: syncing || selected.length === 0 ? t.textDim : t.bgDeep, border: "none", padding: "13px", borderRadius: 8, cursor: syncing || selected.length === 0 ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
         {syncing ? "Triggering sync…" : `⟳ Sync ${selected.length} Menu${selected.length !== 1 ? "s" : ""} Now`}
       </button>
 
       {result && (
-        <div style={{ marginTop: 14, background: result.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${result.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "12px 14px" }}>
-          <div style={{ color: result.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{result.message}</div>
+        <div style={{ marginTop: 14, background: result.ok ? t.successDim : t.errorDim, border: `0.5px solid ${result.ok ? t.success : t.error}`, borderRadius: 8, padding: "12px 14px" }}>
+          <div style={{ color: result.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif, lineHeight: 1.6 }}>{result.message}</div>
         </div>
       )}
 
       {/* Cleanup section */}
-      <div style={{ marginTop: 24, borderTop: "0.5px solid #2a1400", paddingTop: 20 }}>
-        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Data Cleanup</div>
-        <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
+      <div style={{ marginTop: 24, borderTop: `0.5px solid ${t.borderSubtle}`, paddingTop: 20 }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Data Cleanup</div>
+        <div style={{ color: t.textDim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
           Removes enrichment records for items that are no longer in any configured menu. Run this after correcting a miscategorised menu or deleting a menu from Settings.
         </div>
         <button onClick={handleCleanup} disabled={cleaning}
-          style={{ width: "100%", background: cleaning ? "rgba(232,80,80,0.06)" : "rgba(232,80,80,0.12)", color: cleaning ? "#6a5040" : "#e85050", border: "0.5px solid rgba(232,80,80,0.4)", padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
+          style={{ width: "100%", background: cleaning ? "rgba(232,80,80,0.06)" : "rgba(232,80,80,0.12)", color: cleaning ? t.textDim : t.error, border: "0.5px solid rgba(232,80,80,0.4)", padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
           {cleaning ? "Cleaning…" : "🗑 Remove Orphaned Data"}
         </button>
         {cleanResult && (
-          <div style={{ marginTop: 10, background: cleanResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${cleanResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 8, padding: "10px 14px" }}>
-            <div style={{ color: cleanResult.ok ? "#4caf7d" : "#e85050", fontSize: 12, fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{cleanResult.message}</div>
+          <div style={{ marginTop: 10, background: cleanResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${cleanResult.ok ? t.success : t.error}`, borderRadius: 8, padding: "10px 14px" }}>
+            <div style={{ color: cleanResult.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif, lineHeight: 1.6 }}>{cleanResult.message}</div>
           </div>
         )}
       </div>
@@ -998,6 +1126,7 @@ function SyncTab() {
 // ─── All Items Tab ────────────────────────────────────────────────────────────
 
 function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
+  const t = useTheme();
   const [beers, setBeers] = useState([]);
   const [pours, setPours] = useState([]);
   const [food, setFood] = useState([]);
@@ -1109,10 +1238,10 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
   ];
   const activeList = categories.find(c => c.id === category)?.list || [];
 
-  const inputStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200", color: "#f0e8d8", padding: "8px 10px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", marginBottom: 8 };
-  const labelStyle = { color: "#6a5040", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+  const inputStyle = { width: "100%", boxSizing: "border-box", background: t.white06, border: `0.5px solid ${t.borderMid}`, color: t.textPrimary, padding: "8px 10px", borderRadius: 6, fontFamily: t.fontSerif, fontSize: 12, outline: "none", marginBottom: 8 };
+  const labelStyle = { color: t.textDim, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
 
-  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading…</div>;
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading…</div>;
 
   return (
     <div style={{ position: "relative", height: "100%" }}>
@@ -1120,67 +1249,67 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {categories.map(c => (
           <button key={c.id} onClick={() => { setCategory(c.id); setEditingItem(null); }} style={{
-            background: category === c.id ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
-            border: `0.5px solid ${category === c.id ? "#c9a96e" : "#3c2200"}`,
-            color: category === c.id ? "#c9a96e" : "#6a5040",
-            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11
+            background: category === c.id ? t.accentDim : t.white04,
+            border: `0.5px solid ${category === c.id ? t.accent : t.borderMid}`,
+            color: category === c.id ? t.accent : t.textDim,
+            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11
           }}>{c.label} <span style={{ opacity: 0.7 }}>({c.list.length})</span></button>
         ))}
       </div>
 
       {/* Item list */}
       {activeList.length === 0 ? (
-        <div style={{ color: "#5a4030", textAlign: "center", padding: 32 }}>{q ? `No results for "${managerSearch}"` : "No items"}</div>
+        <div style={{ color: t.textDim, textAlign: "center", padding: 32 }}>{q ? `No results for "${managerSearch}"` : "No items"}</div>
       ) : activeList.map(item => (
         <div key={item.id} onClick={() => openEdit(item, category === "beer" ? "beer" : category === "pours" ? "pour" : category === "food" ? "food" : "wine")}
-          style={{ background: editingItem?.id === item.id ? "rgba(201,169,110,0.08)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${editingItem?.id === item.id ? "rgba(201,169,110,0.4)" : "#3c2200"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+          style={{ background: editingItem?.id === item.id ? t.accentDimSm : t.white04, border: `0.5px solid ${editingItem?.id === item.id ? t.accentBorder : t.borderMid}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
           {item.imageUrl && <div style={{ width: 32, height: 44, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
-              <div style={{ color: "#f0e8d8", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={{ color: t.textPrimary, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {item.sourceName || item.name}
               </div>
               {item.sourceName && item.name && item.sourceName !== item.name && (
-                <span style={{ flexShrink: 0, fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px", letterSpacing: "0.5px" }}>AI renamed</span>
+                <span style={{ flexShrink: 0, fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px", letterSpacing: "0.5px" }}>AI renamed</span>
               )}
             </div>
             {item.sourceName && item.name && item.sourceName !== item.name && (
-              <div style={{ color: "#c9a96e", fontSize: 10, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={{ color: t.accent, fontSize: 10, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 → {item.name}
               </div>
             )}
-            <div style={{ color: "#6a5040", fontSize: 10 }}>
+            <div style={{ color: t.textDim, fontSize: 10 }}>
               {category === "wines" && [item.varietal, item.region].filter(Boolean).join(" · ")}
               {category === "beer" && [item.style, item.brewery].filter(Boolean).join(" · ")}
               {category === "pours" && [item.category, item.producer].filter(Boolean).join(" · ")}
               {category === "food" && item.course}
-              {item.manuallyEdited && <span style={{ color: "#4caf7d", marginLeft: 6 }}>✎ edited</span>}
-              {item.excluded && <span style={{ color: "#e85050", marginLeft: 6 }}>hidden</span>}
+              {item.manuallyEdited && <span style={{ color: t.success, marginLeft: 6 }}>✎ edited</span>}
+              {item.excluded && <span style={{ color: t.error, marginLeft: 6 }}>hidden</span>}
             </div>
-            <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
+            <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
           </div>
-          <div style={{ color: "#4a3020", fontSize: 18 }}>›</div>
+          <div style={{ color: t.borderStrong, fontSize: 18 }}>›</div>
         </div>
       ))}
 
       {/* Edit panel */}
       {editingItem && (
-        <div style={{ position: "sticky", bottom: 0, background: "#4d2e00", border: "0.5px solid #3c2200", borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+        <div style={{ position: "sticky", bottom: 0, background: t.bgSurface, border: `0.5px solid ${t.borderMid}`, borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-              <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 2 }}>Toast Name</div>
-              <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: editingItem.sourceName && editingItem.name !== editingItem.sourceName ? 4 : 0 }}>
+              <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 2 }}>Toast Name</div>
+              <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: editingItem.sourceName && editingItem.name !== editingItem.sourceName ? 4 : 0 }}>
                 {editingItem.sourceName || editingItem.name}
               </div>
               {editingItem.sourceName && editingItem.name !== editingItem.sourceName && (
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px" }}>AI renamed to</span>
-                  <span style={{ color: "#c9a96e", fontSize: 12 }}>{editingItem.name}</span>
+                  <span style={{ fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px" }}>AI renamed to</span>
+                  <span style={{ color: t.accent, fontSize: 12 }}>{editingItem.name}</span>
                 </div>
               )}
-              <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>{editingItem.id}</div>
+              <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginTop: 4 }}>{editingItem.id}</div>
             </div>
-            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: t.textDim, fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
           </div>
 
           {editingItem._type !== "food" && (
@@ -1231,34 +1360,34 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
               <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                 <button onClick={() => setEditFields(p => ({ ...p, excluded: !p.excluded }))}
-                  style={{ background: editFields.excluded ? "rgba(232,80,80,0.15)" : "rgba(76,175,125,0.15)", border: `0.5px solid ${editFields.excluded ? "rgba(232,80,80,0.5)" : "#4caf7d"}`, color: editFields.excluded ? "#e85050" : "#4caf7d", padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                  style={{ background: editFields.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${editFields.excluded ? t.errorBorder : t.success}`, color: editFields.excluded ? t.error : t.success, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
                   {editFields.excluded ? "Hidden from guests" : "Visible to guests"}
                 </button>
-                <span style={{ color: "#5a4030", fontSize: 11 }}>Toggle to hide/show in pairings</span>
+                <span style={{ color: t.textDim, fontSize: 11 }}>Toggle to hide/show in pairings</span>
               </div>
             </>
           )}
           {editingItem._type !== "food" && (
-            <div style={{ color: "#4a3020", fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
+            <div style={{ color: t.borderStrong, fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
           )}
           {/* Re-enrich result message */}
           {reEnrichResult && (
-            <div style={{ marginBottom: 10, background: reEnrichResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${reEnrichResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 6, padding: "8px 12px" }}>
-              <div style={{ color: reEnrichResult.ok ? "#4caf7d" : "#e85050", fontSize: 11, fontFamily: "Georgia, serif" }}>{reEnrichResult.message}</div>
+            <div style={{ marginBottom: 10, background: reEnrichResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${reEnrichResult.ok ? t.success : t.error}`, borderRadius: 6, padding: "8px 12px" }}>
+              <div style={{ color: reEnrichResult.ok ? t.success : t.error, fontSize: 11, fontFamily: t.fontSerif }}>{reEnrichResult.message}</div>
             </div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? "rgba(201,169,110,0.1)" : "#c9a96e", color: saving ? "#6a5040" : "#0d0800", border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>
+            <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? t.accentDimSm : t.accent, color: saving ? t.textDim : t.bgDeep, border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>
               {saving ? "Saving…" : "Save Changes"}
             </button>
             {editingItem._type !== "food" && (
               <button onClick={handleReEnrich} disabled={reEnriching || saving}
                 title="Clear existing AI enrichment and re-run from scratch through Claude"
-                style={{ background: reEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reEnriching ? "#6070a0" : "#8090c0"}`, color: reEnriching ? "#6070a0" : "#a0b0e0", padding: "10px 12px", borderRadius: 6, cursor: reEnriching ? "default" : "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                style={{ background: reEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reEnriching ? "#6070a0" : "#8090c0"}`, color: reEnriching ? "#6070a0" : "#a0b0e0", padding: "10px 12px", borderRadius: 6, cursor: reEnriching ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
                 {reEnriching ? "Re-enriching…" : "✦ Re-enrich"}
               </button>
             )}
-            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>Cancel</button>
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1292,7 +1421,7 @@ function FoodManagerTab() {
     setSaving(prev => ({ ...prev, [item.id]: false }));
   }
 
-  if (loading) return <div style={{ color: "#6a5040", textAlign: "center", padding: 40 }}>Loading food menu…</div>;
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading food menu…</div>;
 
   const courseOrder = [...new Map(foodItems.map(f => [f.course, true])).keys()];
   const byCourse = {};
@@ -1300,23 +1429,23 @@ function FoodManagerTab() {
 
   return (
     <div>
-      <div style={{ color: "#6a5040", fontSize: 11, marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ color: t.textDim, fontSize: 11, marginBottom: 12, lineHeight: 1.5 }}>
         Toggle items off to exclude them from guest food pairings. Items shown to guests are pulled from Toast — use this to hide course markers, add-ons, or anything that shouldn't appear in pairings.
       </div>
       {courseOrder.map(course => (
         <div key={course} style={{ marginBottom: 16 }}>
-          <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8, paddingBottom: 6, borderBottom: "0.5px solid #2a1400" }}>{course}</div>
+          <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8, paddingBottom: 6, borderBottom: `0.5px solid ${t.borderSubtle}` }}>{course}</div>
           {byCourse[course].map(item => (
-            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : "#3c2200"}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: t.white04, border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : t.borderMid}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: item.excluded ? "#6a5040" : "#f0e8d8", fontSize: 13, marginBottom: 1 }}>{item.name}</div>
-                {item.description && <div style={{ color: "#5a4030", fontSize: 11, fontStyle: "italic" }}>{item.description}</div>}
-                <div style={{ color: "#4a3020", fontSize: 10, marginTop: 2 }}>{formatPrice(item.price)}</div>
+                <div style={{ color: item.excluded ? t.textDim : t.textPrimary, fontSize: 13, marginBottom: 1 }}>{item.name}</div>
+                {item.description && <div style={{ color: t.textDim, fontSize: 11, fontStyle: "italic" }}>{item.description}</div>}
+                <div style={{ color: t.borderStrong, fontSize: 10, marginTop: 2 }}>{formatPrice(item.price)}</div>
               </div>
               <button
                 onClick={() => toggleExclusion(item)}
                 disabled={saving[item.id]}
-                style={{ background: item.excluded ? "rgba(232,80,80,0.15)" : "rgba(76,175,125,0.15)", border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.5)" : "#4caf7d"}`, color: item.excluded ? "#e85050" : "#4caf7d", padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>
+                style={{ background: item.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${item.excluded ? t.errorBorder : t.success}`, color: item.excluded ? t.error : t.success, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>
                 {saving[item.id] ? "…" : item.excluded ? "Excluded" : "Included"}
               </button>
             </div>
@@ -1328,6 +1457,7 @@ function FoodManagerTab() {
 }
 
 function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetLocation, locationNames = { bar: "Bar", dining: "Dining Room" } }) {
+  const t = useTheme();
   const [activeTab, setActiveTab] = useState("uncertain");
   const [search, setSearch] = useState("");
   const [localWines, setLocalWines] = useState(wines);
@@ -1475,23 +1605,23 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
   const current = lists[activeTab] || [];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "stretch", justifyContent: "center", fontFamily: "Georgia, serif" }}>
-      <div style={{ background: "#3d2200", display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: "1px solid #5a3a1a", borderRight: "1px solid #5a3a1a" }}>
+    <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 1000, display: "flex", alignItems: "stretch", justifyContent: "center", fontFamily: t.fontSerif }}>
+      <div style={{ background: t.bgBase, display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: `1px solid ${t.borderStrong}`, borderRight: "1px solid #5a3a1a" }}>
       {/* Header */}
-      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
-            <div style={{ color: "#f0e8d8", fontSize: 18 }}>Wine List Dashboard</div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
+            <div style={{ color: t.textPrimary, fontSize: 18 }}>Wine List Dashboard</div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+          <button onClick={onClose} style={{ background: t.accentDim, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
             Close
           </button>
         </div>
 
         {/* Tablet Location Toggle */}
         <div style={{ marginTop: 14, background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 14px" }}>
-          <div style={{ color: "#9a7050", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>This Tablet Is In</div>
+          <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>This Tablet Is In</div>
           <div style={{ display: "flex", gap: 6 }}>
             {[
               { id: "bar", label: locationNames.bar, icon: "🍸" },
@@ -1501,20 +1631,20 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
               return (
                 <button key={loc.id} onClick={() => onSetLocation && onSetLocation(loc.id)} style={{
                   flex: 1, padding: "10px 8px", borderRadius: 8,
-                  border: `1.5px solid ${active ? "#c9a96e" : "#5a3a1a"}`,
-                  background: active ? "rgba(201,169,110,0.25)" : "rgba(255,255,255,0.04)",
-                  color: active ? "#f0e8d8" : "#7a5540",
-                  fontFamily: "Georgia, serif", fontSize: 12, cursor: "pointer",
+                  border: `1.5px solid ${active ? t.accent : t.borderStrong}`,
+                  background: active ? t.accentBorderSm : t.white04,
+                  color: active ? t.textPrimary : t.textMuted,
+                  fontFamily: t.fontSerif, fontSize: 12, cursor: "pointer",
                   transition: "all 0.15s", textAlign: "center"
                 }}>
                   <div style={{ fontSize: 18, marginBottom: 3 }}>{loc.icon}</div>
                   <div style={{ fontWeight: active ? 600 : 400 }}>{loc.label}</div>
-                  {active && <div style={{ fontSize: 9, color: "#c9a96e", marginTop: 3, letterSpacing: "1px" }}>✓ THIS DEVICE</div>}
+                  {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 3, letterSpacing: "1px" }}>✓ THIS DEVICE</div>}
                 </button>
               );
             })}
           </div>
-          <div style={{ color: "#6a5040", fontSize: 10, marginTop: 8, fontStyle: "italic" }}>
+          <div style={{ color: t.textDim, fontSize: 10, marginTop: 8, fontStyle: "italic" }}>
             Sets which menus and food items the AI uses for pairing on this device. Persists across restarts.
           </div>
         </div>
@@ -1524,25 +1654,25 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
               width: "calc(25% - 6px)", boxSizing: "border-box", flexShrink: 0,
-              background: activeTab === t.id ? (t.id === "sync" ? "rgba(76,175,125,0.2)" : "rgba(201,169,110,0.15)") : t.id === "sync" ? "rgba(76,175,125,0.06)" : "rgba(255,255,255,0.04)",
-              border: `0.5px solid ${activeTab === t.id ? (t.id === "sync" ? "#4caf7d" : "#c9a96e") : t.id === "sync" ? "rgba(76,175,125,0.3)" : "#3c2200"}`,
+              background: activeTab === t.id ? (t.id === "sync" ? t.successDim : t.accentDim) : t.id === "sync" ? "rgba(76,175,125,0.06)" : t.white04,
+              border: `0.5px solid ${activeTab === t.id ? (t.id === "sync" ? t.success : t.accent) : t.id === "sync" ? t.successDim : t.borderMid}`,
               borderRadius: 8, padding: "10px 4px", cursor: "pointer", textAlign: "center"
             }}>
-              <div style={{ color: t.id === "sync" ? "#4caf7d" : t.count === null ? "#c9a96e" : t.count > 0 ? "#e8a050" : "#4caf7d", fontSize: t.id === "sync" ? 16 : t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.id === "sync" ? "⟳" : t.count === null ? "" : t.count}</div>
-              <div style={{ color: t.id === "sync" ? "#4caf7d" : "#8a7060", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
+              <div style={{ color: t.id === "sync" ? t.success : t.count === null ? t.accent : t.count > 0 ? t.warning : t.success, fontSize: t.id === "sync" ? 16 : t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.id === "sync" ? "⟳" : t.count === null ? "" : t.count}</div>
+              <div style={{ color: t.id === "sync" ? t.success : t.textMuted, fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
             </button>
           ))}
         </div>
       </div>
 
       {/* Search */}
-      <div style={{ padding: "8px 20px 4px", background: "#4d2e00" }}>
+      <div style={{ padding: "8px 20px 4px", background: t.bgSurface }}>
         <div style={{ position: "relative" }}>
           <input type="text" placeholder="Search by wine name…" value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)", border: "0.5px solid #3c2200", color: "#f0e8d8", padding: "7px 30px 7px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none" }}
+            style={{ width: "100%", boxSizing: "border-box", background: t.white06, border: `0.5px solid ${t.borderMid}`, color: t.textPrimary, padding: "7px 30px 7px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none" }}
           />
-          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 16, padding: 0 }}>×</button>}
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 16, padding: 0 }}>×</button>}
         </div>
       </div>
 
@@ -1550,11 +1680,11 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
         {/* Review sub-tab switcher — rendered outside ternary to avoid chain break */}
         {activeTab === "uncertain" && (
-          <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: 16 }}>
-            <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? "#e8a050" : "#6a5040", fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
+          <div style={{ display: "flex", background: t.white04, borderRadius: 8, padding: 4, marginBottom: 16 }}>
+            <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? t.warning : t.textDim, fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
               ⚠️ Needs Review ({uncertain.length})
             </button>
-            <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, background: reviewSubTab === "reviewed" ? "rgba(76,175,125,0.15)" : "transparent", color: reviewSubTab === "reviewed" ? "#4caf7d" : "#6a5040", fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
+            <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, background: reviewSubTab === "reviewed" ? t.successDim : "transparent", color: reviewSubTab === "reviewed" ? t.success : t.textDim, fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
               ✓ Reviewed ({reviewed.length})
             </button>
           </div>
@@ -1569,7 +1699,7 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
           <FoodManagerTab />
         ) : activeTab === "duplicates" ? (
           duplicateGroups.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+            <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
               <div style={{ fontSize: 14 }}>No duplicates found</div>
             </div>
@@ -1579,47 +1709,47 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
               return group.some(w2 => (w2.glassPrice || w2.bottlePrice) !== price);
             });
             return (
-              <div key={gi} style={{ background: "rgba(255,255,255,0.04)", border: `0.5px solid ${hasPriceDiff ? "rgba(232,80,80,0.4)" : "#3c2200"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-                <div style={{ color: hasPriceDiff ? "#e85050" : "#e8a050", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
+              <div key={gi} style={{ background: t.white04, border: `0.5px solid ${hasPriceDiff ? t.errorBorder : t.borderMid}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ color: hasPriceDiff ? t.error : t.warning, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
                   {hasPriceDiff ? "⚠️ Price conflict" : "Duplicate entry"} · {group.length} entries in Toast
                 </div>
                 {group.map((wine, i) => (
-                  <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? "0.5px solid #1a0f00" : "none" }}>
-                    <div style={{ width: 30, height: 42, borderRadius: 3, background: "#502e00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
+                  <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? `0.5px solid ${t.bgDeep}` : "none" }}>
+                    <div style={{ width: 30, height: 42, borderRadius: 3, background: t.bgCardHover, border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
                       {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: "#f0e8d8", fontSize: 13 }}>{wine.name}</div>
-                      <div style={{ color: "#6a5040", fontSize: 10 }}>
+                      <div style={{ color: t.textPrimary, fontSize: 13 }}>{wine.name}</div>
+                      <div style={{ color: t.textDim, fontSize: 10 }}>
                         {wine._type === "beer" ? ["Beer", wine.style, wine.brewery].filter(Boolean).join(" · ")
                           : wine._type === "pour" ? ["Pour", wine.category, wine.producer].filter(Boolean).join(" · ")
                           : [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
                       </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
-                      {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
-                      {!wine.glassPrice && !wine.bottlePrice && <div style={{ color: "#6a5040", fontSize: 11, fontStyle: "italic" }}>No price</div>}
+                      {wine.glassPrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                      {wine.bottlePrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                      {!wine.glassPrice && !wine.bottlePrice && <div style={{ color: t.textDim, fontSize: 11, fontStyle: "italic" }}>No price</div>}
                     </div>
                   </div>
                 ))}
-                <div style={{ marginTop: 10, color: "#6a5040", fontSize: 11, fontStyle: "italic", borderTop: "0.5px solid #1a0f00", paddingTop: 8 }}>
+                <div style={{ marginTop: 10, color: t.textDim, fontSize: 11, fontStyle: "italic", borderTop: `0.5px solid ${t.bgDeep}`, paddingTop: 8 }}>
                   Remove the duplicate{hasPriceDiff ? " and correct the price" : ""} in Toast — it will update on next sync
                 </div>
               </div>
             );
           })
         ) : (activeTab === "uncertain" && reviewSubTab === "pending" && uncertain.length === 0) ? (
-          <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+          <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 14 }}>Nothing needs review</div>
           </div>
         ) : (activeTab === "uncertain" && reviewSubTab === "reviewed" && reviewed.length === 0) ? (
-          <div style={{ textAlign: "center", color: "#6a5040", padding: 40 }}>
+          <div style={{ textAlign: "center", color: t.textDim, padding: 40 }}>
             <div style={{ fontSize: 14 }}>No reviewed items yet</div>
           </div>
         ) : (activeTab !== "uncertain" && current.length === 0) ? (
-          <div style={{ textAlign: "center", color: "#4caf7d", padding: 40 }}>
+          <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 14 }}>All clear</div>
           </div>
@@ -1627,60 +1757,60 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
           (activeTab === "uncertain" ? (reviewSubTab === "pending" ? uncertain : reviewed) : current).map(wine => {
             const isEditingThis = reviewEditingId === wine.id;
             const itemType = wine._type || "wine";
-            const riInputStyle = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.08)", border: "0.5px solid #5a3a1a", color: "#f0e8d8", padding: "7px 10px", borderRadius: 6, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", marginBottom: 8 };
-            const riLabelStyle = { color: "#9a7050", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+            const riInputStyle = { width: "100%", boxSizing: "border-box", background: t.white08, border: `0.5px solid ${t.borderStrong}`, color: t.textPrimary, padding: "7px 10px", borderRadius: 6, fontFamily: t.fontSerif, fontSize: 12, outline: "none", marginBottom: 8 };
+            const riLabelStyle = { color: t.textMuted, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
             return (
-            <div key={wine.id} style={{ background: isEditingThis ? "rgba(201,169,110,0.06)" : "rgba(255,255,255,0.04)", border: `0.5px solid ${isEditingThis ? "#c9a96e" : "#2a1400"}`, borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+            <div key={wine.id} style={{ background: isEditingThis ? "rgba(201,169,110,0.06)" : t.white04, border: `0.5px solid ${isEditingThis ? t.accent : t.borderSubtle}`, borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
               {/* Main row */}
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", cursor: activeTab === "uncertain" ? "pointer" : "default" }}
                 onClick={() => activeTab === "uncertain" && openReviewEdit(wine)}>
-                <div style={{ width: 36, height: 50, borderRadius: 3, background: "#502e00", border: "0.5px solid #2a1400", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
+                <div style={{ width: 36, height: 50, borderRadius: 3, background: t.bgCardHover, border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
                   {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
-                    <div style={{ color: "#f0e8d8", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ color: t.textPrimary, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {wine.sourceName || wine.name}
                     </div>
                     {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
-                      <span style={{ flexShrink: 0, fontSize: 9, background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", borderRadius: 4, padding: "1px 5px" }}>AI renamed</span>
+                      <span style={{ flexShrink: 0, fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px" }}>AI renamed</span>
                     )}
                   </div>
                   {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
-                    <div style={{ color: "#c9a96e", fontSize: 10, marginBottom: 2 }}>→ {wine.name}</div>
+                    <div style={{ color: t.accent, fontSize: 10, marginBottom: 2 }}>→ {wine.name}</div>
                   )}
-                  <div style={{ color: "#7a6050", fontSize: 9, fontFamily: "monospace", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
-                  <div style={{ color: "#6a5040", fontSize: 10, letterSpacing: "0.5px" }}>
+                  <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
+                  <div style={{ color: t.textDim, fontSize: 10, letterSpacing: "0.5px" }}>
                     {itemType === "beer" ? [wine.style, wine.brewery].filter(Boolean).join(" · ")
                       : itemType === "pour" ? [wine.category, wine.producer].filter(Boolean).join(" · ")
                       : [wine.varietal, wine.region].filter(Boolean).join(" · ") || [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
                   </div>
                   {activeTab === "uncertain" && reviewSubTab === "reviewed" && (
                     <div style={{ marginTop: 4 }}>
-                      <span style={{ color: "#4caf7d", fontSize: 10 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved"}</span>
+                      <span style={{ color: t.success, fontSize: 10 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved"}</span>
                     </div>
                   )}
                   {activeTab === "uncertain" && reviewSubTab === "pending" && wine.uncertainReason && (
-                    <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{wine.uncertainReason}</div>
+                    <div style={{ color: t.warning, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{wine.uncertainReason}</div>
                   )}
-                  {activeTab === "noprice" && <div style={{ color: "#e8a050", fontSize: 11, marginTop: 4 }}>No price in Toast — update menu item</div>}
-                  {activeTab === "noimage" && <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>{wine._type === "beer" || wine._type === "pour" ? "Upload image in Toast → item → Image" : "Upload label image in Toast"}</div>}
-                  {activeTab === "unenriched" && <div style={{ color: "#8a7060", fontSize: 11, marginTop: 4 }}>Pending AI enrichment — will auto-populate next sync</div>}
+                  {activeTab === "noprice" && <div style={{ color: t.warning, fontSize: 11, marginTop: 4 }}>No price in Toast — update menu item</div>}
+                  {activeTab === "noimage" && <div style={{ color: t.textMuted, fontSize: 11, marginTop: 4 }}>{wine._type === "beer" || wine._type === "pour" ? "Upload image in Toast → item → Image" : "Upload label image in Toast"}</div>}
+                  {activeTab === "unenriched" && <div style={{ color: t.textMuted, fontSize: 11, marginTop: 4 }}>Pending AI enrichment — will auto-populate next sync</div>}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                   <div style={{ textAlign: "right" }}>
-                    {wine.glassPrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
-                    {wine.bottlePrice && <div style={{ color: "#c9a96e", fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                    {wine.glassPrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                    {wine.bottlePrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
                   </div>
                   {activeTab === "uncertain" && (
-                    <div style={{ color: "#6a5040", fontSize: 10 }}>{isEditingThis ? "▲ close" : "✎ edit"}</div>
+                    <div style={{ color: t.textDim, fontSize: 10 }}>{isEditingThis ? "▲ close" : "✎ edit"}</div>
                   )}
                 </div>
               </div>
 
               {/* Inline edit panel — only on Review tab */}
               {activeTab === "uncertain" && isEditingThis && (
-                <div style={{ borderTop: "0.5px solid #5a3a1a", padding: "14px 14px 16px", background: "rgba(0,0,0,0.15)" }}>
+                <div style={{ borderTop: `0.5px solid ${t.borderStrong}`, padding: "14px 14px 16px", background: "rgba(0,0,0,0.15)" }}>
                   {/* Fields by type */}
                   {itemType !== "food" && (
                     <>
@@ -1722,33 +1852,33 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
                   <textarea style={{ ...riInputStyle, height: 64, resize: "vertical", marginBottom: 10 }} value={reviewEditFields.description || ""} onChange={e => setReviewEditFields(p => ({ ...p, description: e.target.value }))} />
 
                   {/* Re-enrich hint */}
-                  <div style={{ color: "#7a5540", fontSize: 10, fontStyle: "italic", marginBottom: 10, lineHeight: 1.5 }}>
+                  <div style={{ color: t.textMuted, fontSize: 10, fontStyle: "italic", marginBottom: 10, lineHeight: 1.5 }}>
                     Fill in Region (and any other known fields) above, then tap ✦ Re-enrich — Claude will use your corrections as facts and write a fresh description.
                   </div>
 
                   {/* Result message */}
                   {reviewEditResult && (
-                    <div style={{ marginBottom: 10, background: reviewEditResult.ok ? "rgba(76,175,125,0.1)" : "rgba(232,80,80,0.1)", border: `0.5px solid ${reviewEditResult.ok ? "#4caf7d" : "#e85050"}`, borderRadius: 6, padding: "7px 12px" }}>
-                      <div style={{ color: reviewEditResult.ok ? "#4caf7d" : "#e85050", fontSize: 11 }}>{reviewEditResult.message}</div>
+                    <div style={{ marginBottom: 10, background: reviewEditResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${reviewEditResult.ok ? t.success : t.error}`, borderRadius: 6, padding: "7px 12px" }}>
+                      <div style={{ color: reviewEditResult.ok ? t.success : t.error, fontSize: 11 }}>{reviewEditResult.message}</div>
                     </div>
                   )}
 
                   {/* Action buttons */}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => handleReviewSave(wine)} disabled={reviewSaving || reviewReEnriching}
-                      style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600 }}>
+                      style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
                       {reviewSaving ? "Saving…" : "Save"}
                     </button>
                     <button onClick={() => handleReviewReEnrich(wine)} disabled={reviewReEnriching || reviewSaving}
-                      style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
                       {reviewReEnriching ? "Re-enriching…" : "✦ Re-enrich"}
                     </button>
                     <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
-                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11, whiteSpace: "nowrap" }}>
+                      style={{ background: t.successDim, border: `0.5px solid ${t.success}`, color: t.success, padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
                       ✓ Approve
                     </button>
                     <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); }}
-                      style={{ background: "none", border: "0.5px solid #3c2200", color: "#6a5040", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12 }}>
+                      style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
                       Cancel
                     </button>
                   </div>
@@ -1759,19 +1889,19 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
               {activeTab === "uncertain" && reviewSubTab === "pending" && !isEditingThis && (
                 <div style={{ padding: "0 14px 12px" }}>
                   {wine.correctedName && wine.correctedName !== wine.name && (
-                    <div style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
-                      <div style={{ color: "#9a8060", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
-                      <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 6 }}>{wine.correctedName}</div>
+                    <div style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                      <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
+                      <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 6 }}>{wine.correctedName}</div>
                       <CopyButton text={wine.correctedName} />
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => openReviewEdit(wine)}
-                      style={{ background: "rgba(201,169,110,0.1)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", color: t.accent, padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
                       ✎ Edit & Re-enrich
                     </button>
                     <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
-                      style={{ background: "rgba(76,175,125,0.12)", border: "0.5px solid #4caf7d", color: "#4caf7d", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                      style={{ background: t.successDim, border: "0.5px solid #4caf7d", color: t.success, padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
                       Looks Good ✓
                     </button>
                   </div>
@@ -1784,8 +1914,8 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
       </div>
 
       {/* Footer */}
-      <div style={{ background: "#4d2e00", borderTop: "1px solid #2a1400", padding: "12px 20px", textAlign: "center" }}>
-        <div style={{ color: "#4e3020", fontSize: 10, letterSpacing: "1px" }}>
+      <div style={{ background: t.bgSurface, borderTop: `1px solid ${t.borderSubtle}`, padding: "12px 20px", textAlign: "center" }}>
+        <div style={{ color: t.borderStrong, fontSize: 10, letterSpacing: "1px" }}>
           {wines.length} total wines · {isAdmin ? "Admin access" : "Manager access"} · Tap AK logo 5× to access this screen
         </div>
       </div>
@@ -1797,6 +1927,7 @@ function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetL
 // ─── PIN Screen ───────────────────────────────────────────────────────────────
 
 function PinScreen({ onSuccess, onCancel }) {
+  const t = useTheme();
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
 
@@ -1819,37 +1950,37 @@ function PinScreen({ onSuccess, onCancel }) {
   function handleDelete() { setPin(p => p.slice(0, -1)); setError(false); }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
-      <div style={{ background: "#4d2e00", border: "1px solid #2a1400", borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
-        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Staff Access</div>
-        <div style={{ color: "#f0e8d8", fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
+      <div style={{ background: t.bgSurface, border: `1px solid ${t.borderSubtle}`, borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Staff Access</div>
+        <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
 
         {/* PIN dots */}
         <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 24 }}>
           {[0,1,2,3].map(i => (
             <div key={i} style={{
               width: 14, height: 14, borderRadius: "50%",
-              background: i < pin.length ? (error ? "#e85050" : "#c9a96e") : "transparent",
-              border: `2px solid ${error ? "#e85050" : i < pin.length ? "#c9a96e" : "#4e3020"}`,
+              background: i < pin.length ? (error ? t.error : t.accent) : "transparent",
+              border: `2px solid ${error ? t.error : i < pin.length ? t.accent : t.borderStrong}`,
               transition: "all 0.15s"
             }} />
           ))}
         </div>
 
-        {error && <div style={{ color: "#e85050", fontSize: 12, marginBottom: 16 }}>Incorrect PIN</div>}
+        {error && <div style={{ color: t.error, fontSize: 12, marginBottom: 16 }}>Incorrect PIN</div>}
 
         {/* Keypad */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
           {[1,2,3,4,5,6,7,8,9].map(d => (
             <button key={d} onClick={() => handleDigit(String(d))} style={{
-              background: "rgba(255,255,255,0.06)", border: "0.5px solid #2a1400",
-              color: "#f0e8d8", fontSize: 20, padding: "14px", borderRadius: 10,
-              cursor: "pointer", fontFamily: "Georgia, serif"
+              background: t.white06, border: `0.5px solid ${t.borderSubtle}`,
+              color: t.textPrimary, fontSize: 20, padding: "14px", borderRadius: 10,
+              cursor: "pointer", fontFamily: t.fontSerif
             }}>{d}</button>
           ))}
-          <button onClick={onCancel} style={{ background: "transparent", border: "0.5px solid #2a1400", color: "#6a5040", fontSize: 12, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
-          <button onClick={() => handleDigit("0")} style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid #2a1400", color: "#f0e8d8", fontSize: 20, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: "Georgia, serif" }}>0</button>
-          <button onClick={handleDelete} style={{ background: "transparent", border: "0.5px solid #2a1400", color: "#6a5040", fontSize: 18, padding: "14px", borderRadius: 10, cursor: "pointer" }}>⌫</button>
+          <button onClick={onCancel} style={{ background: "transparent", border: `0.5px solid ${t.borderSubtle}`, color: t.textDim, fontSize: 12, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif }}>Cancel</button>
+          <button onClick={() => handleDigit("0")} style={{ background: t.white06, border: `0.5px solid ${t.borderSubtle}`, color: t.textPrimary, fontSize: 20, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif }}>0</button>
+          <button onClick={handleDelete} style={{ background: "transparent", border: `0.5px solid ${t.borderSubtle}`, color: t.textDim, fontSize: 18, padding: "14px", borderRadius: 10, cursor: "pointer" }}>⌫</button>
         </div>
       </div>
     </div>
@@ -1861,23 +1992,23 @@ function PinScreen({ onSuccess, onCancel }) {
 
 function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children }) {
   return (
-    <div style={{ background: "#432800", padding: "0 20px" }}>
+    <div style={{ background: t.bgBase, padding: "0 20px" }}>
       <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#f0e8d8", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: t.textPrimary, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
           ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ color: "#e8d5a0", fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+          <div style={{ color: t.accent, fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
         </div>
         <div style={{ width: 80, textAlign: "right" }}>
           {favorites.length > 0 && (
-            <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+            <button onClick={onShowShortlist} style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
               ★ {favorites.length}
             </button>
           )}
         </div>
       </div>
-      <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
+      <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${t.accent}44, transparent)`, marginBottom: 10 }} />
       {children}
     </div>
   );
@@ -1886,16 +2017,16 @@ function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children 
 function ListSectionHeading({ label, borderTop }) {
   return (
     <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? "0.5px solid #e8e0d0" : "none" }}>
-      <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
     </div>
   );
 }
 
 function ListCountBar({ left, right }) {
   return (
-    <div style={{ background: "#472a00", padding: "5px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ color: "#6a5040", fontSize: 11, letterSpacing: "1px" }}>{left}</span>
-      {right && <span style={{ color: "#6a5040", fontSize: 10, fontStyle: "italic" }}>{right}</span>}
+    <div style={{ background: t.bgSurface, padding: "5px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ color: t.textDim, fontSize: 11, letterSpacing: "1px" }}>{left}</span>
+      {right && <span style={{ color: t.textDim, fontSize: 10, fontStyle: "italic" }}>{right}</span>}
     </div>
   );
 }
@@ -1903,6 +2034,7 @@ function ListCountBar({ left, right }) {
 // ─── Generic Item List Screen (Beer, Pours, Cocktails, NAB) ──────────────────
 
 function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+  const t = useTheme();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1965,38 +2097,38 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
   const filteredGroupOrder = [...new Map(searchFiltered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
 
   if (loading) return (
-    <div style={{ background: "#432800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-      <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>Loading {title}...</div>
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: t.fontSerif }}>Loading {title}...</div>
     </div>
   );
 
   if (error) return (
-    <div style={{ background: "#432800", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
       <div style={{ textAlign: "center", maxWidth: 400 }}>
         <div style={{ color: accentColor, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Unable to load {title}</div>
-        <div style={{ color: "#6a5040", fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
-        <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 6, padding: "10px 14px", marginBottom: 16, textAlign: "left" }}>
-          <div style={{ color: "#9a5040", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
-          <div style={{ color: "#c0a090", fontSize: 12, fontFamily: "monospace", wordBreak: "break-all" }}>{error}</div>
+        <div style={{ color: t.textDim, fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
+        <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 6, padding: "10px 14px", marginBottom: 16, textAlign: "left" }}>
+          <div style={{ color: t.textDim, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
+          <div style={{ color: t.textSecondary, fontSize: 12, fontFamily: t.fontMono, wordBreak: "break-all" }}>{error}</div>
         </div>
-        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: "#432800", border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: "Georgia, serif", cursor: "pointer" }}>Try Again</button>
+        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: t.bgBase, border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: t.fontSerif, cursor: "pointer" }}>Try Again</button>
       </div>
     </div>
   );
 
   return (
-    <div style={{ background: "#432800", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Shared header — edit ListScreenHeader to change all list screens */}
       <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
         <ListScreenHeader title={title} onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
             {groups.map(g => (
               <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
-                background: activeGroup === g ? accentColor : "rgba(255,255,255,0.07)",
+                background: activeGroup === g ? accentColor : t.white08,
                 border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
-                color: activeGroup === g ? "#432800" : "#c8a878",
+                color: activeGroup === g ? t.bgBase : t.accent,
                 fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
-                fontFamily: "Georgia, serif", whiteSpace: "nowrap",
+                fontFamily: t.fontSerif, whiteSpace: "nowrap",
                 fontWeight: activeGroup === g ? 600 : 400
               }}>{g === "All" ? (allLabel || `All ${title}`) : g}</button>
             ))}
@@ -2004,9 +2136,9 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
           <div style={{ padding: "4px 0 10px", position: "relative" }}>
             <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+              style={{ width: "100%", boxSizing: "border-box", background: t.white08, border: "0.5px solid rgba(201,169,110,0.25)", color: t.textPrimary, padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
             />
-            {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+            {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
           </div>
         </ListScreenHeader>
       </div>
@@ -2016,7 +2148,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
         right="☆ Star to save to My Menu"
       />
 
-      <div style={{ background: "#faf8f4" }}>
+      <div style={{ background: t.textPrimary }}>
         {filteredGroupOrder.map((group, gi) => (
           <div key={group}>
             <ListSectionHeading label={group} borderTop={gi > 0} />
@@ -2025,40 +2157,40 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
                 <div key={item.id} onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
-                    background: selectedItem === item.id ? "#f0ebe0" : "transparent",
+                    background: selectedItem === item.id ? t.textPrimary : "transparent",
                     borderLeft: selectedItem === item.id ? `2px solid ${accentColor}` : "2px solid transparent",
                     borderRadius: 8, padding: "11px 8px", cursor: "pointer", transition: "all 0.15s"
                   }}>
                   <div
                     onClick={item.imageUrl ? e => { e.stopPropagation(); setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }); } : undefined}
-                    style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${item.imageUrl ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
+                    style={{ width: 40, height: 56, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${item.imageUrl ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
                     {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#502e00", fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                     {(item.style || item.category) && (
                       <div style={{ color: accentColor, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
                         {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
                       </div>
                     )}
                     {item.description ? (
-                      <div style={{ color: "#8a7060", fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description} <span style={{ color: accentColor, fontSize: 11 }}>Details ›</span></div>
+                      <div style={{ color: t.textMuted, fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description} <span style={{ color: accentColor, fontSize: 11 }}>Details ›</span></div>
                     ) : (
                       <div style={{ color: accentColor, fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    <button onClick={e => { e.stopPropagation(); onToggleFavorite(item); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: favorites.some(f => f.id === item.id) ? accentColor : "#d0c0b0", padding: "2px 0", lineHeight: 1 }}>
+                    <button onClick={e => { e.stopPropagation(); onToggleFavorite(item); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: favorites.some(f => f.id === item.id) ? accentColor : t.textSecondary, padding: "2px 0", lineHeight: 1 }}>
                       {favorites.some(f => f.id === item.id) ? "★" : "☆"}
                     </button>
                     <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
                     {item.price ? (
                       <>
-                        <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
-                        <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>each</div>
+                        <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>each</div>
                       </>
                     ) : (
-                      <span style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Ask</span>
+                      <span style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>Ask</span>
                     )}
                     </div>
                   </div>
@@ -2068,7 +2200,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
           </div>
         ))}
         {filtered.length === 0 && (
-          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>
+          <div style={{ color: t.textSecondary, textAlign: "center", padding: 40, fontSize: 14 }}>
             {items.length === 0 ? "Menu coming soon" : "No items in this selection"}
           </div>
         )}
@@ -2083,24 +2215,24 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
             <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
               <div
                 onClick={item.imageUrl ? () => setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }) : undefined}
-                style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: `0.5px solid ${item.imageUrl ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
+                style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${item.imageUrl ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#502e00", fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                <div style={{ color: t.bgCardHover, fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
                 {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
-                {(item.brewery || item.producer) && <div style={{ color: "#8a7060", fontSize: 11 }}>{item.brewery || item.producer}</div>}
+                {(item.brewery || item.producer) && <div style={{ color: t.textMuted, fontSize: 11 }}>{item.brewery || item.producer}</div>}
                 <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                  {item.abv && <span style={{ color: "#8a7060", fontSize: 11 }}>{item.abv} ABV</span>}
-                  {item.age && <span style={{ color: "#8a7060", fontSize: 11 }}>{item.age}</span>}
+                  {item.abv && <span style={{ color: t.textMuted, fontSize: 11 }}>{item.abv} ABV</span>}
+                  {item.age && <span style={{ color: t.textMuted, fontSize: 11 }}>{item.age}</span>}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                {item.price && <div style={{ color: "#502e00", fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+                {item.price && <div style={{ color: t.bgCardHover, fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
               </div>
             </div>
             {item.description && (
-              <div style={{ color: "#5a4030", fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10, marginBottom: 12 }}>
+              <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10, marginBottom: 12 }}>
                 {item.description}
               </div>
             )}
@@ -2170,29 +2302,29 @@ function GuestMenuLoader({ menuCode }) {
   }, [menuCode]);
 
   if (state === "loading") return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ color: "#c9a96e", fontSize: 22, marginBottom: 12 }}>✦</div>
-        <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>Loading your menu…</div>
+        <div style={{ color: t.accent, fontSize: 22, marginBottom: 12 }}>✦</div>
+        <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>Loading your menu…</div>
       </div>
     </div>
   );
 
   if (state === "expired") return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: t.fontSerif }}>
       <div style={{ textAlign: "center", maxWidth: 360 }}>
-        <div style={{ color: "#c9a96e", fontSize: 28, marginBottom: 16 }}>✦</div>
-        <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 12 }}>Appalachia Kitchen</div>
-        <div style={{ color: "#f0e8d8", fontSize: 18, marginBottom: 12 }}>This menu link has expired</div>
-        <div style={{ color: "#6a5040", fontSize: 13, lineHeight: 1.6 }}>Menu QR codes are valid for 24 hours. We hope your evening was wonderful — we'd love to welcome you back soon.</div>
-        <div style={{ color: "#4a3020", fontSize: 11, marginTop: 24, letterSpacing: "1px" }}>CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV</div>
+        <div style={{ color: t.accent, fontSize: 28, marginBottom: 16 }}>✦</div>
+        <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 12 }}>Appalachia Kitchen</div>
+        <div style={{ color: t.textPrimary, fontSize: 18, marginBottom: 12 }}>This menu link has expired</div>
+        <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.6 }}>Menu QR codes are valid for 24 hours. We hope your evening was wonderful — we'd love to welcome you back soon.</div>
+        <div style={{ color: t.borderStrong, fontSize: 11, marginTop: 24, letterSpacing: "1px" }}>CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV</div>
       </div>
     </div>
   );
 
   if (state === "error") return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Georgia, serif" }}>
-      <div style={{ textAlign: "center", color: "#6a5040", fontSize: 14 }}>Menu not found. Please ask your server for assistance.</div>
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: t.fontSerif }}>
+      <div style={{ textAlign: "center", color: t.textDim, fontSize: 14 }}>Menu not found. Please ask your server for assistance.</div>
     </div>
   );
 
@@ -2223,40 +2355,40 @@ function GuestMenuScreen({ favorites, savedAt }) {
   });
 
   const SectionHeader = ({ label }) => (
-    <div style={{ background: "#5e3600", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
-      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    <div style={{ background: t.bgCardHover, padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
     </div>
   );
 
   const WineCard = ({ item }) => (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+    <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         {item.imageUrl
-          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: "0.5px solid #c9a96e" }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: `0.5px solid ${t.accent}` }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
           : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
-          {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ color: t.textPrimary, fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#9a8060" }}>glass</span></div>}
-            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#9a8060" }}>bottle</span></div>}
+            {item.glassPrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: t.textSecondary }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: t.textSecondary }}>bottle</span></div>}
           </div>
         </div>
       </div>
-      {item.reason && <div style={{ color: "#c8b49a", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
+      {item.reason && <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
     </div>
   );
 
   return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 480, margin: "0 auto" }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 480, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "24px 20px 20px", textAlign: "center" }}>
-        <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
-        <div style={{ color: "#f0e8d8", fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
-        <div style={{ color: "#9a8060", fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "24px 20px 20px", textAlign: "center" }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
+        <div style={{ color: t.textPrimary, fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
+        <div style={{ color: t.textSecondary, fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
         {savedAt && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>
-            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.5px" }}>
+            <div style={{ color: t.accent, fontSize: 12, letterSpacing: "0.5px" }}>
               {new Date(savedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
           </div>
@@ -2271,12 +2403,12 @@ function GuestMenuScreen({ favorites, savedAt }) {
             <div key={role}>
               <SectionHeader label={label} />
               {foodByCourse[role].map(item => (
-                <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
-                    {item.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
-                    {item.price && <div style={{ color: "#b8a080", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                    <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                    {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
+                    {item.price && <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
                   </div>
                 </div>
               ))}
@@ -2296,14 +2428,14 @@ function GuestMenuScreen({ favorites, savedAt }) {
           <div>
             <SectionHeader label="Drinks" />
             {drinkItems.map(item => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
                 <div style={{ fontSize: 20, flexShrink: 0 }}>
                   {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
+                  <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
                 </div>
-                {item.price && <div style={{ color: "#9a8060", fontSize: 12 }}>{formatPrice(item.price)}</div>}
+                {item.price && <div style={{ color: t.textSecondary, fontSize: 12 }}>{formatPrice(item.price)}</div>}
               </div>
             ))}
           </div>
@@ -2311,12 +2443,12 @@ function GuestMenuScreen({ favorites, savedAt }) {
       </div>
 
       <div style={{ textAlign: "center", padding: "24px 20px 40px", margin: "8px 16px 0", borderTop: "0.5px solid rgba(201,169,110,0.15)" }}>
-        <div style={{ color: "#c9a96e", fontSize: 13, marginBottom: 12 }}>Enjoyed your evening?</div>
+        <div style={{ color: t.accent, fontSize: 13, marginBottom: 12 }}>Enjoyed your evening?</div>
         <a href={RESERVATION_URL} target="_blank" rel="noopener noreferrer"
-          style={{ display: "inline-block", background: "#c9a96e", color: "#0d0800", textDecoration: "none", padding: "10px 24px", borderRadius: 8, fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 16 }}>
+          style={{ display: "inline-block", background: t.accent, color: t.bgDeep, textDecoration: "none", padding: "10px 24px", borderRadius: 8, fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 16 }}>
           Book Your Next Visit
         </a>
-        <div style={{ color: "#5a4030", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+        <div style={{ color: t.textDim, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
           Corduroy Inn & Lodge · Snowshoe Mountain, WV
         </div>
       </div>
@@ -2327,6 +2459,7 @@ function GuestMenuScreen({ favorites, savedAt }) {
 // ─── Shortlist Screen ─────────────────────────────────────────────────────────
 
 function ShortlistScreen({ favorites, onRemove, onClose }) {
+  const t = useTheme();
   const courseOrder  = ["first", "main", "dessert"];
   const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
 
@@ -2398,62 +2531,62 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
   }
 
   const SectionHeader = ({ label }) => (
-    <div style={{ background: "#5e3600", padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
-      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    <div style={{ background: t.bgCardHover, padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
     </div>
   );
 
   const RemoveBtn = ({ item }) => (
-    <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: "#4a3020", cursor: "pointer", fontSize: 20, padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}>×</button>
+    <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: t.borderStrong, cursor: "pointer", fontSize: 20, padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}>×</button>
   );
 
   const WineCard = ({ item }) => (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid #2a1400", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+    <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         {item.imageUrl
-          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: "0.5px solid #c9a96e" }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: `0.5px solid ${t.accent}` }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
           : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#f0e8d8", fontSize: 14, marginBottom: 2 }}>{item.name}</div>
-          {(item.varietal || item.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ color: t.textPrimary, fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            {item.glassPrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: "#9a8060" }}>glass</span></div>}
-            {item.bottlePrice && <div style={{ color: "#9a8060", fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: "#9a8060" }}>bottle</span></div>}
+            {item.glassPrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: t.textSecondary }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: t.textSecondary }}>bottle</span></div>}
           </div>
         </div>
         <RemoveBtn item={item} />
       </div>
-      {item.reason && <div style={{ color: "#c8b49a", fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
+      {item.reason && <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
     </div>
   );
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
-    <div style={{ width: "100%", maxWidth: 680, background: "#3d2200", display: "flex", flexDirection: "column", fontFamily: "Georgia, serif", overflow: "hidden" }}>
+    <div style={{ width: "100%", maxWidth: 680, background: t.bgBase, display: "flex", flexDirection: "column", fontFamily: t.fontSerif, overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ background: "#4d2e00", borderBottom: "1px solid #2a1400", padding: "16px 20px" }}>
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
-            <div style={{ color: "#c8b49a", fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
+            <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
+            <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {favorites.length > 0 && (
-            <button onClick={handleOpenQR} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+            <button onClick={handleOpenQR} style={{ background: t.accentDim, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
               Save ↗
             </button>
           )}
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
           </div>
         </div>
-        <div style={{ borderTop: "0.5px solid rgba(201,169,110,0.2)", paddingTop: 8, color: "#c9a96e", fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
+        <div style={{ borderTop: "0.5px solid rgba(201,169,110,0.2)", paddingTop: 8, color: t.accent, fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
           Ready to order? Your server will be happy to help.
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
         {favorites.length === 0 ? (
-          <div style={{ color: "#5a4030", textAlign: "center", padding: "60px 20px" }}>
+          <div style={{ color: t.textDim, textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 36, marginBottom: 16 }}>☆</div>
             <div style={{ fontSize: 14 }}>Star wines, dishes, and drinks to build your menu for the evening</div>
           </div>
@@ -2467,12 +2600,12 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                 <div key={role}>
                   <SectionHeader label={label} />
                   {foodByCourse[role].map(item => (
-                    <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                    <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
                       <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
-                        {item.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
-                        {item.price && <div style={{ color: "#b8a080", fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                        <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                        {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
+                        {item.price && <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
                       </div>
                       <RemoveBtn item={item} />
                     </div>
@@ -2495,17 +2628,17 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
               <div>
                 <SectionHeader label="Drinks" />
                 {drinkItems.map(item => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "0.5px solid #2a1400", borderRadius: 8, marginBottom: 8 }}>
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ fontSize: 20, flexShrink: 0 }}>
                       {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: "#f0e8d8", fontSize: 14 }}>{item.name}</div>
-                      <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginTop: 2 }}>
+                      <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginTop: 2 }}>
                         {item.favoriteType === "beer" ? (item.style || "Beer") : item.favoriteType === "cocktail" ? "Cocktail" : item.favoriteType === "nab" ? "Non-Alcoholic" : "Premium Pour"}
                       </div>
                     </div>
-                    {item.price && <div style={{ color: "#9a8060", fontSize: 12, flexShrink: 0 }}>{formatPrice(item.price)}</div>}
+                    {item.price && <div style={{ color: t.textSecondary, fontSize: 12, flexShrink: 0 }}>{formatPrice(item.price)}</div>}
                     <RemoveBtn item={item} />
                   </div>
                 ))}
@@ -2517,30 +2650,30 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       {showQR && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div style={{ background: "#4d2e00", border: "1px solid #3c2200", borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
-            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
+          <div style={{ background: t.bgSurface, border: `1px solid ${t.borderMid}`, borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
 
             {qrSaving ? (
-              <div style={{ padding: "40px 0", color: "#c9a96e", fontSize: 12, letterSpacing: "2px" }}>Saving your menu…</div>
+              <div style={{ padding: "40px 0", color: t.accent, fontSize: 12, letterSpacing: "2px" }}>Saving your menu…</div>
             ) : menuCode ? (
               <>
-                <div style={{ color: "#f0e8d8", fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>Scan to view your menu while you dine</div>
-                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: "#c9a96e" }}>Corduroy Guest</span> WiFi first</div>
+                <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>Scan to view your menu while you dine</div>
+                <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: t.accent }}>Corduroy Guest</span> WiFi first</div>
                 <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
                 </div>
-                <div style={{ color: "#b8a080", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Scan anytime — this code does not expire</div>
+                <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Scan anytime — this code does not expire</div>
                 <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 20, wordBreak: "break-all" }}>
-                  <span style={{ color: "#9a8060", fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
+                  <span style={{ color: t.textSecondary, fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
                 </div>
 
                 {/* Email section — coming soon, code preserved for when Resend is configured */}
               </>
             ) : (
-              <div style={{ color: "#6a5040", padding: "24px 0", fontSize: 13 }}>Unable to save menu. Please ask your server.</div>
+              <div style={{ color: t.textDim, padding: "24px 0", fontSize: 13 }}>Unable to save menu. Please ask your server.</div>
             )}
 
-            <button onClick={() => setShowQR(false)} style={{ marginTop: 20, background: "#c9a96e", color: "#0d0800", border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 600 }}>Done</button>
+            <button onClick={() => setShowQR(false)} style={{ marginTop: 20, background: t.accent, color: t.bgDeep, border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>Done</button>
           </div>
         </div>
       )}
@@ -2560,6 +2693,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 //                  used to personalise the opening message; null for generic open
 
 function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null }) {
+  const t = useTheme();
   function buildOpener() {
     if (selectedFoods.length > 0) {
       const names = selectedFoods.map(f => f.name).join(", ");
@@ -2654,17 +2788,17 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
 
   return <>
     <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: "Georgia, serif" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
 
         {/* Header — X becomes "Done ✓" once something has been added */}
-        <div style={{ background: "#472a00", borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{ background: t.bgSurface, borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
-            <div style={{ color: "#f0e8d8", fontSize: 13 }}>Appalachia Kitchen</div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
+            <div style={{ color: t.textPrimary, fontSize: 13 }}>Appalachia Kitchen</div>
           </div>
           <button
             onClick={handleClose}
-            style={{ background: hasAdded ? "#c9a96e" : "rgba(201,169,110,0.15)", border: hasAdded ? "none" : "0.5px solid rgba(201,169,110,0.4)", color: hasAdded ? "#0d0800" : "#c9a96e", height: 32, borderRadius: hasAdded ? 8 : "50%", width: hasAdded ? "auto" : 32, padding: hasAdded ? "0 12px" : 0, cursor: "pointer", fontSize: hasAdded ? 12 : 18, fontFamily: "Georgia, serif", fontWeight: hasAdded ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", whiteSpace: "nowrap" }}
+            style={{ background: hasAdded ? t.accent : t.accentDim, border: hasAdded ? "none" : "0.5px solid rgba(201,169,110,0.4)", color: hasAdded ? t.bgDeep : t.accent, height: 32, borderRadius: hasAdded ? 8 : "50%", width: hasAdded ? "auto" : 32, padding: hasAdded ? "0 12px" : 0, cursor: "pointer", fontSize: hasAdded ? 12 : 18, fontFamily: t.fontSerif, fontWeight: hasAdded ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", whiteSpace: "nowrap" }}
           >{hasAdded ? "Done ✓" : "×"}</button>
         </div>
 
@@ -2673,7 +2807,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "85%", background: m.role === "user" ? "#472a00" : "#faf5ec", color: m.role === "user" ? "#f0e8d8" : "#3d2000", border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.bgSurface : "#faf5ec", color: m.role === "user" ? t.textPrimary : t.bgBase, border: m.role === "user" ? "none" : "0.5px solid #e8dcc8", borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
                   {m.text}
                 </div>
               </div>
@@ -2686,22 +2820,22 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
                     const sub = s.type === "wine" ? [s.varietal, s.region].filter(Boolean).join(" · ") : s.course;
                     const hasImage = s.type === "wine" && s.imageUrl;
                     return (
-                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? "rgba(76,175,125,0.08)" : "rgba(201,169,110,0.07)", border: `0.5px solid ${isAdded ? "#4caf7d" : "rgba(201,169,110,0.4)"}`, borderRadius: 10, padding: "8px 12px" }}>
+                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? t.successDim : "rgba(201,169,110,0.07)", border: `0.5px solid ${isAdded ? t.success : t.accentBorder}`, borderRadius: 10, padding: "8px 12px" }}>
                         {/* Label thumbnail or emoji fallback */}
                         <div
                           onClick={hasImage ? () => setZoomedLabel(s) : undefined}
-                          style={{ width: 36, height: 50, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${hasImage ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: hasImage ? "zoom-in" : "default" }}
+                          style={{ width: 36, height: 50, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${hasImage ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: hasImage ? "zoom-in" : "default" }}
                         >
                           {hasImage
                             ? <img src={s.imageUrl} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             : (s.type === "wine" ? "🍷" : "🍽")}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ color: "#3d2000", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                          {sub && <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
-                          {hasImage && <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
+                          <div style={{ color: t.bgBase, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          {sub && <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
+                          {hasImage && <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
                         </div>
-                        <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? "rgba(76,175,125,0.15)" : "#472a00", border: isAdded ? "0.5px solid #4caf7d" : "none", color: isAdded ? "#4caf7d" : "#c9a96e", fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap", flexShrink: 0 }}>
+                        <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? t.successDim : t.bgSurface, border: isAdded ? `0.5px solid ${t.success}` : "none", color: isAdded ? t.success : t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>
                           {isAdded ? "★ Added" : "☆ Add to My Menu"}
                         </button>
                       </div>
@@ -2710,13 +2844,13 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
 
                   {/* Hint text — only on the last message with suggestions, only if not yet added anything */}
                   {i === lastSuggestionMsgIndex && !hasAdded && (
-                    <div style={{ color: "#9a7855", fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                    <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
                       Tap ☆ Add to My Menu to save, or keep chatting below.
                     </div>
                   )}
                   {/* Hint text — once something added, encourage close */}
                   {i === lastSuggestionMsgIndex && hasAdded && (
-                    <div style={{ color: "#7a9a6e", fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                    <div style={{ color: t.textMuted, fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
                       Saved! Tap <strong>Done ✓</strong> when you're finished, or keep chatting.
                     </div>
                   )}
@@ -2727,7 +2861,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
           {sending && (
             <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 10 }}>
               <div style={{ background: "#faf5ec", border: "0.5px solid #e8dcc8", borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
-                <span style={{ color: "#c9a96e", fontSize: 18, letterSpacing: 4 }}>• • •</span>
+                <span style={{ color: t.accent, fontSize: 18, letterSpacing: 4 }}>• • •</span>
               </div>
             </div>
           )}
@@ -2737,10 +2871,10 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         {/* Input bar */}
         <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid #e8e0d0", flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
-            style={{ flex: 1, background: "#faf8f4", border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: "Georgia, serif", fontSize: 13, color: "#3d2000", outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
+            style={{ flex: 1, background: t.textPrimary, border: "0.5px solid #d8cfc0", borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.bgBase, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
           <button onClick={handleSend} disabled={!input.trim() || sending}
-            style={{ background: input.trim() && !sending ? "#c9a96e" : "rgba(201,169,110,0.2)", border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
-            <span style={{ color: input.trim() && !sending ? "#0d0800" : "#c9a96e", fontSize: 16, lineHeight: 1 }}>›</span>
+            style={{ background: input.trim() && !sending ? t.accent : t.accentDim, border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+            <span style={{ color: input.trim() && !sending ? t.bgDeep : t.accent, fontSize: 16, lineHeight: 1 }}>›</span>
           </button>
         </div>
       </div>
@@ -2749,9 +2883,9 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
       <div onClick={() => setZoomedLabel(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, cursor: "pointer" }}>
         <img src={zoomedLabel.imageUrl} alt={zoomedLabel.name} style={{ maxHeight: "72vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 48px rgba(0,0,0,0.7)" }} onClick={e => e.stopPropagation()} />
         <div style={{ marginTop: 20, textAlign: "center" }}>
-          <div style={{ color: "#f0e8d8", fontSize: 16, fontFamily: "Georgia, serif", marginBottom: 4 }}>{zoomedLabel.name}</div>
+          <div style={{ color: t.textPrimary, fontSize: 16, fontFamily: t.fontSerif, marginBottom: 4 }}>{zoomedLabel.name}</div>
           {(zoomedLabel.varietal || zoomedLabel.region) && (
-            <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>
+            <div style={{ color: t.accent, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: t.fontSerif }}>
               {[zoomedLabel.varietal, zoomedLabel.region].filter(Boolean).join(" · ")}
             </div>
           )}
@@ -2774,13 +2908,13 @@ function SommelierToast({ items, onViewMenu, onDismiss }) {
     : `★ ${items.length} items added to My Menu`;
 
   return (
-    <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1000, display: "flex", alignItems: "center", gap: 12, background: "#2a1800", border: "0.5px solid #c9a96e", borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", fontFamily: "Georgia, serif", maxWidth: "90vw", animation: "toastIn 0.3s ease" }}>
+    <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1000, display: "flex", alignItems: "center", gap: 12, background: t.bgBase, border: `0.5px solid ${t.accent}`, borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", fontFamily: t.fontSerif, maxWidth: "90vw", animation: "toastIn 0.3s ease" }}>
       <style>{`@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
-      <span style={{ color: "#f0e8d8", fontSize: 13, flex: 1 }}>{label}</span>
-      <button onClick={onViewMenu} style={{ background: "#c9a96e", border: "none", color: "#0d0800", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", whiteSpace: "nowrap" }}>
+      <span style={{ color: t.textPrimary, fontSize: 13, flex: 1 }}>{label}</span>
+      <button onClick={onViewMenu} style={{ background: t.accent, border: "none", color: t.bgDeep, fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap" }}>
         View →
       </button>
-      <button onClick={onDismiss} style={{ background: "none", border: "none", color: "#6a5040", fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+      <button onClick={onDismiss} style={{ background: "none", border: "none", color: t.textDim, fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
     </div>
   );
 }
@@ -2791,19 +2925,19 @@ function SommelierToast({ items, onViewMenu, onDismiss }) {
 
 function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", textAlign: "center" }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>★</div>
-        <div style={{ color: "#472a00", fontSize: 20, fontWeight: 600, marginBottom: 10 }}>You're all set!</div>
-        <div style={{ color: "#6a5040", fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
+        <div style={{ color: t.bgSurface, fontSize: 20, fontWeight: 600, marginBottom: 10 }}>You're all set!</div>
+        <div style={{ color: t.textDim, fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
           You've selected <strong>{foodCount}</strong> {foodCount === 1 ? "dish" : "dishes"} and added <strong>{wineCount}</strong> {wineCount === 1 ? "wine" : "wines"} to your menu.<br/>Ready to review your evening's selections?
         </div>
         <button onClick={onViewMenu}
-          style={{ width: "100%", background: "#472a00", color: "#c9a96e", border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: "Georgia, serif", letterSpacing: "0.5px", marginBottom: 10 }}>
+          style={{ width: "100%", background: t.bgSurface, color: t.accent, border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: t.fontSerif, letterSpacing: "0.5px", marginBottom: 10 }}>
           View My Menu →
         </button>
         <button onClick={onKeepBrowsing}
-          style={{ width: "100%", background: "none", border: "0.5px solid #d8cfc0", color: "#9a7855", padding: "12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: "Georgia, serif" }}>
+          style={{ width: "100%", background: "none", border: "0.5px solid #d8cfc0", color: t.textSecondary, padding: "12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: t.fontSerif }}>
           Keep Browsing
         </button>
       </div>
@@ -2814,6 +2948,7 @@ function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }
 // ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
 
 function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite }) {
+  const t = useTheme();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [shownDishes, setShownDishes] = useState([]);
@@ -2864,11 +2999,11 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
       {!loading && (
         <div style={{ display: "flex", gap: 8, marginBottom: result ? 12 : 0 }}>
           <button onClick={() => onOpenChat && onOpenChat({ name: item.name, type: item.style || item.category || "beverage" })}
-            style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
             ✦ Chat with Our<br/>Virtual Sommelier
           </button>
           <button onClick={handlePairing}
-            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            style={{ flex: 1, background: t.bgSurface, color: t.accent, border: `0.5px solid ${t.accent}`, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
             Instant Pairing<br/>Suggestions
           </button>
         </div>
@@ -2876,19 +3011,19 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
       {loading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleMsgComplete} />}
       {result && result.length > 0 && (
         <div style={{ marginTop: 2 }}>
-          <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
+          <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
           {result.map((p, i) => {
             const isStarred = favorites.some(f => f.id === p.id);
             return (
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
-                  <div style={{ color: "#9a7855", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
-                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
+                  <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
                   {p.id && onToggleFavorite && (
                     <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
-                      style={{ background: isStarred ? "rgba(201,169,110,0.15)" : "rgba(201,169,110,0.08)", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.4)"}`, color: "#c9a96e", fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                      style={{ background: isStarred ? t.accentDim : t.accentDimSm, border: `0.5px solid ${isStarred ? t.accent : t.accentBorder}`, color: t.accent, fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif }}>
                       {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
                     </button>
                   )}
@@ -2899,7 +3034,7 @@ function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite 
         </div>
       )}
       {result && result.length === 0 && (
-        <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+        <div style={{ color: t.textSecondary, fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
     </div>
   );
@@ -2928,14 +3063,14 @@ function LabelModal({ wine, onClose }) {
         onClick={e => e.stopPropagation()}
       />
       <div style={{ marginTop: 20, textAlign: "center" }}>
-        <div style={{ color: "#f0e8d8", fontSize: 16, fontFamily: "Georgia, serif", marginBottom: 4 }}>{wine.name}</div>
+        <div style={{ color: t.textPrimary, fontSize: 16, fontFamily: t.fontSerif, marginBottom: 4 }}>{wine.name}</div>
         {(wine.varietal || wine.region) && (
-          <div style={{ color: "#c9a96e", fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: "Georgia, serif" }}>
+          <div style={{ color: t.accent, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: t.fontSerif }}>
             {[wine.varietal, wine.region].filter(Boolean).join(" · ")}
           </div>
         )}
       </div>
-      <div style={{ marginTop: 24, color: "#5a4030", fontSize: 11, fontFamily: "Georgia, serif", letterSpacing: "1px" }}>
+      <div style={{ marginTop: 24, color: t.textDim, fontSize: 11, fontFamily: t.fontSerif, letterSpacing: "1px" }}>
         TAP ANYWHERE TO CLOSE
       </div>
     </div>
@@ -2945,6 +3080,7 @@ function LabelModal({ wine, onClose }) {
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
 function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, tabletLocation = "all" }) {
+  const t = useTheme();
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
 
@@ -2984,57 +3120,57 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
   return (
     <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f0ebe0", border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+        <div style={{ width: 52, height: 72, borderRadius: 4, background: t.textPrimary, border: "0.5px solid #e0d8c8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#502e00", fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
-          <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+          <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
             {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
           </div>
         </div>
-        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#b0a090", fontSize: 22, cursor: "pointer", padding: "0 4px", alignSelf: "flex-start", lineHeight: 1 }}>×</button>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: t.textSecondary, fontSize: 22, cursor: "pointer", padding: "0 4px", alignSelf: "flex-start", lineHeight: 1 }}>×</button>
       </div>
 
       {wine.description ? (
-        <div style={{ color: "#5a4a3a", fontSize: 13, lineHeight: 1.8, marginBottom: 12 }}>{wine.description}</div>
+        <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.8, marginBottom: 12 }}>{wine.description}</div>
       ) : (
-        <div style={{ color: "#c0b0a0", fontSize: 12, fontStyle: "italic", marginBottom: 12 }}>Ask your server for tasting notes</div>
+        <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", marginBottom: 12 }}>Ask your server for tasting notes</div>
       )}
 
       {wine.reviews && wine.reviews !== "null" && (
-        <div style={{ background: "#faf8f4", border: "0.5px solid #e8e0d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
-          <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
-          <div style={{ color: "#5a4a3a", fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
+        <div style={{ background: t.textPrimary, border: "0.5px solid #e8e0d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+          <div style={{ color: t.accent, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
+          <div style={{ color: t.textDim, fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 24, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid #e8e0d0" }}>
         {wine.glassPrice && (
           <div>
-            <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
-            <div style={{ color: "#502e00", fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
+            <div style={{ color: t.bgCardHover, fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
           </div>
         )}
         {wine.bottlePrice && (
           <div>
-            <div style={{ color: "#b0a090", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
-            <div style={{ color: "#502e00", fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
+            <div style={{ color: t.bgCardHover, fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
           </div>
         )}
         {!wine.glassPrice && !wine.bottlePrice && (
-          <div style={{ color: "#c0b0a0", fontSize: 13, fontStyle: "italic", alignSelf: "center" }}>Ask your server for pricing</div>
+          <div style={{ color: t.textSecondary, fontSize: 13, fontStyle: "italic", alignSelf: "center" }}>Ask your server for pricing</div>
         )}
       </div>
 
       {!pairingLoading && (
         <div style={{ display: "flex", gap: 8, marginBottom: pairingResult ? 14 : 0 }}>
           <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine" })}
-            style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
             ✦ Chat with Our<br/>Virtual Sommelier
           </button>
           <button onClick={handlePairing}
-            style={{ flex: 1, background: "#472a00", color: "#c9a96e", border: "0.5px solid #c9a96e", padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+            style={{ flex: 1, background: t.bgSurface, color: t.accent, border: `0.5px solid ${t.accent}`, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
             Instant Pairing<br/>Suggestions
           </button>
         </div>
@@ -3043,19 +3179,19 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 
       {pairingResult && pairingResult.length > 0 && (
         <div>
-          <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Pairs beautifully with</div>
+          <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Pairs beautifully with</div>
           {pairingResult.map((p, i) => {
             const isStarred = favorites.some(f => f.id === p.id);
             return (
               <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
                 <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
-                  <div style={{ color: "#9a7855", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
-                  <div style={{ color: "#6a5040", fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
+                  <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
                   {p.id && onToggleFavorite && (
                     <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
-                      style={{ background: isStarred ? "rgba(201,169,110,0.15)" : "rgba(201,169,110,0.08)", border: `0.5px solid ${isStarred ? "#c9a96e" : "rgba(201,169,110,0.4)"}`, color: "#c9a96e", fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                      style={{ background: isStarred ? t.accentDim : t.accentDimSm, border: `0.5px solid ${isStarred ? t.accent : t.accentBorder}`, color: t.accent, fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif }}>
                       {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
                     </button>
                   )}
@@ -3066,7 +3202,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
         </div>
       )}
       {pairingResult && pairingResult.length === 0 && (
-        <div style={{ color: "#b0a090", fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+        <div style={{ color: t.textSecondary, fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
       )}
     </div>
   );
@@ -3075,6 +3211,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 // ─── Sommelier Screen ─────────────────────────────────────────────────────────
 
 function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+  const t = useTheme();
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
   const [activeCourse, setActiveCourse] = useState("All");
@@ -3195,34 +3332,34 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
-    <div style={{ background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto" }}>
-      <div style={{ background: "#432800", padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ background: t.bgBase, padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
-            style={{ background: "none", border: "none", color: "#c9a96e", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+            style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
             ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>{view === "result" ? "Back" : "Main Menu"}</span>
           </button>
           <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ color: "#e8d5a0", fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
+            <div style={{ color: t.accent, fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
           </div>
           <div style={{ width: 80, textAlign: "right" }}>
             {favorites.length > 0 && (
-              <button onClick={onShowShortlist} style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.4)", color: "#c9a96e", padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 11 }}>
+              <button onClick={onShowShortlist} style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
                 ★ {favorites.length}
               </button>
             )}
           </div>
         </div>
-        <div style={{ height: "0.5px", background: "linear-gradient(90deg, transparent, #c9a96e44, transparent)", marginBottom: 10 }} />
+        <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${t.accent}44, transparent)`, marginBottom: 10 }} />
         {view === "pick" && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
             {courses.map(c => (
               <button key={c} onClick={() => setActiveCourse(c)} style={{
-                background: activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.07)",
-                border: `0.5px solid ${activeCourse === c ? "#c9a96e" : "rgba(255,255,255,0.15)"}`,
-                color: activeCourse === c ? "#432800" : "#c8a878",
+                background: activeCourse === c ? t.accent : t.white08,
+                border: `0.5px solid ${activeCourse === c ? t.accent : "rgba(255,255,255,0.15)"}`,
+                color: activeCourse === c ? t.bgBase : t.accent,
                 fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
-                fontFamily: "Georgia, serif", whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
+                fontFamily: t.fontSerif, whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
               }}>{c}</button>
             ))}
           </div>
@@ -3232,29 +3369,29 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       {view === "pick" && (
         <>
         <div>
-          <div style={{ background: "#472a00", padding: "8px 16px 10px 20px" }}>
+          <div style={{ background: t.bgSurface, padding: "8px 16px 10px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ flex: 1, color: "#c9a96e", fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
+              <div style={{ flex: 1, color: t.accent, fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
             </div>
-            <div style={{ color: "#9a7855", fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+            <div style={{ color: t.textSecondary, fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
               For larger parties, run the sommelier a second time to capture additional guests' selections.
             </div>
           </div>
-          <div style={{ background: "#faf8f4" }}>
+          <div style={{ background: t.textPrimary }}>
             {loadingFood ? (
-              <div style={{ color: "#b0a090", textAlign: "center", padding: 40 }}>Loading menu…</div>
+              <div style={{ color: t.textSecondary, textAlign: "center", padding: 40 }}>Loading menu…</div>
             ) : (() => {
               const courseOrder = [...new Map(filtered.map(f => [f.course, true])).keys()];
               const byCourse = {};
               filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
               return courseOrder.map(course => (
                 <div key={course}>
-                  <div style={{ padding: "8px 16px 6px 20px", background: "#5e3600", display: "flex", alignItems: "center" }}>
-                    <div style={{ flex: 1, color: "#c9a96e", fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
+                  <div style={{ padding: "8px 16px 6px 20px", background: t.bgCardHover, display: "flex", alignItems: "center" }}>
+                    <div style={{ flex: 1, color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
-                      <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
-                      <div style={{ width: 22, textAlign: "center", color: "#c9a96e", fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course === "Dessert" ? "visible" : "hidden" }}>DES</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course === "Dessert" ? "visible" : "hidden" }}>DES</div>
                     </div>
                   </div>
                   {byCourse[course].map(food => {
@@ -3271,18 +3408,18 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
                     const Chk = ({ checked, role, disabled }) => (
                       <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
-                        style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? "#c9a96e" : disabled ? "transparent" : "#d0c0b0"}`, background: checked ? "#c9a96e" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-                        {checked && <span style={{ color: "#0d0800", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                        style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? t.accent : disabled ? "transparent" : t.textSecondary}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                        {checked && <span style={{ color: t.bgDeep, fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
                       </div>
                     );
 
                     return (
-                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "#f0ebe4" : "#faf8f4", transition: "background 0.15s" }}>
+                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: "0.5px solid #e8e0d0", background: anySelected ? "rgba(240,235,228,0.08)" : t.textPrimary, transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: "#502e00", fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
-                              {food.description && <div style={{ color: "#8a7060", fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
+                              <div style={{ color: t.bgCardHover, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              {food.description && <div style={{ color: t.textMuted, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
                             </div>
-                            <div style={{ color: "#8a7060", fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
+                            <div style={{ color: t.textMuted, fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
                             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                               <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert || (!chkFirst && firstCount >= 4)} />
                               <Chk checked={chkMain}    role="main"    disabled={isDessert || (!chkMain && mainCount >= 4)} />
@@ -3299,32 +3436,32 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 
         {/* Sticky Find Pairings button */}
         {selectedFoods.length > 0 && (
-          <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px" }}>
+          <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 16px" }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
               {selectedFoods.map(f => (
-                <div key={f.id} style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: "#f0e8d8", fontSize: 11 }}>{f.name}</span>
-                  {f.courseRole !== "main" && <span style={{ color: "#9a7855", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.courseRole === "first" ? "1st" : "Dessert"}</span>}
-                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f, f.courseRole); }} style={{ color: "#6a5040", fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
+                <div key={f.id} style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: t.textPrimary, fontSize: 11 }}>{f.name}</span>
+                  {f.courseRole !== "main" && <span style={{ color: t.textSecondary, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.courseRole === "first" ? "1st" : "Dessert"}</span>}
+                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f, f.courseRole); }} style={{ color: t.textDim, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
                 </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }}
-                style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, lineHeight: 1.3, textAlign: "center" }}>
+                style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, lineHeight: 1.3, textAlign: "center" }}>
                 ✦ Chat with Our<br/>Virtual Sommelier
               </button>
               <button onClick={handleGetPairings}
-                style={{ flex: 1, background: "#c9a96e", color: "#0d0800", border: "none", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 600, lineHeight: 1.3, textAlign: "center" }}>
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600, lineHeight: 1.3, textAlign: "center" }}>
                 Instant Pairing Suggestions →
               </button>
             </div>
           </div>
         )}
         {selectedFoods.length === 0 && (
-          <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 14px", textAlign: "center" }}>
+          <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 14px", textAlign: "center" }}>
             <button onClick={() => { setChatFoods([]); setChatOpen(true); }}
-              style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+              style={{ background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>
               ✦ Chat with Our Virtual Sommelier Instead
             </button>
           </div>
@@ -3333,7 +3470,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
       )}
 
       {view === "result" && (
-        <div style={{ padding: "20px 20px", background: "#3d2200" }}>
+        <div style={{ padding: "20px 20px", background: t.bgBase }}>
           {selectedFoods.length > 0 && pairingLoading && (() => {
             const roleOrder = ["first", "main", "dessert"];
             const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
@@ -3346,16 +3483,16 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             const courses = roleOrder.filter(r => grouped[r]);
             return (
               <div style={{ background: "rgba(201,169,110,0.06)", border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
-                <div style={{ color: "#9a7855", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>
+                <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>
                   Your table's selections
                 </div>
                 {courses.map((role, ci) => (
                   <div key={role} style={{ marginBottom: ci < courses.length - 1 ? 14 : 0 }}>
-                    <div style={{ color: "#c9a96e", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>{roleLabels[role]}</div>
+                    <div style={{ color: t.accent, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>{roleLabels[role]}</div>
                     {grouped[role].map((f, i) => (
                       <div key={`${f.id}-${role}`} style={{ marginBottom: i < grouped[role].length - 1 ? 6 : 0, paddingLeft: 10, borderLeft: "1.5px solid rgba(201,169,110,0.25)" }}>
-                        <div style={{ color: "#f0e8d8", fontSize: 13 }}>{f.name}</div>
-                        {f.description && <div style={{ color: "#c8b49a", fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
+                        <div style={{ color: t.textPrimary, fontSize: 13 }}>{f.name}</div>
+                        {f.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
                       </div>
                     ))}
                   </div>
@@ -3375,28 +3512,28 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             const isEmpty = pairingResult && !pairingLoading && !hasResults;
 
             const WineCard = (p, i) => (
-              <div key={i} style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+              <div key={i} style={{ background: t.white06, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                  <div style={{ background: "rgba(201,169,110,0.15)", border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
-                    <span style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
+                  <div style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
+                    <span style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {p.glassPrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: "#c9a96e", fontSize: 10 }}>glass</span></div>}
-                    {p.bottlePrice && <div style={{ color: "#f0e8d8", fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: "#c9a96e", fontSize: 10 }}>bottle</span></div>}
+                    {p.glassPrice && <div style={{ color: t.textPrimary, fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: t.accent, fontSize: 10 }}>glass</span></div>}
+                    {p.bottlePrice && <div style={{ color: t.textPrimary, fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: t.accent, fontSize: 10 }}>bottle</span></div>}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                  {p.imageUrl && <div onClick={() => setZoomedLabel({ name: p.name, varietal: p.varietal, region: p.region, imageUrl: p.imageUrl })} style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: "0.5px solid #c9a96e", cursor: "zoom-in" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+                  {p.imageUrl && <div onClick={() => setZoomedLabel({ name: p.name, varietal: p.varietal, region: p.region, imageUrl: p.imageUrl })} style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: `0.5px solid ${t.accent}`, cursor: "zoom-in" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#f5ede0", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
-                    {(p.varietal || p.region) && <div style={{ color: "#c9a96e", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
+                    {(p.varietal || p.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
                   </div>
                 </div>
-                <div style={{ color: "#c8b49a", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+                <div style={{ color: t.textSecondary, fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
                 {p.id && (() => {
                   const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice, imageUrl: p.imageUrl || null, reason: p.reason || null, level: p.level || null, courseLabel: p.courseLabel || null, fromPairing: true };
                   const isStarred = favorites.some(f => f.id === p.id);
-                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? "rgba(201,169,110,0.2)" : "rgba(201,169,110,0.1)", border: `1px solid ${isStarred ? "#c9a96e" : "#c9a96e"}`, color: "#c9a96e", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
+                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? t.accentDim : t.accentDimSm, border: `1px solid ${isStarred ? t.accent : t.accent}`, color: t.accent, padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
                 })()}
               </div>
             );
@@ -3409,12 +3546,12 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                 {/* Multi-course */}
                 {byCourse?.map((courseResult, ci) => (
                   <div key={ci} style={{ marginBottom: 24 }}>
-                    <div style={{ background: "rgba(201,169,110,0.12)", border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
-                      <div style={{ color: "#c9a96e", fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600, marginBottom: courseResult.dishes?.length > 0 ? 6 : 0 }}>
+                    <div style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+                      <div style={{ color: t.accent, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600, marginBottom: courseResult.dishes?.length > 0 ? 6 : 0 }}>
                         ✦ {courseResult.course}
                       </div>
                       {courseResult.dishes?.length > 0 && (
-                        <div style={{ color: "#9a8060", fontSize: 12, fontStyle: "italic" }}>
+                        <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic" }}>
                           {courseResult.dishes.join(" · ")}
                         </div>
                       )}
@@ -3427,26 +3564,26 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   <div style={{ marginBottom: 8 }} />
                 )}
 
-                {isEmpty && <div style={{ color: "#9a8060", textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
+                {isEmpty && <div style={{ color: t.textSecondary, textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
               </>
             );
           })()}
 
           {!pairingLoading && pairingResult && (
-            <div style={{ position: "sticky", bottom: 0, background: "#3d2200", borderTop: "0.5px solid #3c2200", padding: "12px 20px 16px", marginTop: 8 }}>
+            <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 16px", marginTop: 8 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+                <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }} style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
                   ✦ Chat with Our<br/>Virtual Sommelier
                 </button>
-                <button onClick={handleDifferentOptions} style={{ flex: 1, background: "rgba(201,169,110,0.08)", border: "0.5px solid rgba(201,169,110,0.3)", color: "#c9a96e", padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Georgia, serif", lineHeight: 1.3, textAlign: "center" }}>
+                <button onClick={handleDifferentOptions} style={{ flex: 1, background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", color: t.accent, padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
                   Get Different<br/>Pairings
                 </button>
               </div>
               <button onClick={onShowShortlist}
-                style={{ width: "100%", background: "#c9a96e", color: "#0d0800", border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 6 }}>
+                style={{ width: "100%", background: t.accent, color: t.bgDeep, border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 14, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 6 }}>
                 ★ Go to My Menu
               </button>
-              <div style={{ color: "#6a5040", fontSize: 10, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+              <div style={{ color: t.textDim, fontSize: 10, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
                 If suggestions repeat, it reflects the limits of our current wine selection for this dish.
               </div>
             </div>
@@ -3479,6 +3616,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
 }
 
 function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {}, tabletLocation = "bar", deviceSetup = {}, locationNames = {}, settings = null }) {
+  const t = useTheme();
   const [visible, setVisible] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const tapTimer = useRef(null);
@@ -3523,7 +3661,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
   return (
     <div style={{
-      background: "#3d2200", minHeight: "100vh", fontFamily: "Georgia, serif",
+      background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif,
       display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "flex-start", padding: "48px 32px 40px",
       opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
@@ -3560,10 +3698,10 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
             style={{
               background: btn.id === "sommelier"
                 ? "rgba(180,120,60,0.18)"
-                : btn.available ? "rgba(201,169,110,0.08)" : "rgba(255,255,255,0.02)",
+                : btn.available ? t.accentDimSm : "rgba(255,255,255,0.02)",
               border: btn.id === "sommelier"
                 ? "1px solid rgba(201,169,110,0.8)"
-                : `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : "rgba(255,255,255,0.08)"}`,
+                : `0.5px solid ${btn.available ? "rgba(201,169,110,0.5)" : t.white08}`,
               borderRadius: 8, padding: "18px 24px",
               display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: btn.available ? "pointer" : "default",
@@ -3571,22 +3709,22 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
               opacity: btn.available ? 1 : 0.35,
             }}
             onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.28)" : "rgba(201,169,110,0.14)"; }}
-            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.18)" : "rgba(201,169,110,0.08)"; }}
+            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? "rgba(180,120,60,0.18)" : t.accentDimSm; }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <span style={{ fontSize: 20 }}>{btn.icon}</span>
               <span style={{
-                color: btn.id === "sommelier" ? "#c9a96e" : btn.available ? "#e8d9b8" : "#5a4a30",
+                color: btn.id === "sommelier" ? t.accent : btn.available ? "#e8d9b8" : "#5a4a30",
                 fontSize: btn.id === "sommelier" ? 14 : btn.id === "nab" ? 13 : 15,
                 letterSpacing: btn.id === "sommelier" ? "1.5px" : btn.id === "nab" ? "1px" : "2px",
-                textTransform: "uppercase", fontFamily: "Georgia, serif",
+                textTransform: "uppercase", fontFamily: t.fontSerif,
                 textAlign: "left", lineHeight: 1.3
               }}>
                 {btn.label}
               </span>
             </div>
             {btn.available ? (
-              <span style={{ color: "#c9a96e", fontSize: 18, lineHeight: 1 }}>›</span>
+              <span style={{ color: t.accent, fontSize: 18, lineHeight: 1 }}>›</span>
             ) : (
               <span style={{ color: "#4e3e24", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
             )}
@@ -3596,13 +3734,13 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
       {/* Shortlist button */}
       {favorites.length > 0 && (
-        <button onClick={onShowShortlist} style={{ marginTop: 24, background: "rgba(201,169,110,0.12)", border: "0.5px solid #c9a96e", color: "#c9a96e", padding: "10px 28px", borderRadius: 24, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 8 }}>
-          ★ My Menu <span style={{ background: "rgba(201,169,110,0.25)", borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
+        <button onClick={onShowShortlist} style={{ marginTop: 24, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "10px 28px", borderRadius: 24, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 8 }}>
+          ★ My Menu <span style={{ background: t.accentBorderSm, borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
         </button>
       )}
 
       {/* Footer */}
-      <div style={{ marginTop: 32, color: "#9a7855", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+      <div style={{ marginTop: 32, color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
         Corduroy Inn & Lodge · Snowshoe Mountain
       </div>
     </div>
@@ -3612,6 +3750,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 // ─── Wine List Screen ─────────────────────────────────────────────────────────
 
 function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist, tabletLocation = "all" }) {
+  const t = useTheme();
   const [activeTier, setActiveTier]       = useState("All");
   const [activeSubgroup, setActiveSubgroup] = useState("All");
   const [activeVarietal, setActiveVarietal] = useState("All");
@@ -3669,7 +3808,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
   const countLeft  = `${availCount} ${availCount === 1 ? "wine" : "wines"}${oosCount > 0 ? ` · ${oosCount} out of stock` : ""}${wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}`;
 
   return (
-    <div style={{ background: "#faf8f4", minHeight: "100vh", fontFamily: "Georgia, serif", maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+    <div style={{ background: t.textPrimary, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
       {/* Shared header — edit ListScreenHeader to change all list screens */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <ListScreenHeader title="Wine List" onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
@@ -3682,7 +3821,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
           </div>
           {activeTier !== "All" && subgroups.length > 2 && (
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
+              <span style={{ color: t.textDim, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
               {subgroups.map(s => (
                 <FilterBtn key={s} small label={s === "All" ? "All" : s.replace(/^(Cellar |House )/, "")}
                   active={activeSubgroup === s}
@@ -3692,7 +3831,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
           )}
           {varietals.length > 2 && (
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-              <span style={{ color: "#6a5040", fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
+              <span style={{ color: t.textDim, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
               {varietals.map(v => (
                 <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
                   active={activeVarietal === v}
@@ -3703,16 +3842,16 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
           <div style={{ padding: "4px 0 10px", position: "relative" }}>
             <input type="text" placeholder="Search wines, grapes, regions…" value={wineSearch}
               onChange={e => setWineSearch(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.07)", border: "0.5px solid rgba(201,169,110,0.25)", color: "#f0e8d8", padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: "Georgia, serif", fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+              style={{ width: "100%", boxSizing: "border-box", background: t.white08, border: "0.5px solid rgba(201,169,110,0.25)", color: t.textPrimary, padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
             />
-            {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5040", cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+            {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
           </div>
         </ListScreenHeader>
       </div>
 
       <ListCountBar left={countLeft} right="☆ Star to save to My Menu" />
 
-      <div style={{ background: "#faf8f4" }}>
+      <div style={{ background: t.textPrimary }}>
         {groupOrder.map((group, gi) => (
           <div key={group}>
             <ListSectionHeading label={group} borderTop={gi > 0} />
@@ -3728,7 +3867,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
           </div>
         ))}
         {searchFiltered.length === 0 && (
-          <div style={{ color: "#b0a090", textAlign: "center", padding: 40, fontSize: 14 }}>
+          <div style={{ color: t.textSecondary, textAlign: "center", padding: 40, fontSize: 14 }}>
             {wineSearch ? `No wines matching "${wineSearch}"` : "No wines in this selection"}
           </div>
         )}
@@ -3750,9 +3889,14 @@ function AppContent() {
   const [wines, setWines] = useState([]);
   const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || null);
   const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
-  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "" });
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
   const [appSettings, setAppSettings] = useState(null);
   function setTabletLocationPersist(loc) { localStorage.setItem("tabletLocation", loc); setTabletLocationState(loc); }
+  const resolvedLocation = tabletLocation || "bar";
+  const barThemeKey = deviceSetup.barTheme || "charcoalAndMaple";
+  const diningThemeKey = deviceSetup.diningTheme || "espressoAndGold";
+  const activeThemeKey = resolvedLocation === "bar" ? barThemeKey : diningThemeKey;
+  const activeTheme = THEMES[activeThemeKey] || THEMES.espressoAndGold;
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -3764,10 +3908,21 @@ function AppContent() {
   const [showShortlist, setShowShortlist] = useState(false);
 
   useEffect(() => {
+    // Inject Google Fonts for Playfair Display (Tuque's theme)
+    if (!document.getElementById('theme-fonts')) {
+      const link = document.createElement('link');
+      link.id = 'theme-fonts';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  useEffect(() => {
     fetch(SETTINGS_URL).then(r => r.json()).then(data => {
       if (data.settings) setAppSettings(data.settings);
       if (data.settings?.locationNames) setLocationNames(data.settings.locationNames);
-      const ds = data.settings?.deviceSetup || { defaultLocation: "bar", barLogo: "", diningLogo: "" };
+      const ds = data.settings?.deviceSetup || { defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" };
       setDeviceSetup(ds);
       // If this device has never been assigned a location, apply the configured default
       if (!localStorage.getItem("tabletLocation")) {
@@ -3844,68 +3999,70 @@ function AppContent() {
     </>
   );
 
-  if (screen === "home") return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>;
-  if (screen === "wine") return <>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
-  if (screen === "sommelier") return <>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
-  if (screen === "cocktails") return <>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
-  if (screen === "nab") return <>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
-  if (screen === "beer") return <>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
-  if (screen === "pours") return <>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>;
+  const wrapTheme = (el) => <ThemeContext.Provider value={activeTheme}>{el}</ThemeContext.Provider>;
+  if (screen === "home") return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
+  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "sommelier") return wrapTheme(<>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "cocktails") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "nab") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "beer") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "pours") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
 
   // AppContent no longer renders the wine list directly
   // All screens accounted for above — return home as fallback
-  return <>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>;
+  return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
 }
 
 function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZoomLabel }) {
+  const t = useTheme();
   const [hovered, setHovered] = useState(false);
   return (
     <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       display: "flex", alignItems: "center", gap: 12,
-      background: selected ? "#f0ebe0" : hovered ? "#f5f0e8" : "transparent",
-      borderLeft: selected ? "2px solid #c9a96e" : "2px solid transparent",
+      background: selected ? "rgba(240,235,224,0.08)" : hovered ? "rgba(240,235,224,0.05)" : "transparent`,
+      borderLeft: selected ? `2px solid ${t.accent}` : `2px solid transparent",
       borderRadius: 8, padding: "11px 8px", cursor: "pointer",
       transition: "all 0.15s", opacity: wine.available === false ? 0.4 : 1
     }}>
       <div
         onClick={onZoomLabel ? e => { e.stopPropagation(); onZoomLabel(); } : undefined}
-        style={{ width: 40, height: 56, borderRadius: 3, background: "#f0ebe0", border: `0.5px solid ${onZoomLabel ? "#c9a96e" : "#e0d8c8"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: onZoomLabel ? "zoom-in" : "default" }}>
+        style={{ width: 40, height: 56, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${onZoomLabel ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: onZoomLabel ? "zoom-in" : "default" }}>
         {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "#502e00", fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        <div style={{ color: t.bgCardHover, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
         {wine.varietal && (
-          <div style={{ color: "#c9a96e", fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
+          <div style={{ color: t.accent, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
             {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
           </div>
         )}
         {wine.description ? (
-          <div style={{ color: "#8a7060", fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{wine.description} <span style={{ color: "#c9a96e", fontSize: 11 }}>Details ›</span></div>
+          <div style={{ color: t.textMuted, fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{wine.description} <span style={{ color: t.accent, fontSize: 11 }}>Details ›</span></div>
         ) : (
-          <div style={{ color: "#c9a96e", fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
+          <div style={{ color: t.accent, fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
         )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        <button onClick={e => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(wine); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: isFavorited ? "#c9a96e" : "#d0c0b0", padding: "2px 0", lineHeight: 1, flexShrink: 0 }}>
+        <button onClick={e => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(wine); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: isFavorited ? t.accent : t.textSecondary, padding: "2px 0", lineHeight: 1, flexShrink: 0 }}>
           {isFavorited ? "★" : "☆"}
         </button>
         <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
         {wine.available === false ? (
-          <div style={{ background: "#f0ebe0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
+          <div style={{ background: "#f5ede0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
         ) : wine.glassPrice && wine.bottlePrice ? (
-          <div style={{ color: "#502e00", fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: "#b0a090" }}>/</span>{Math.round(wine.bottlePrice)}</div>
+          <div style={{ color: t.bgCardHover, fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: t.textSecondary }}>/</span>{Math.round(wine.bottlePrice)}</div>
         ) : wine.glassPrice ? (
           <>
-            <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
-            <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>glass</div>
+            <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>glass</div>
           </>
         ) : wine.bottlePrice ? (
           <>
-            <div style={{ color: "#502e00", fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
-            <div style={{ color: "#b0a090", fontSize: 10, marginTop: 1 }}>bottle</div>
+            <div style={{ color: t.bgCardHover, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>bottle</div>
           </>
         ) : (
-          <span style={{ color: "#c0b0a0", fontSize: 11, fontStyle: "italic" }}>Ask</span>
+          <span style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>Ask</span>
         )}
         </div>
       </div>
