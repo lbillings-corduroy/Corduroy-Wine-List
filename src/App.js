@@ -2703,6 +2703,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 
 function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null }) {
   const t = useTheme();
+  const restaurantName = t.name === "charcoalAndMaple" ? "Tuque's Bar & Grill" : "Appalachia Kitchen";
   function buildOpener() {
     if (selectedFoods.length > 0) {
       const names = selectedFoods.map(f => f.name).join(", ");
@@ -2797,7 +2798,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
 
   return <>
     <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: t.bgOverlay, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: t.bgCard, borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: t.bgBase, borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
 
         {/* Header — X becomes "Done ✓" once something has been added */}
         <div style={{ background: t.bgSurface, borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -2812,11 +2813,11 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         </div>
 
         {/* Message list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", background: t.bgCard }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", background: t.bgBase }}>
           {messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.accentDim : t.bgSurface, color: t.textPrimary, border: m.role === "user" ? `0.5px solid ${t.accentBorder}` : `0.5px solid ${t.borderMid}`, borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.accentDim : t.bgCard, color: t.textPrimary, border: m.role === "user" ? `0.5px solid ${t.accentBorder}` : `0.5px solid ${t.borderMid}`, borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
                   {m.text}
                 </div>
               </div>
@@ -2829,7 +2830,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
                     const sub = s.type === "wine" ? [s.varietal, s.region].filter(Boolean).join(" · ") : s.course;
                     const hasImage = s.type === "wine" && s.imageUrl;
                     return (
-                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? t.successDim : "rgba(201,169,110,0.07)", border: `0.5px solid ${isAdded ? t.success : t.accentBorder}`, borderRadius: 10, padding: "8px 12px" }}>
+                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? t.successDim : t.bgSurface, border: `0.5px solid ${isAdded ? t.success : t.accentBorder}`, borderRadius: 10, padding: "8px 12px" }}>
                         {/* Label thumbnail or emoji fallback */}
                         <div
                           onClick={hasImage ? () => setZoomedLabel(s) : undefined}
@@ -2878,7 +2879,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         </div>
 
         {/* Input bar */}
-        <div style={{ padding: "8px 12px 16px", borderTop: `0.5px solid ${t.borderMid}`, background: t.bgCard, flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <div style={{ padding: "8px 12px 16px", borderTop: `0.5px solid ${t.borderMid}`, background: t.bgBase, flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
             style={{ flex: 1, background: t.bgCard, border: `0.5px solid ${t.borderMid}`, borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.textPrimary, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
           <button onClick={handleSend} disabled={!input.trim() || sending}
@@ -3401,8 +3402,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                   <div style={{ padding: "8px 16px 6px 20px", background: t.bgDeep, display: "flex", alignItems: "center" }}>
                     <div style={{ flex: 1, color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
-                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.textSecondary, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.textSecondary, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
                       <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course === "Dessert" ? "visible" : "hidden" }}>DES</div>
                     </div>
                   </div>
@@ -3428,10 +3429,10 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
                     return (
                           <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: `0.5px solid ${t.borderSubtle}`, background: anySelected ? t.accentDimSm : t.bgSurface, transition: "background 0.15s" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
-                              {food.description && <div style={{ color: t.textMuted, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
+                              <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              {food.description && <div style={{ color: t.textSecondary, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
                             </div>
-                            <div style={{ color: t.textMuted, fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
+                            <div style={{ color: t.textSecondary, fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
                             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                               <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert || (!chkFirst && firstCount >= 4)} />
                               <Chk checked={chkMain}    role="main"    disabled={isDessert || (!chkMain && mainCount >= 4)} />
