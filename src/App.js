@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from "react";
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 
 // ─── Theme System ─────────────────────────────────────────────────────────────
 
@@ -4072,6 +4072,53 @@ function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZ
 
 // ─── Root Export ─────────────────────────────────────────────────────────────
 // Checks for shared menu QR link BEFORE rendering AppContent (avoids hook violations)
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("App crashed:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      const err = this.state.error;
+      const stack = this.state.errorInfo?.componentStack || "";
+      return (
+        <div style={{ minHeight: "100vh", background: "#0e0b09", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+          <div style={{ maxWidth: 480, width: "100%" }}>
+            <div style={{ color: "#c85050", fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>⚠ App Error</div>
+            <div style={{ color: "#ede8e0", fontSize: 18, marginBottom: 16, lineHeight: 1.4 }}>{err?.message || "Something went wrong"}</div>
+            <div style={{ background: "#1a1410", border: "0.5px solid #3e2c1e", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+              <div style={{ color: "#7a6858", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Stack Trace</div>
+              <pre style={{ color: "#b0a090", fontSize: 10, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+                {err?.stack || "No stack available"}
+              </pre>
+            </div>
+            {stack && (
+              <div style={{ background: "#1a1410", border: "0.5px solid #3e2c1e", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+                <div style={{ color: "#7a6858", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Component Stack</div>
+                <pre style={{ color: "#b0a090", fontSize: 10, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>{stack}</pre>
+              </div>
+            )}
+            <button onClick={() => { this.setState({ hasError: false, error: null, errorInfo: null }); window.location.reload(); }}
+              style={{ background: "rgba(200,150,50,0.14)", border: "0.5px solid rgba(200,150,50,0.38)", color: "#c89632", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
   // Short DB-backed code: ?m=ABC123
@@ -4085,5 +4132,5 @@ export default function App() {
       if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} savedAt={sharedFavorites._savedAt} />;
     } catch(e) {}
   }
-  return <AppContent />;
+  return <ErrorBoundary><AppContent /></ErrorBoundary>;
 }
