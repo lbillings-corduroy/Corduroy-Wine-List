@@ -2048,7 +2048,7 @@ function ListCountBar({ left, right }) {
 
 // ─── Generic Item List Screen (Beer, Pours, Cocktails, NAB) ──────────────────
 
-function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all", locationNames = { bar: "Bar", dining: "Dining Room" } }) {
   const t = useTheme();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2257,7 +2257,7 @@ function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBac
       })()}
 
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} locationNames={locationNames} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
@@ -2709,9 +2709,9 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
 //   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
 //                  used to personalise the opening message; null for generic open
 
-function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null }) {
+function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null, locationNames = { bar: "Bar", dining: "Dining Room" } }) {
   const t = useTheme();
-  const restaurantName = tabletLocation === "bar" ? "Tuque's Bar & Grill" : "Appalachia Kitchen";
+  const restaurantName = tabletLocation === "bar" ? (locationNames.bar || "Bar") : tabletLocation === "dining" ? (locationNames.dining || "Dining Room") : (locationNames.bar || "Bar");
   function buildOpener() {
     if (selectedFoods.length > 0) {
       const names = selectedFoods.map(f => f.name).join(", ");
@@ -2812,7 +2812,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
         <div style={{ background: t.bgSurface, borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <div style={{ flex: 1 }}>
             <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
-            <div style={{ color: t.textPrimary, fontSize: 13 }}>Appalachia Kitchen</div>
+            <div style={{ color: t.textPrimary, fontSize: 13 }}>{restaurantName}</div>
           </div>
           <button
             onClick={handleClose}
@@ -3231,7 +3231,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 
 // ─── Sommelier Screen ─────────────────────────────────────────────────────────
 
-function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all", locationNames = { bar: "Bar", dining: "Dining Room" } }) {
   const t = useTheme();
   const [foodItems, setFoodItems] = useState([]);
   const [loadingFood, setLoadingFood] = useState(true);
@@ -3637,7 +3637,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               setToast(added);
             }
           }
-        }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+        }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} locationNames={locationNames} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       {doneModal && (
         <SommelierDoneModal
@@ -3790,7 +3790,7 @@ function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, on
 
 // ─── Wine List Screen ─────────────────────────────────────────────────────────
 
-function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist, tabletLocation = "all" }) {
+function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist, tabletLocation = "all", locationNames = { bar: "Bar", dining: "Dining Room" } }) {
   const t = useTheme();
   const [activeTier, setActiveTier]       = useState("All");
   const [activeSubgroup, setActiveSubgroup] = useState("All");
@@ -3916,7 +3916,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
 
       {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
-      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} locationNames={locationNames} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
       <div style={{ height: 32 }} />
     </div>
@@ -4042,12 +4042,12 @@ function AppContent() {
 
   const wrapTheme = (el) => <ThemeContext.Provider value={activeTheme}>{el}</ThemeContext.Provider>;
   if (screen === "home") return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
-  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
-  if (screen === "sommelier") return wrapTheme(<>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
-  if (screen === "cocktails") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
-  if (screen === "nab") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
-  if (screen === "beer") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
-  if (screen === "pours") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "sommelier") return wrapTheme(<>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "cocktails") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "nab") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "beer") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "pours") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
 
   // AppContent no longer renders the wine list directly
   // All screens accounted for above — return home as fallback
