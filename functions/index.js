@@ -1035,9 +1035,11 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
     if (topLevelMenu) {
       console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — guid: ${guid}`);
       if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
-        topLevelMenu.menuGroups.forEach(subgroup => {
-          collectItems(subgroup, subgroup.name, sortOrder ?? 0, guid);
-          console.log(`  Section "${subgroup.name}" — ${allItems.filter(i => i.course === subgroup.name).length} items`);
+        topLevelMenu.menuGroups.forEach((subgroup, subIdx) => {
+          // Use (menuSortOrder * 1000 + subgroup index) to preserve Toast order within a menu
+          const subgroupSortOrder = (sortOrder ?? 0) * 1000 + subIdx;
+          collectItems(subgroup, subgroup.name, subgroupSortOrder, guid);
+          console.log(`  Section "${subgroup.name}" (order=${subgroupSortOrder}) — ${allItems.filter(i => i.course === subgroup.name).length} items`);
         });
       }
       continue;
