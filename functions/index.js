@@ -2196,7 +2196,7 @@ RESPONSE FORMAT -- you MUST always respond with valid JSON in this exact shape a
   "reply": "Your warm conversational response to the guest here",
   "recommended": ["id:wine-abc123", "id:food-xyz456"]
 }
-The "recommended" array must contain the [id:...] values of every food dish or wine you mention as a recommendation in this turn, taken exactly from the menu above (e.g. if the menu shows "[id:wine-abc123] Opus One 2021", put "wine-abc123" in the array). If you are not recommending specific items this turn (e.g. asking a clarifying question), use an empty array.`;
+The "recommended" array is CRITICAL -- it is how items appear as tappable cards for the guest. EVERY time your reply names a specific dish or wine as a recommendation -- whether it is the first message or a follow-up -- you MUST include its [id:...] value here, taken exactly from the menu above (e.g. if the menu shows "[id:wine-abc123] Opus One 2021", put "wine-abc123" in the array). Never leave this array empty if you named specific items in your reply. Only use an empty array if you asked a clarifying question and recommended nothing specific.`;
 
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
