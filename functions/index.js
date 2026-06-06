@@ -10,7 +10,9 @@ const TOAST_CLIENT_SECRET = process.env.TOAST_CLIENT_SECRET;
 const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-// GUIDs are now configured via Settings — no hardcoded defaults
+const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
+const BEER_MENU_GUID = 'ae7ea1cf-e85d-497a-a210-9a7271daa0ac';
+const POURS_MENU_GUID = 'c07d9143-a7c5-497a-8434-2ab85d44ea48';
 
 // ─── Settings Loader ──────────────────────────────────────────────────────────
 // Reads app settings from Firebase. Falls back to hardcoded GUIDs if settings
@@ -27,9 +29,18 @@ async function getAppSettings() {
   }
 }
 
-// Returns menus of a given menuType from settings. Returns empty array if not configured.
+// Returns menus of a given menuType from settings, with fallback to hardcoded defaults.
 function getMenusOfType(settings, menuType) {
-  return (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
+  const configured = (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
+  if (configured.length > 0) return configured;
+  // Fallback defaults — used until admin configures settings
+  const defaults = {
+    wine:         [{ guid: WINE_MENU_GUID,     label: 'Wine List' }],
+    beer_pours:   [{ guid: BEER_MENU_GUID,     label: 'Beer List' }, { guid: POURS_MENU_GUID, label: 'Premium Pours' }],
+    cocktails_na: [{ guid: COCKTAILS_MENU_GUID, label: 'Specialty Cocktails' }, { guid: NAB_MENU_GUID, label: 'Non-Alcoholic Beverages' }],
+    food:         [],
+  };
+  return defaults[menuType] || [];
 }
 
 // Returns true if a menu is currently available based on the Toast-sourced availability
@@ -215,7 +226,7 @@ function extractItemsFromGroup(group, stockMap, topTier, wines) {
 
 function extractWines(menus, stockData) {
   const wines = [];
-  // wineMenu lookup now uses settings-configured GUIDs only
+  const wineMenu = menus.menus.find(m => m.guid === WINE_MENU_GUID);
   if (!wineMenu) { console.log('Wine menu not found'); return wines; }
   const stockMap = {};
   if (Array.isArray(stockData)) {
@@ -490,33 +501,6 @@ Respond in JSON only (no other text):
   }
 }
 
-// ─── Enrichment Cleanup Helper ───────────────────────────────────────────────
-async function purgeOrphanedEnrichment(db, dataRef, enrichRef, currentIds, label) {
-  const [dataSnap, enrichSnap] = await Promise.all([
-    db.ref(dataRef).once('value'),
-    db.ref(enrichRef).once('value'),
-  ]);
-  const currentIdSet = new Set(currentIds);
-  const deletes = {};
-
-  const dataVal = dataSnap.val() || {};
-  for (const id of Object.keys(dataVal)) {
-    if (!currentIdSet.has(id)) deletes[`${dataRef}/${id}`] = null;
-  }
-
-  const enrichVal = enrichSnap.val() || {};
-  for (const id of Object.keys(enrichVal)) {
-    if (!currentIdSet.has(id)) deletes[`${enrichRef}/${id}`] = null;
-  }
-
-  if (Object.keys(deletes).length > 0) {
-    await db.ref('/').update(deletes);
-    console.log(`[${label}] Purged ${Object.keys(deletes).length} orphaned records`);
-  } else {
-    console.log(`[${label}] No orphaned records found`);
-  }
-}
-
 // ─── Main Wine Sync ───────────────────────────────────────────────────────────
 
 exports.syncWineMenu = functions
@@ -609,8 +593,7 @@ exports.syncBeerMenu = functions
       const beerPourMenus = getMenusOfType(settings, 'beer_pours');
       // Separate beer from pours by looking for "beer" in the label (case-insensitive), else use first
       const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
-      if (beerPourMenus.length === 0) { console.log('No beer/pours menus configured in settings — skipping beer sync'); return null; }
-      const toSync = beerMenus.length > 0 ? beerMenus : [beerPourMenus[0]];
+      const toSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : [{ guid: BEER_MENU_GUID, label: 'Beer List' }]);
 
       const token = await getToastToken();
       const menus = await getMenus(token);
@@ -682,8 +665,7 @@ exports.syncPoursMenu = functions
       const settings = await getAppSettings();
       const beerPourMenus = getMenusOfType(settings, 'beer_pours');
       const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
-      if (beerPourMenus.length === 0) { console.log('No beer/pours menus configured in settings — skipping pours sync'); return null; }
-      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [beerPourMenus[0]]);
+      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [{ guid: POURS_MENU_GUID, label: 'Premium Pours' }]);
 
       const token = await getToastToken();
       const menus = await getMenus(token);
@@ -952,9 +934,72 @@ exports.triggerEnrichment = functions
 
 // ─── Food Menu Constants ──────────────────────────────────────────────────────
 
-// FOOD_GROUPS previously hardcoded — now driven entirely by Settings
+const FOOD_GROUPS = [
+  { name: 'Soups & Salads', guid: 'c12bef8f-e3e0-4a50-8007-7edaddd2f4a2' },
+  { name: 'Starters',       guid: '17cc57c6-8192-42bb-82a4-7a873b2dcf67' },
+  { name: 'Entrees',        guid: '05bad67c-e484-4cca-91a9-59f11ac42628' },
+  { name: 'Dessert',        guid: '3c87ad2b-a3e8-44c4-9fd1-da741d9b0501' },
+];
 
 // ─── Food Extraction ──────────────────────────────────────────────────────────
+
+function extractFoodItems(menus, stockData) {
+  const stockMap = {};
+  if (Array.isArray(stockData)) {
+    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
+  }
+
+  const allItems = [];
+
+  for (const { name: courseName, guid } of FOOD_GROUPS) {
+    // Search all menus for this group GUID
+    let group = null;
+    for (const menu of menus.menus) {
+      group = findGroupByGuid(menu.menuGroups || [], guid);
+      if (group) break;
+    }
+
+    if (!group) {
+      console.log(`Food group "${courseName}" (${guid}) not found`);
+      continue;
+    }
+
+    // Recursively collect all items from this group and its sub-groups
+    function collectItems(g) {
+      if (g.menuItems && g.menuItems.length > 0) {
+        g.menuItems.forEach(item => {
+          const price = item.price || null;
+          // Skip zero-price course markers
+          if (!price || price === 0) return;
+          // Skip out of stock — check both stock inventory API and item's own outOfStock flag
+          const stockInfo = stockMap[item.guid];
+          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+          // Toast marks out of stock by clearing visibility to []
+          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
+          // Avoid duplicates
+          if (allItems.find(i => i.id === item.guid)) return;
+
+          allItems.push({
+            id: item.guid,
+            name: item.name,
+            price,
+            course: courseName,
+            description: item.description || null,
+            available: true,
+          });
+        });
+      }
+      if (g.menuGroups && g.menuGroups.length > 0) {
+        g.menuGroups.forEach(sub => collectItems(sub));
+      }
+    }
+
+    collectItems(group);
+    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
+  }
+
+  return allItems;
+}
 
 // Settings-aware version: accepts a dynamic groups array instead of hardcoded FOOD_GROUPS
 function extractFoodItemsFromGroups(menus, stockData, groups) {
@@ -963,45 +1008,29 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
     stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
   }
   const allItems = [];
-
-  function collectItems(g, courseName, locations) {
-    if (g.menuItems && g.menuItems.length > 0) {
-      g.menuItems.forEach(item => {
-        const price = item.price || null;
-        if (!price || price === 0) return;
-        const stockInfo = stockMap[item.guid];
-        if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-        if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-        if (allItems.find(i => i.id === item.guid)) return;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations });
-      });
-    }
-    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations));
-  }
-
-  for (const { name: configName, guid, locations } of groups) {
-    // locations is [] (all) or ["bar"] / ["dining"] from settings
-    const topLevelMenu = menus.menus.find(m => m.guid === guid);
-    if (topLevelMenu) {
-      console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — pulling subgroups as sections`);
-      if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
-        topLevelMenu.menuGroups.forEach(subgroup => {
-          const courseName = subgroup.name;
-          collectItems(subgroup, courseName, locations || []);
-          console.log(`  Section "${courseName}" — ${allItems.filter(i => i.course === courseName).length} items`);
-        });
-      }
-      continue;
-    }
-
+  for (const { name: courseName, guid } of groups) {
     let group = null;
     for (const menu of menus.menus) {
       group = findGroupByGuid(menu.menuGroups || [], guid);
       if (group) break;
     }
-    if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName, locations || []);
-    console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
+    if (!group) { console.log(`Food group "${courseName}" (${guid}) not found`); continue; }
+    function collectItems(g) {
+      if (g.menuItems && g.menuItems.length > 0) {
+        g.menuItems.forEach(item => {
+          const price = item.price || null;
+          if (!price || price === 0) return;
+          const stockInfo = stockMap[item.guid];
+          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
+          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
+          if (allItems.find(i => i.id === item.guid)) return;
+          allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
+        });
+      }
+      if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub));
+    }
+    collectItems(group);
+    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
   }
   return allItems;
 }
@@ -1016,8 +1045,9 @@ exports.syncFoodMenu = functions
       const settings = await getAppSettings();
       const foodMenuConfigs = getMenusOfType(settings, 'food');
 
-      const dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid, locations: m.locations || [] }));
-      if (dynamicFoodGroups.length === 0) { console.log('No food menus configured in settings — skipping food sync'); return null; }
+      // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
+      let dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid, locations: m.locations || [] }));
+      if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
 
       const token = await getToastToken();
       const menus = await getMenus(token);
@@ -1027,10 +1057,22 @@ exports.syncFoodMenu = functions
       const freshItems = extractFoodItemsFromGroups(menus, stockData, dynamicFoodGroups);
 
       const db = admin.database();
+      // Merge locations when the same item appears in multiple menu configs
+      // (e.g. AK Entrees subgroup appears in both AK master menu and standalone Tuque's entry)
       const foodById = {};
-      freshItems.forEach(item => { foodById[item.id] = item; });
+      freshItems.forEach(item => {
+        if (foodById[item.id]) {
+          // Item already seen — merge locations arrays
+          const existing = foodById[item.id].locations || [];
+          const incoming = item.locations || [];
+          const merged = [...new Set([...existing, ...incoming])];
+          foodById[item.id] = { ...foodById[item.id], locations: merged };
+        } else {
+          foodById[item.id] = item;
+        }
+      });
       await db.ref('foodItems').set(foodById);
-      await db.ref('foodOrder').set(freshItems.map(i => i.id));
+      await db.ref('foodOrder').set([...new Set(freshItems.map(i => i.id))]);
       await db.ref('foodLastUpdated').set(Date.now());
 
       console.log(`Food sync complete — saved ${freshItems.length} items`);
@@ -1059,18 +1101,10 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     const lastUpdated = lastUpdatedSnap.val();
     const exclusions = exclusionsSnap.val() || {};
 
-    const requestedLocation = req.query.location || req.body?.location || null;
-
     const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
       : Object.values(foodById)
-    ).filter(item => {
-      // If a location is requested, only return items whose menu is assigned to that location
-      // Items with empty locations array are available everywhere
-      if (!requestedLocation) return true;
-      const locs = item.locations || [];
-      return locs.length === 0 || locs.includes(requestedLocation);
-    }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
+    ).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
@@ -1102,13 +1136,7 @@ exports.getPairing = functions
         const wine = wineSnap.val();
         if (!wine) return res.status(404).json({ error: 'Wine not found' });
         const enrich = enrichSnap.val() || {};
-        const requestedLocation = req.body.location || null;
-        const allFoodItems = Object.values(foodSnap.val() || {});
-        const foodItems = allFoodItems.filter(f => {
-          if (!requestedLocation) return true;
-          const locs = f.locations || [];
-          return locs.length === 0 || locs.includes(requestedLocation);
-        });
+        const foodItems = Object.values(foodSnap.val() || {});
 
         const wineName = enrich.correctedName || wine.name;
         const foodList = foodItems
@@ -1755,7 +1783,7 @@ exports.sommelierChat = functions
     if (req.method === 'OPTIONS') return res.status(204).send('');
 
     try {
-      const { messages, contextItem, selectedFoods, location: tabletLocation } = req.body;
+      const { messages, contextItem, selectedFoods } = req.body;
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'messages array required' });
       }
@@ -1811,13 +1839,7 @@ exports.sommelierChat = functions
       const orderedWines = (wineOrder.length > 0
         ? wineOrder.map(id => winesById[id]).filter(Boolean)
         : Object.values(winesById)
-      ).filter(w => {
-        if (w.available === false) return false;
-        if (wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved) return false;
-        if (!tabletLocation) return true;
-        const menuForWine = configuredMenus.filter(m => m.menuType === 'wine');
-        return menuForWine.length === 0 || menuForWine.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
-      });
+      ).filter(w => w.available !== false && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
 
       const wineLines = orderedWines.map(w => {
         const e = wineEnrich[w.id] || {};
@@ -1836,12 +1858,7 @@ exports.sommelierChat = functions
       const orderedBeers = (beerOrder.length > 0
         ? beerOrder.map(id => beersById[id]).filter(Boolean)
         : Object.values(beersById)
-      ).filter(b => {
-        if (b.available === false) return false;
-        if (!tabletLocation) return true;
-        const beerMenus = configuredMenus.filter(m => m.menuType === 'beer_pours');
-        return beerMenus.length === 0 || beerMenus.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
-      });
+      ).filter(b => b.available !== false);
 
       const beerLines = orderedBeers.map(b => {
         const e = beerEnrich[b.id] || {};
@@ -1856,12 +1873,7 @@ exports.sommelierChat = functions
       const orderedPours = (poursOrder.length > 0
         ? poursOrder.map(id => poursById[id]).filter(Boolean)
         : Object.values(poursById)
-      ).filter(p => {
-        if (p.available === false) return false;
-        if (!tabletLocation) return true;
-        const pourMenus = configuredMenus.filter(m => m.menuType === 'beer_pours');
-        return pourMenus.length === 0 || pourMenus.some(m => { const locs = m.locations || []; return locs.length === 0 || locs.includes(tabletLocation); });
-      });
+      ).filter(p => p.available !== false);
 
       const pourLines = orderedPours.map(p => {
         const e = poursEnrich[p.id] || {};
@@ -1895,19 +1907,14 @@ exports.sommelierChat = functions
         return `  - ${n.name}${n.subgroup ? ` (${n.subgroup})` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
       });
 
-      // Build food menu grouped by course — filtered by tablet location
+      // Build food menu grouped by course
       const foodById = foodSnap.val() || {};
       const foodOrder = foodOrderSnap.val() || [];
       const exclusions = exclusionsSnap.val() || {};
       const orderedFood = (foodOrder.length > 0
         ? foodOrder.map(id => foodById[id]).filter(Boolean)
         : Object.values(foodById)
-      ).filter(f => {
-        if (exclusions[f.id]) return false;
-        if (!tabletLocation) return true;
-        const locs = f.locations || [];
-        return locs.length === 0 || locs.includes(tabletLocation);
-      });
+      ).filter(f => !exclusions[f.id]);
 
       const foodByCourse = {};
       orderedFood.forEach(f => {
@@ -1929,15 +1936,6 @@ exports.sommelierChat = functions
         (cocktailsNAAvailable && nabLines.length)     ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
         (foodAvailable && foodSection)                ? `FOOD MENU:\n${foodSection}` : null,
       ].filter(Boolean).join('\n\n');
-
-      const locationName = tabletLocation === 'bar'
-        ? (appSettings.locationNames?.bar || 'the bar')
-        : tabletLocation === 'dining'
-        ? (appSettings.locationNames?.dining || 'the dining room')
-        : null;
-      const locationContext = locationName
-        ? `\n\nIMPORTANT: This tablet is located in ${locationName}. Only recommend food and beverages available in ${locationName}. Do not mention or suggest items from other areas of the restaurant.`
-        : '';
 
       let contextLine;
       if (selectedFoods && selectedFoods.length > 0) {
@@ -2180,17 +2178,7 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
 
         if (found) {
           menuName = found.name;
-          // Handle both Toast field name variants
-          if (found.availabilitySchedules && found.availabilitySchedules.length > 0) {
-            availSchedule = found.availabilitySchedules;
-          } else if (found.availability && found.availability.schedule && found.availability.schedule.length > 0) {
-            availSchedule = found.availability.schedule.map(s => ({
-              availableDays: s.days || null,
-              timeRanges: (s.timeRanges || []).map(tr => ({ startTime: tr.start, endTime: tr.end }))
-            }));
-          } else {
-            availSchedule = null;
-          }
+          availSchedule = found.availabilitySchedules || null;
           // Count all items recursively
           function countItems(group) {
             let c = (group.menuItems || []).length;
@@ -2206,23 +2194,10 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
             if (group) {
               found = group;
               menuName = group.name;
-              // Inherit availability from parent menu — Toast uses different field names
-              // depending on whether it's a top-level menu (availabilitySchedules) or
-              // returned via the availability field with a different structure
-              if (m.availabilitySchedules && m.availabilitySchedules.length > 0) {
-                availSchedule = m.availabilitySchedules;
-              } else if (m.availability && m.availability.schedule && m.availability.schedule.length > 0) {
-                // Convert to the same shape our parser expects
-                availSchedule = m.availability.schedule.map(s => ({
-                  availableDays: s.days || null,
-                  timeRanges: (s.timeRanges || []).map(tr => ({
-                    startTime: tr.start,
-                    endTime: tr.end
-                  }))
-                }));
-              } else {
-                availSchedule = null;
-              }
+              // Groups never have their own schedule in Toast — always inherit from parent menu
+              availSchedule = (m.availabilitySchedules && m.availabilitySchedules.length > 0)
+                ? m.availabilitySchedules
+                : null;
               function countGrpItems(g) {
                 let c = (g.menuItems || []).length;
                 (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
