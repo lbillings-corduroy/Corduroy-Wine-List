@@ -2135,11 +2135,16 @@ exports.sommelierChat = functions
       ].filter(Boolean).join('\n\n');
 
       let contextLine;
+      let persistentContext = '';
       if (selectedFoods && selectedFoods.length > 0) {
         const foodNames = selectedFoods.map(f => f.name).join(', ');
         contextLine = `The guest has selected the following dishes and wants wine pairing recommendations: ${foodNames}. Use these as your starting point and recommend wines from the menu that pair well with this specific selection.`;
+      } else if (contextItem && contextItem.type === 'wine') {
+        contextLine = `The guest is viewing the ${contextItem.name} wine and opened this chat to learn more or find food pairings. Keep this wine as your anchor throughout the entire conversation.`;
+        persistentContext = `
+REMEMBER: This entire conversation is anchored to the ${contextItem.name}. Whenever you recommend food or discuss pairings -- even if the guest asks general questions first -- always connect your recommendations back to how they pair with this specific wine. Never lose sight of the wine the guest is looking at.`;
       } else if (contextItem) {
-        contextLine = `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Use that as your starting point.`;
+        contextLine = `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Keep this item as your anchor throughout the conversation.`;
       } else {
         contextLine = 'The guest opened this chat from the main menu.';
       }
@@ -2175,7 +2180,7 @@ exports.sommelierChat = functions
       // surface every recommendation as an actionable chip -- no fuzzy matching needed
       const systemPrompt = `You are the virtual sommelier and food & beverage guide at ${thisLocationName} at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
 
-${contextLine}
+${contextLine}${persistentContext}
 
 You have full access to tonight's complete menu below. Use it to give specific, confident recommendations by name. When a guest asks about food pairings, dietary needs, or what's available, answer directly from the menu -- do not tell guests to ask their server for information you already have here.
 
@@ -2225,8 +2230,10 @@ The "recommended" array is CRITICAL -- it is how items appear as tappable cards 
         const parsed = JSON.parse(jsonStart !== -1 && jsonEnd !== -1 ? raw.slice(jsonStart, jsonEnd + 1) : raw);
         reply = parsed.reply || '';
         // Resolve each recommended ID to its full menu item object
+        // The AI returns ids with optional "id:" prefix — strip it before lookup
         const recommended = parsed.recommended || [];
-        for (const id of recommended) {
+        for (const raw of recommended) {
+          const id = typeof raw === 'string' ? raw.replace(/^id:/, '') : raw;
           if (wineById[id]) {
             suggestions.push({ type: 'wine', ...wineById[id] });
           } else if (foodById2[id]) {
