@@ -1012,7 +1012,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
   }
   const allItems = [];
 
-  function collectItems(g, courseName, locations, sortOrder) {
+  function collectItems(g, courseName, locations, sortOrder, menuGuid) {
     if (g.menuItems && g.menuItems.length > 0) {
       g.menuItems.forEach(item => {
         const price = item.price || null;
@@ -1021,10 +1021,10 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
         if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
         if (allItems.find(i => i.id === item.guid)) return;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [], menuSortOrder: sortOrder ?? 0 });
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [], menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
       });
     }
-    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations, sortOrder));
+    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations, sortOrder, menuGuid));
   }
 
   for (const { name: configName, guid, locations, sortOrder } of groups) {
@@ -1048,7 +1048,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
       if (group) break;
     }
     if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName, locations || [], sortOrder ?? 0);
+    collectItems(group, configName, locations || [], sortOrder ?? 0, guid);
     console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
@@ -1130,14 +1130,43 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
 
     const requestedLocation = req.query.location || req.body?.location || null;
 
+    // Load availability cache to filter menus by current time
+    const settingsSnap = await db.ref('appSettings').once('value');
+    const appSettings = settingsSnap.val() || {};
+    const toastAvailCache = appSettings.toastAvailability || {};
+    const configuredMenus = appSettings.settings?.menus || [];
+
+    // Build set of currently-available menu GUIDs for the requested location
+    const availableMenuGuids = new Set();
+    configuredMenus.forEach(menu => {
+      if (menu.menuType !== 'food') return;
+      // Check location match
+      const locs = menu.locations || [];
+      if (requestedLocation && locs.length > 0 && !locs.includes(requestedLocation)) return;
+      // Check availability schedule
+      if (isMenuAvailableNow(menu, toastAvailCache)) {
+        availableMenuGuids.add(menu.guid);
+      }
+    });
+
+    // If we have configured food menus, use availability filtering
+    // If no configured menus found, fall back to showing everything
+    const useAvailabilityFilter = configuredMenus.some(m => m.menuType === 'food');
+
     const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
       : Object.values(foodById)
     ).filter(item => {
-      // Filter by location if requested
-      if (!requestedLocation) return true;
-      const locs = item.locations || [];
-      return locs.length === 0 || locs.includes(requestedLocation);
+      // Location filter
+      if (requestedLocation) {
+        const locs = item.locations || [];
+        if (locs.length > 0 && !locs.includes(requestedLocation)) return false;
+      }
+      // Availability filter — only show items from currently-available menus
+      if (useAvailabilityFilter && item.menuGuid) {
+        return availableMenuGuids.has(item.menuGuid);
+      }
+      return true;
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     res.json({ foodItems: ordered, lastUpdated });
