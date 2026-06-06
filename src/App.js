@@ -3393,10 +3393,10 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           </div>
           <div style={{ background: t.accentDimSm, border: `0.5px solid ${t.accentBorderSm}`, borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
             <div style={{ color: t.textPrimary, fontSize: 13, fontFamily: t.fontSerif, fontWeight: 500, marginBottom: 3 }}>
-              Select up to 4 dishes, then tap <span style={{ color: t.accent }}>Get Wine Pairings</span> below
+              Select your dishes, then tap <span style={{ color: t.accent }}>Get Wine Pairings</span> to find the perfect match
             </div>
             <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", lineHeight: 1.5 }}>
-              Choose dishes from any course — for larger parties, run the pairing a second time.
+              Choose up to 4 per course — for larger parties, run the sommelier a second time.
             </div>
           </div>
           </>
