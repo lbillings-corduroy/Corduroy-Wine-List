@@ -2557,7 +2557,11 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
     <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: t.borderStrong, cursor: "pointer", fontSize: 20, padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}>×</button>
   );
 
-  const WineCard = ({ item }) => (
+  const WineCard = ({ item }) => {
+    const [expanded, setExpanded] = React.useState(false);
+    const desc = item.description || item.reason || null;
+    const truncated = desc && desc.length > 100 ? desc.slice(0, 100) + "…" : desc;
+    return (
     <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         {item.imageUrl
@@ -2570,12 +2574,20 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
             {item.glassPrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: t.textSecondary }}>glass</span></div>}
             {item.bottlePrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: t.textSecondary }}>bottle</span></div>}
           </div>
+          {desc && (
+            <div style={{ marginTop: 6 }}>
+              <span style={{ color: t.textDim, fontSize: 11, lineHeight: 1.5, fontStyle: "italic" }}>{expanded ? desc : truncated}</span>
+              {desc.length > 100 && (
+                <span onClick={() => setExpanded(e => !e)} style={{ color: t.accent, fontSize: 11, cursor: "pointer", marginLeft: 4 }}>{expanded ? " less" : " more"}</span>
+              )}
+            </div>
+          )}
         </div>
         <RemoveBtn item={item} />
       </div>
-      {item.reason && <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
     </div>
-  );
+    );
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
@@ -2621,7 +2633,7 @@ function ShortlistScreen({ favorites, onRemove, onClose }) {
                       <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
-                        {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
+                        {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.5 }}>{item.description}</div>}
                         {item.price && <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
                       </div>
                       <RemoveBtn item={item} />
@@ -4082,7 +4094,7 @@ function AppContent() {
 
   const wrapTheme = (el) => <ThemeContext.Provider value={activeTheme}>{el}</ThemeContext.Provider>;
   if (screen === "home") return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
-  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
+  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
   if (screen === "sommelier") return wrapTheme(<>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
   if (screen === "cocktails") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
   if (screen === "nab") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} locationNames={locationNames} /></>);
