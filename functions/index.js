@@ -2281,7 +2281,17 @@ exports.saveSettings = functions.https.onRequest(async (req, res) => {
 
         if (found) {
           menuName = found.name;
-          availSchedule = found.availabilitySchedules || null;
+          // Handle both Toast field name variants for top-level menus
+          if (found.availabilitySchedules && found.availabilitySchedules.length > 0) {
+            availSchedule = found.availabilitySchedules;
+          } else if (found.availability && found.availability.schedule && found.availability.schedule.length > 0) {
+            availSchedule = found.availability.schedule.map(s => ({
+              availableDays: s.days || null,
+              timeRanges: (s.timeRanges || []).map(tr => ({ startTime: tr.start, endTime: tr.end }))
+            }));
+          } else {
+            availSchedule = null;
+          }
           // Count all items recursively
           function countItems(group) {
             let c = (group.menuItems || []).length;
