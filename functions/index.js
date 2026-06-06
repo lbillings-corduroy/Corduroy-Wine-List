@@ -1128,10 +1128,17 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     const lastUpdated = lastUpdatedSnap.val();
     const exclusions = exclusionsSnap.val() || {};
 
+    const requestedLocation = req.query.location || req.body?.location || null;
+
     const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
       : Object.values(foodById)
-    ).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
+    ).filter(item => {
+      // Filter by location if requested
+      if (!requestedLocation) return true;
+      const locs = item.locations || [];
+      return locs.length === 0 || locs.includes(requestedLocation);
+    }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
@@ -1163,7 +1170,13 @@ exports.getPairing = functions
         const wine = wineSnap.val();
         if (!wine) return res.status(404).json({ error: 'Wine not found' });
         const enrich = enrichSnap.val() || {};
-        const foodItems = Object.values(foodSnap.val() || {});
+        const pairingLocation = req.body.location || null;
+        const allFoodItems = Object.values(foodSnap.val() || {});
+        const foodItems = allFoodItems.filter(f => {
+          if (!pairingLocation) return true;
+          const locs = f.locations || [];
+          return locs.length === 0 || locs.includes(pairingLocation);
+        });
 
         const wineName = enrich.correctedName || wine.name;
         const foodList = foodItems
