@@ -1133,8 +1133,8 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     // Load availability cache to filter menus by current time
     const settingsSnap = await db.ref('appSettings').once('value');
     const appSettings = settingsSnap.val() || {};
-    const toastAvailCache = appSettings.toastAvailability || {};
-    const configuredMenus = appSettings.settings?.menus || [];
+    const toastAvailCache = appSettings.toastAvailability || appSettings.settings?.toastAvailability || {};
+    const configuredMenus = appSettings.menus || appSettings.settings?.menus || [];
 
     // Build set of currently-available menu GUIDs for the requested location
     const availableMenuGuids = new Set();
@@ -1953,7 +1953,7 @@ exports.sommelierChat = functions
       // Check which menu types are currently available per Toast-sourced schedule
       const appSettings = appSettingsSnap.val() || {};
       const configuredMenus = appSettings.menus || [];
-      const toastAvailCache = appSettings.toastAvailability || {};
+      const toastAvailCache = appSettings.toastAvailability || appSettings.settings?.toastAvailability || {};
       function isTypeAvailableNow(menuType) {
         const menusOfType = configuredMenus.filter(m => m.menuType === menuType);
         if (menusOfType.length === 0) return true; // not configured — assume available
