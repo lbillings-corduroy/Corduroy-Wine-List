@@ -2794,7 +2794,31 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
   }
 
   // When closing, fire toast if anything was added
+  const [winePrompt, setWinePrompt] = useState(false);
+
   function handleClose() {
+    // If chat opened from a wine detail page and guest hasn't added that wine yet, prompt them
+    if (contextItem && contextItem.type && contextItem.type !== "food" && contextItem.wineId) {
+      const alreadyAdded = favorites.some(f => f.id === contextItem.wineId);
+      if (!alreadyAdded) {
+        setWinePrompt(true);
+        return;
+      }
+    }
+    onClose(addedThisSession.length > 0 ? addedThisSession : null);
+  }
+
+  function handleWinePromptAdd() {
+    if (contextItem?.wineId && contextItem?.wineFull) {
+      onToggleFavorite({ ...contextItem.wineFull, fromPairing: false }, "wine");
+      setAddedThisSession(prev => [...prev, { type: "wine", id: contextItem.wineId, name: contextItem.name }]);
+    }
+    setWinePrompt(false);
+    onClose(addedThisSession.length > 0 ? addedThisSession : [{ type: "wine", id: contextItem?.wineId, name: contextItem?.name }]);
+  }
+
+  function handleWinePromptSkip() {
+    setWinePrompt(false);
     onClose(addedThisSession.length > 0 ? addedThisSession : null);
   }
 
@@ -2805,6 +2829,19 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
   messages.forEach((m, i) => { if (m.role === "assistant" && m.suggestions?.length > 0) lastSuggestionMsgIndex = i; });
 
   return <>
+    {winePrompt && contextItem && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ background: t.bgSurface, borderRadius: 14, padding: "24px 20px", maxWidth: 340, width: "100%", fontFamily: t.fontSerif, textAlign: "center" }}>
+          <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 10 }}>Add to My Menu?</div>
+          <div style={{ color: t.textPrimary, fontSize: 15, marginBottom: 6 }}>{contextItem.name}</div>
+          <div style={{ color: t.textDim, fontSize: 12, lineHeight: 1.6, marginBottom: 20 }}>Would you like to save this wine to your menu before you go?</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={handleWinePromptSkip} style={{ flex: 1, background: "transparent", border: `0.5px solid ${t.borderMid}`, color: t.textSecondary, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif }}>No thanks</button>
+            <button onClick={handleWinePromptAdd} style={{ flex: 1, background: t.accent, border: "none", color: t.bgDeep, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, fontWeight: 600 }}>☆ Add to My Menu</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: t.bgOverlay, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: t.bgBase, borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
 
@@ -2851,6 +2888,7 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: t.textPrimary, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                           {sub && <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
+                          {s.description && <div style={{ color: t.textDim, fontSize: 11, lineHeight: 1.4, marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{s.description}</div>}
                           {hasImage && <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
                         </div>
                         <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? t.successDim : t.bgSurface, border: isAdded ? `0.5px solid ${t.success}` : "none", color: isAdded ? t.success : t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -3100,7 +3138,7 @@ function LabelModal({ wine, onClose }) {
 
 // ─── Wine Detail Panel ────────────────────────────────────────────────────────
 
-function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, tabletLocation = "all" }) {
+function WineDetailPanel({ wine, onClose, onOpenChat, onZoomLabel, favorites = [], onToggleFavorite, tabletLocation = "all" }) {
   const t = useTheme();
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingResult, setPairingResult] = useState(null);
@@ -3141,7 +3179,9 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
   return (
     <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+        <div
+          onClick={wine.imageUrl && onZoomLabel ? () => onZoomLabel(wine) : undefined}
+          style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${wine.imageUrl && onZoomLabel ? t.accent : t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: wine.imageUrl && onZoomLabel ? "zoom-in" : "default" }}>
           {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3186,7 +3226,7 @@ function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFa
 
       {!pairingLoading && (
         <div style={{ display: "flex", gap: 8, marginBottom: pairingResult ? 14 : 0 }}>
-          <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine" })}
+          <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine", wineId: wine.id, wineFull: { id: wine.id, name: wine.name, varietal: wine.varietal || null, region: wine.region || null, glassPrice: wine.glassPrice || null, bottlePrice: wine.bottlePrice || null, imageUrl: wine.imageUrl || null } })}
             style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
             ✦ Chat with Our<br/>Virtual Sommelier
           </button>
@@ -3914,7 +3954,7 @@ function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShor
         )}
       </div>
 
-      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} onZoomLabel={(w) => setZoomedLabel(w)} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
       <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
       <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} locationNames={locationNames} />
       {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
