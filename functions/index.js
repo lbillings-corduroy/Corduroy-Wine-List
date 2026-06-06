@@ -1019,12 +1019,10 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         const stockInfo = stockMap[item.guid];
         const isOOS = stockInfo && stockInfo.status === 'OUT_OF_STOCK';
         const isHidden = Array.isArray(item.visibility) && item.visibility.length === 0;
-        const isDupe = !!allItems.find(i => i.id === item.guid);
-        console.log(`[food-debug] "${courseName}" item="${item.name}" price=${price} OOS=${isOOS} hidden=${isHidden} dupe=${isDupe}`);
         if (!price || price === 0) return;
         if (isOOS) return;
         if (isHidden) return;
-        if (isDupe) return;
+        // Same item GUID from different menus simply overwrites — last write wins
         allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
       });
     }
@@ -1091,16 +1089,9 @@ exports.syncFoodMenu = functions
       console.log('[syncFoodMenu] Location distribution:', JSON.stringify(locationSummary));
 
       // Step 1: Merge locations within this sync batch
+      // Write by item.id — same GUID overwrites, last menu's data wins
       const foodById = {};
-      freshItems.forEach(item => {
-        if (foodById[item.id]) {
-          const existing = foodById[item.id].locations || [];
-          const incoming = item.locations || [];
-          foodById[item.id] = { ...foodById[item.id], locations: [...new Set([...existing, ...incoming])] };
-        } else {
-          foodById[item.id] = item;
-        }
-      });
+      freshItems.forEach(item => { foodById[item.id] = item; });
 
       await db.ref('foodItems').set(foodById);
       await db.ref('foodOrder').set([...new Set(freshItems.map(i => i.id))]);
@@ -1164,13 +1155,8 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
       : Object.values(foodById)
     ).filter(item => {
       if (!useMenuFilter) return true;
-      // Filter by menu — item must belong to an allowed menu
       if (item.menuGuid) return allowedMenuGuids.has(item.menuGuid);
-      // Fallback for items without menuGuid — show if any allowed menu has no location restriction
-      return allowedMenuGuids.size > 0 && [...allowedMenuGuids].some(guid => {
-        const m = foodMenus.find(fm => fm.guid === guid);
-        return !m || (m.locations || []).length === 0;
-      });
+      return allowedMenuGuids.size > 0;
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     console.log(`[getFoodItems] returned ${ordered.length} items`);
