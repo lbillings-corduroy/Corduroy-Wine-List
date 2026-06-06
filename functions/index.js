@@ -1642,7 +1642,7 @@ exports.syncStockOnly = functions
           if (newAvailable === undefined) return; // not in stock data — leave as-is
           const currentAvailable = item.available !== false;
           if (newAvailable !== currentAvailable) {
-            updates[\`\${node}/\${id}/available\`] = newAvailable;
+            updates[`${node}/${id}/available`] = newAvailable;
             totalUpdated++;
           }
         });
@@ -1652,7 +1652,7 @@ exports.syncStockOnly = functions
         }
       }
 
-      console.log(\`[stockSync] Updated \${totalUpdated} item availability changes\`);
+      console.log(`[stockSync] Updated ${totalUpdated} item availability changes`);
       await db.ref('stockLastChecked').set(Date.now());
       return null;
     } catch (e) {
