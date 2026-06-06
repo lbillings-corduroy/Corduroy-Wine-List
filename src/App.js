@@ -3349,7 +3349,13 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
   }
 
   const availableFood = foodItems.filter(f => !f.excluded);
-  const courses = ["All", ...new Set(availableFood.map(f => f.course))];
+  const chipSortMap = {};
+  availableFood.forEach(f => {
+    if (chipSortMap[f.course] === undefined) chipSortMap[f.course] = f.menuSortOrder ?? 999;
+    else chipSortMap[f.course] = Math.min(chipSortMap[f.course], f.menuSortOrder ?? 999);
+  });
+  const courses = ["All", ...[...new Set(availableFood.map(f => f.course))]
+    .sort((a, b) => (chipSortMap[a] ?? 999) - (chipSortMap[b] ?? 999))];
   const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
 
   return (
