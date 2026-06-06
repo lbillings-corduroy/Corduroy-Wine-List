@@ -669,6 +669,15 @@ function SettingsTab() {
           )}
         </div>
 
+        {/* Sort Order */}
+        <div>
+          <label style={labelStyle}>Sort Order</label>
+          <input type="number" style={{ ...inputStyle, marginBottom: 0 }} placeholder="0"
+            value={draft.sortOrder ?? 0}
+            onChange={e => setDraft(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} />
+          <div style={{ ...hintText }}>Lower numbers appear first in the pairing screen. Use 0, 10, 20... to leave room for reordering.</div>
+        </div>
+
         {/* Toast Availability — read-only display */}
         <div>
           <label style={labelStyle}>Availability (from Toast)</label>
@@ -1427,7 +1436,14 @@ function FoodManagerTab() {
 
   if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading food menu…</div>;
 
-  const courseOrder = [...new Map(foodItems.map(f => [f.course, true])).keys()];
+  // Sort courses by menuSortOrder, then by first appearance
+  const courseSortMap = {};
+  foodItems.forEach(f => {
+    if (courseSortMap[f.course] === undefined) courseSortMap[f.course] = f.menuSortOrder ?? 999;
+    else courseSortMap[f.course] = Math.min(courseSortMap[f.course], f.menuSortOrder ?? 999);
+  });
+  const courseOrder = [...new Map(foodItems.map(f => [f.course, true])).keys()]
+    .sort((a, b) => (courseSortMap[a] ?? 999) - (courseSortMap[b] ?? 999));
   const byCourse = {};
   foodItems.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
 
@@ -3394,7 +3410,13 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
             {loadingFood ? (
               <div style={{ color: t.textSecondary, textAlign: "center", padding: 40 }}>Loading menu…</div>
             ) : (() => {
-              const courseOrder = [...new Map(filtered.map(f => [f.course, true])).keys()];
+              const courseSortMap2 = {};
+              filtered.forEach(f => {
+                if (courseSortMap2[f.course] === undefined) courseSortMap2[f.course] = f.menuSortOrder ?? 999;
+                else courseSortMap2[f.course] = Math.min(courseSortMap2[f.course], f.menuSortOrder ?? 999);
+              });
+              const courseOrder = [...new Map(filtered.map(f => [f.course, true])).keys()]
+                .sort((a, b) => (courseSortMap2[a] ?? 999) - (courseSortMap2[b] ?? 999));
               const byCourse = {};
               filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
               return courseOrder.map(course => (
