@@ -1023,7 +1023,8 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (isOOS) return;
         if (isHidden) return;
         // Same item GUID from different menus simply overwrites — last write wins
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null, menuGuids: menuGuid ? [menuGuid] : [] });
+        const itemSortOrders = {}; if (menuGuid) itemSortOrders[menuGuid] = sortOrder ?? 0;
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null, menuGuids: menuGuid ? [menuGuid] : [], menuSortOrders: itemSortOrders });
       });
     }
     if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, sortOrder, menuGuid));
@@ -1095,13 +1096,12 @@ exports.syncFoodMenu = functions
       const foodById = {};
       freshItems.forEach(item => {
         if (foodById[item.id]) {
-          // Merge menuGuids arrays
-          const existing = foodById[item.id].menuGuids || [];
-          const incoming = item.menuGuids || [];
-          const merged = [...new Set([...existing, ...incoming])];
-          // Keep best menuSortOrder (lowest = first)
-          const bestSortOrder = Math.min(foodById[item.id].menuSortOrder ?? 999, item.menuSortOrder ?? 999);
-          foodById[item.id] = { ...item, menuGuids: merged, menuSortOrder: bestSortOrder };
+          const existingGuids = foodById[item.id].menuGuids || [];
+          const incomingGuids = item.menuGuids || [];
+          const mergedGuids = [...new Set([...existingGuids, ...incomingGuids])];
+          // Merge menuSortOrders map
+          const mergedSortOrders = { ...(foodById[item.id].menuSortOrders || {}), ...(item.menuSortOrders || {}) };
+          foodById[item.id] = { ...item, menuGuids: mergedGuids, menuSortOrders: mergedSortOrders };
         } else {
           foodById[item.id] = item;
         }
@@ -1166,12 +1166,18 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
       : Object.values(foodById)
     ).filter(item => {
       if (!useMenuFilter) return true;
-      // item.menuGuids is an array of all menus this item belongs to
-      // item.menuGuid (singular) is legacy — check both
       const itemGuids = item.menuGuids || (item.menuGuid ? [item.menuGuid] : []);
       if (itemGuids.length === 0) return allowedMenuGuids.size > 0;
       return itemGuids.some(g => allowedMenuGuids.has(g));
-    }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
+    }).map(item => {
+      // Pick the menuSortOrder for whichever allowed menu this item matched
+      const itemGuids = item.menuGuids || (item.menuGuid ? [item.menuGuid] : []);
+      const matchedGuid = itemGuids.find(g => allowedMenuGuids.has(g));
+      const resolvedSortOrder = (item.menuSortOrders && matchedGuid)
+        ? (item.menuSortOrders[matchedGuid] ?? item.menuSortOrder ?? 0)
+        : (item.menuSortOrder ?? 0);
+      return { ...item, menuSortOrder: resolvedSortOrder, excluded: exclusions[item.id] === true };
+    });
 
     console.log(`[getFoodItems] returned ${ordered.length} items`);
     res.json({ foodItems: ordered, lastUpdated });
