@@ -2075,22 +2075,43 @@ exports.sommelierChat = functions
         return `  - ${n.name}${n.subgroup ? ` (${n.subgroup})` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
       });
 
-      // Build food menu grouped by course
+      // Build food menu grouped by course — filtered by location using the same
+      // menuGuids logic as getFoodItems (food items don't have a 'locations' field;
+      // they carry menuGuids which map to menus that do have location assignments)
       const foodById = foodSnap.val() || {};
       const foodOrder = foodOrderSnap.val() || [];
       const exclusions = exclusionsSnap.val() || {};
-      const orderedFood = (foodOrder.length > 0
+
+      // Build allowed menu GUID set for this location (same logic as getFoodItems)
+      const foodMenuConfigs = configuredMenus.filter(m => m.menuType === 'food');
+      const allowedFoodGuids = new Set();
+      foodMenuConfigs.forEach(menu => {
+        if (chatLocation) {
+          const locs = menu.locations || [];
+          if (locs.length > 0 && !locs.includes(chatLocation)) return;
+        }
+        allowedFoodGuids.add(menu.guid);
+      });
+      const useFoodGuidFilter = foodMenuConfigs.length > 0;
+
+      const locationFilteredFood = (foodOrder.length > 0
         ? foodOrder.map(id => foodById[id]).filter(Boolean)
         : Object.values(foodById)
-      ).filter(f => !exclusions[f.id]);
-
-      // Filter food to only items available at this tablet's location
-      const locationFilteredFood = chatLocation
-        ? orderedFood.filter(f => {
-            const locs = f.locations || [];
-            return locs.length === 0 || locs.includes(chatLocation);
-          })
-        : orderedFood;
+      ).filter(f => {
+        if (exclusions[f.id]) return false;
+        if (!useFoodGuidFilter) return true;
+        const itemGuids = f.menuGuids || (f.menuGuid ? [f.menuGuid] : []);
+        if (itemGuids.length === 0) return allowedFoodGuids.size > 0;
+        return itemGuids.some(g => allowedFoodGuids.has(g));
+      }).map(f => {
+        // Resolve course name for the matched menu (same as getFoodItems)
+        const itemGuids = f.menuGuids || (f.menuGuid ? [f.menuGuid] : []);
+        const matchedGuid = itemGuids.find(g => allowedFoodGuids.has(g));
+        const resolvedCourse = (f.courseNames && matchedGuid && f.courseNames[matchedGuid])
+          ? f.courseNames[matchedGuid]
+          : f.course;
+        return { ...f, course: resolvedCourse };
+      });
 
       const foodByCourse = {};
       locationFilteredFood.forEach(f => {
@@ -2134,9 +2155,25 @@ exports.sommelierChat = functions
         foodById2[f.id] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
       });
 
+      // Build location-aware identity and redirect instructions for the system prompt
+      const locationNames = appSettings.locationNames || {};
+      const thisLocationName = chatLocation === 'bar'
+        ? (locationNames.bar || 'the bar')
+        : chatLocation === 'dining'
+        ? (locationNames.dining || 'the dining room')
+        : 'this venue';
+      const otherLocationName = chatLocation === 'bar'
+        ? (locationNames.dining || null)
+        : chatLocation === 'dining'
+        ? (locationNames.bar || null)
+        : null;
+      const otherLocationRedirect = otherLocationName
+        ? `If a guest asks for something not on the menu above (e.g. a dish category, style, or item that exists at the other venue but not here), warmly let them know it's not available at ${thisLocationName} tonight, and mention that they may find it upstairs/downstairs at ${otherLocationName} if relevant.`
+        : `If a guest asks for something not on the menu above, let them know it's not available tonight.`;
+
       // System prompt instructs Claude to return structured JSON so we can
       // surface every recommendation as an actionable chip -- no fuzzy matching needed
-      const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
+      const systemPrompt = `You are the virtual sommelier and food & beverage guide at ${thisLocationName} at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
 
 ${contextLine}
 
@@ -2148,9 +2185,11 @@ ${menuBlock}
 STRICT RULES -- never break these under any circumstances:
 1. NEVER compare our prices to retail wine shop prices, grocery store prices, or prices at other restaurants. If asked, say: "I'm not able to make that comparison, but I'm happy to help you find something you'll love tonight."
 2. NEVER discuss topics outside food and beverage -- sports, news, weather, travel, politics, entertainment, or anything else unrelated to tonight's dining. Politely redirect: "I'm best at helping you find something delicious tonight -- what can I help you with?"
-3. ONLY recommend items that appear in the menu above. Do not invent dishes or beverages.
+3. ONLY recommend items that appear in the FOOD MENU section above. Do not recommend or mention food items that are not listed. ${otherLocationRedirect}
 4. Keep responses concise and conversational -- 2-4 sentences is right. Guests are at the table.
 5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.
+6. When the guest is asking what food goes with a specific wine or drink (or vice versa), always explain WHY each recommendation pairs well -- connect the flavor profile of the wine/drink to specific qualities of the dish. Do not just list items; make the pairing feel personal and specific.
+7. When recommending food pairings, pick 1-3 best matches. Do not list every item on the menu -- be selective and confident.
 
 RESPONSE FORMAT -- you MUST always respond with valid JSON in this exact shape and nothing else:
 {
