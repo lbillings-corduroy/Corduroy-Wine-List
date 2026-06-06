@@ -1,2262 +1,4154 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const axios = require('axios');
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 
-admin.initializeApp();
+// ─── Theme System ─────────────────────────────────────────────────────────────
 
-const TOAST_API_URL = process.env.TOAST_API_URL || 'https://ws-api.toasttab.com';
-const TOAST_CLIENT_ID = process.env.TOAST_CLIENT_ID;
-const TOAST_CLIENT_SECRET = process.env.TOAST_CLIENT_SECRET;
-const TOAST_RESTAURANT_GUID = process.env.TOAST_RESTAURANT_GUID;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const THEMES = {
+  espressoAndGold: {
+    name: "espressoAndGold",
+    displayName: "Espresso & Gold",
+    description: "Deep chocolate brown with rich antique gold — brand-accurate AK colors",
+    // Backgrounds — derived from brand brown #463228 (extracted from AK logo)
+    bgDeep:       "#0e0b09",
+    bgBase:       "#1a1410",
+    bgSurface:    "#231a13",
+    bgCard:       "#2c2018",
+    bgCardHover:  "#352618",
+    bgInput:      "rgba(255,255,255,0.05)",
+    bgOverlay:    "rgba(0,0,0,0.75)",
+    // Accents — exact brand gold #c89632 (extracted from AK logo)
+    accent:       "#c89632",
+    accentDim:    "rgba(200,150,50,0.14)",
+    accentDimSm:  "rgba(200,150,50,0.08)",
+    accentBorder: "rgba(200,150,50,0.38)",
+    accentBorderSm:"rgba(200,150,50,0.22)",
+    accentText:   "#0e0b09",
+    // Borders — derived from brand brown
+    borderSubtle: "#1e1510",
+    borderMid:    "#2e2018",
+    borderStrong: "#3e2c1e",
+    // Text
+    textPrimary:  "#ede8e0",
+    textSecondary:"#b0a090",
+    textMuted:    "#7a6858",
+    textDim:      "#564840",
+    textVeryDim:  "#3e3028",
+    // Functional
+    success:      "#5a9e6f",
+    successDim:   "rgba(90,158,111,0.12)",
+    successBorder:"rgba(90,158,111,0.35)",
+    error:        "#c85050",
+    errorDim:     "rgba(200,80,80,0.1)",
+    errorBorder:  "rgba(200,80,80,0.4)",
+    warning:      "#c89632",
+    // White overlays
+    white04:      "rgba(255,255,255,0.04)",
+    white06:      "rgba(255,255,255,0.05)",
+    white08:      "rgba(255,255,255,0.07)",
+    // Fonts
+    fontSerif:    "Georgia, serif",
+    fontMono:     "monospace",
+  },
+  charcoalAndMaple: {
+    name: "charcoalAndMaple",
+    displayName: "Parchment & Maple",
+    description: "Warm cream parchment with rich brown ink and maple red — light theme for busy day service",
+    // Backgrounds — warm cream parchment derived from Tuque's logo white background
+    bgDeep:       "#e8e0d0",
+    bgBase:       "#f0ebe0",
+    bgSurface:    "#f8f4ec",
+    bgCard:       "#e8e2d4",
+    bgCardHover:  "#ddd6c8",
+    bgInput:      "rgba(42,30,20,0.07)",
+    bgOverlay:    "rgba(42,30,20,0.55)",
+    // Accents — Tuque's logo gold + maple red as highlight
+    accent:       "#9a7010",
+    accentDim:    "rgba(154,112,16,0.18)",
+    accentDimSm:  "rgba(154,112,16,0.12)",
+    accentBorder: "rgba(154,112,16,0.55)",
+    accentBorderSm:"rgba(154,112,16,0.35)",
+    accentText:   "#ffffff",
+    // Borders — warm tan, stronger for visibility
+    borderSubtle: "#d8d0be",
+    borderMid:    "#c0b098",
+    borderStrong: "#a09070",
+    // Text — dark brown ink (from logo letterforms)
+    textPrimary:  "#1e1510",
+    textSecondary:"#5a4030",
+    textMuted:    "#7a6050",
+    textDim:      "#9a8870",
+    textVeryDim:  "#baa898",
+    // Functional — maple red for success/active, forest green for positive
+    success:      "#c8202a",
+    successDim:   "rgba(200,32,42,0.1)",
+    successBorder:"rgba(200,32,42,0.3)",
+    error:        "#c8202a",
+    errorDim:     "rgba(200,32,42,0.08)",
+    errorBorder:  "rgba(200,32,42,0.35)",
+    warning:      "#b8860e",
+    // Dark overlays (inverted from dark theme — used for modals on light bg)
+    white04:      "rgba(42,30,20,0.06)",
+    white06:      "rgba(42,30,20,0.10)",
+    white08:      "rgba(42,30,20,0.14)",
+    // Fonts
+    fontSerif:    "'Playfair Display', Georgia, serif",
+    fontMono:     "monospace",
+  },
+};
 
-const WINE_MENU_GUID = '2d490bef-759b-447f-9af4-5bf0971948ba';
-const BEER_MENU_GUID = 'ae7ea1cf-e85d-497a-a210-9a7271daa0ac';
-const POURS_MENU_GUID = 'c07d9143-a7c5-497a-8434-2ab85d44ea48';
+// Add new themes to THEMES above, then register them here for the settings dropdown
+const THEME_CATALOGUE = [
+  { value: "espressoAndGold",  label: "Espresso & Gold",   preview: "#1a1410" },
+  { value: "charcoalAndMaple", label: "Parchment & Maple", preview: "#f5f0e6" },
+];
 
-// ─── Settings Loader ──────────────────────────────────────────────────────────
-// Reads app settings from Firebase. Falls back to hardcoded GUIDs if settings
-// haven't been configured yet, so existing behavior is preserved on first deploy.
+const ThemeContext = createContext(THEMES.espressoAndGold);
+const useTheme = () => useContext(ThemeContext);
 
-async function getAppSettings() {
-  try {
-    const db = admin.database();
-    const snap = await db.ref('appSettings').once('value');
-    return snap.val() || {};
-  } catch (e) {
-    console.log('Could not load appSettings:', e.message);
-    return {};
+
+const FIREBASE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getWines";
+const BEER_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getBeers";
+const POURS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPours";
+const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
+const ADMIN_PIN = process.env.REACT_APP_ADMIN_PIN || "9999";
+const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getFoodItems";
+const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getCocktails";
+const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
+const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
+const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
+const FORCE_SYNC_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/forceSync";
+const CLEANUP_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/cleanupOrphanedData";
+const SAVE_MENU_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveMenu";
+const GET_MENU_URL  = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getMenu";
+const SEND_EMAIL_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sendMenuEmail";
+const RESERVATION_URL = "https://www.appalachiakitchen.com/";
+const CHAT_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/sommelierChat";
+const SETTINGS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getSettings";
+const SAVE_SETTINGS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/saveSettings";
+const REENRICH_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/reenrichItem";
+
+// Tiers and subgroups are derived dynamically from Toast data in arrival order.
+// TIER_LABELS just controls the short display name in the filter buttons — add entries as needed.
+const TIER_LABELS = { "House Wines": "House", "Cellar Wines": "Cellar", "London's List": "London's List" };
+
+const VARIETAL_GROUPS = {
+  "Sparkling": ["Prosecco", "Champagne", "Sparkling", "Cava"],
+  "Rosé": ["Rosé"],
+  "Port": ["Port"],
+};
+
+function consolidateVarietal(v) {
+  if (!v) return null;
+  for (const [group, members] of Object.entries(VARIETAL_GROUPS)) {
+    if (members.includes(v)) return group;
   }
+  return v;
 }
 
-// Returns menus of a given menuType from settings, with fallback to hardcoded defaults.
-function getMenusOfType(settings, menuType) {
-  const configured = (settings?.menus || []).filter(m => m.menuType === menuType && m.guid);
-  if (configured.length > 0) return configured;
-  // Fallback defaults — used until admin configures settings
-  const defaults = {
-    wine:         [{ guid: WINE_MENU_GUID,     label: 'Wine List' }],
-    beer_pours:   [{ guid: BEER_MENU_GUID,     label: 'Beer List' }, { guid: POURS_MENU_GUID, label: 'Premium Pours' }],
-    cocktails_na: [{ guid: COCKTAILS_MENU_GUID, label: 'Specialty Cocktails' }, { guid: NAB_MENU_GUID, label: 'Non-Alcoholic Beverages' }],
-    food:         [],
-  };
-  return defaults[menuType] || [];
+function formatPrice(p) { return p ? `$${Math.round(p)}` : null; }
+function timeAgo(ts) {
+  if (!ts) return "";
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return "just now";
+  if (mins === 1) return "1 min ago";
+  if (mins < 60) return `${mins} min ago`;
+  return `${Math.round(mins / 60)}hr ago`;
 }
 
-// Returns true if a menu is currently available based on the Toast-sourced availability
-// cached in appSettings.toastAvailability. If no cached data exists, assumes available.
-function isMenuAvailableNow(menu, toastAvailabilityCache) {
-  const ta = toastAvailabilityCache && toastAvailabilityCache[menu.guid];
-  if (!ta) return true; // no data fetched yet — don't block anything
+function FilterBtn({ label, active, onClick, small }) {
+  const t = useTheme();
+  return (
+    <button onClick={onClick} style={{
+      background: active ? t.accent : t.white08,
+      border: `0.5px solid ${active ? t.accent : t.accentBorderSm}`,
+      color: active ? t.accentText : t.accent,
+      fontSize: small ? 10 : 11,
+      padding: small ? "4px 11px" : "6px 15px",
+      borderRadius: 20, cursor: "pointer",
+      letterSpacing: "0.5px", fontFamily: t.fontSerif,
+      fontWeight: active ? 600 : 400, transition: "all 0.15s",
+      whiteSpace: "nowrap"
+    }}>{label}</button>
+  );
+}
 
-  const now = new Date();
-  // Toast days come back as full names e.g. "MONDAY" or abbreviated — normalize both
-  const dayFull = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'][now.getDay()];
-  const dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()];
+// ─── Copy Button ─────────────────────────────────────────────────────────────
 
-  if (ta.toastDays && ta.toastDays.length > 0) {
-    const upperDays = ta.toastDays.map(d => d.toUpperCase());
-    if (!upperDays.includes(dayFull) && !upperDays.includes(dayAbbr.toUpperCase())) return false;
+function CopyButton({ text }) {
+  const t = useTheme();
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
-
-  if (ta.toastHours && ta.toastHours.open && ta.toastHours.close) {
-    // Parse HH:MM or HH:MM:SS
-    const parseTime = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const nowMins = now.getHours() * 60 + now.getMinutes();
-    const openMins = parseTime(ta.toastHours.open);
-    let closeMins = parseTime(ta.toastHours.close);
-    if (closeMins <= openMins) closeMins += 24 * 60; // midnight crossover
-    if (nowMins < openMins || nowMins >= closeMins) return false;
-  }
-
-  return true;
+  return (
+    <button onClick={handleCopy} style={{
+      background: copied ? t.successDim : t.accentDim,
+      border: `0.5px solid ${copied ? t.success : t.accent}`,
+      color: copied ? t.success : t.accent,
+      fontSize: 11, padding: "4px 12px", borderRadius: 5,
+      cursor: "pointer", fontFamily: t.fontSerif,
+      transition: "all 0.2s", whiteSpace: "nowrap"
+    }}>
+      {copied ? "✓ Copied" : "Copy Name"}
+    </button>
+  );
 }
 
-const EXCLUDE_KEYWORDS = ['cooking', 'cook wine', 'cork fee', 'wine dinner', 'liter'];
+// ─── Manager Screen ───────────────────────────────────────────────────────────
 
-function shouldExclude(name) {
-  const lower = name.toLowerCase();
-  return EXCLUDE_KEYWORDS.some(k => lower.includes(k));
-}
-
-function cleanWineName(name) {
-  return name
-    .replace(/\s+Glass$/i, '')
-    .replace(/\s+Bottle$/i, '')
-    .replace(/\s+1L\s+Bottle$/i, '')
-    .replace(/\s+1\s*Liter\s+Bottle$/i, '')
+function normalizeName(name) {
+  return (name || "")
+    .toLowerCase()
+    .replace(/\b(glass|bottle|btl|gls)\b/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-// ─── Toast Auth ───────────────────────────────────────────────────────────────
-
-async function getToastToken() {
-  const response = await axios.post(
-    `${TOAST_API_URL}/authentication/v1/authentication/login`,
-    { clientId: TOAST_CLIENT_ID, clientSecret: TOAST_CLIENT_SECRET, userAccessType: 'TOAST_MACHINE_CLIENT' },
-    { headers: { 'Content-Type': 'application/json' } }
-  );
-  return response.data.token.accessToken;
-}
-
-async function getMenus(token) {
-  const response = await axios.get(`${TOAST_API_URL}/menus/v2/menus`, {
-    headers: { 'Authorization': `Bearer ${token}`, 'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID }
+function findDuplicates(wines) {
+  const groups = {};
+  wines.forEach(w => {
+    const key = normalizeName(w.name);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(w);
   });
-  return response.data;
-}
-
-async function getStockData(token) {
-  try {
-    const response = await axios.get(`${TOAST_API_URL}/stock/v1/inventory`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID }
-    });
-    const data = response.data;
-    console.log(`Stock API: ${Array.isArray(data) ? data.length : '?'} items`);
-    return data;
-  } catch (e) {
-    console.log('Stock unavailable:', e.message, 'Status:', e.response?.status, 'Data:', JSON.stringify(e.response?.data));
-    return [];
-  }
-}
-
-// ─── Generic Item Extraction (Beer, Pours, Cocktails) ────────────────────────
-
-function findGroupByGuid(groups, guid) {
-  for (const group of groups) {
-    if (group.guid === guid) return group;
-    if (group.menuGroups && group.menuGroups.length > 0) {
-      const found = findGroupByGuid(group.menuGroups, guid);
-      if (found) return found;
+  // Return groups with more than one wine, excluding valid glass/bottle pairs
+  return Object.values(groups).filter(group => {
+    if (group.length < 2) return false;
+    // If exactly 2 wines and one has glassPrice and the other has bottlePrice — valid pair, not a duplicate
+    if (group.length === 2) {
+      const hasGlass = group.some(w => w.glassPrice && !w.bottlePrice);
+      const hasBottle = group.some(w => w.bottlePrice && !w.glassPrice);
+      if (hasGlass && hasBottle) return false;
     }
-  }
-  return null;
-}
-
-function extractItemsFromMenu(menus, menuGuid, stockData) {
-  const items = [];
-
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
-
-  function extractGroup(group, topGroup) {
-    if (group.menuItems && group.menuItems.length > 0) {
-      group.menuItems.forEach(item => {
-        if (shouldExclude(item.name)) return;
-        const stockInfo = stockMap[item.guid];
-        const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
-        const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
-        if (!items.find(i => i.id === item.guid)) {
-          items.push({
-            id: item.guid,
-            name: item.name,
-            price: item.price || item.pricingRules?.[0]?.price || null,
-            groupPrice: group.price || null,
-            tier: topGroup,
-            subgroup: group.name,
-            available: isAvailable,
-            description: item.description || null,
-            toastImageUrl: item.image || item.images?.[0] || item.imageUrl || null,
-            masterId: item.masterId
-          });
-        }
-      });
-    }
-    if (group.menuGroups && group.menuGroups.length > 0) {
-      group.menuGroups.forEach(sub => extractGroup(sub, topGroup));
-    }
-  }
-
-  // First try: match as a top-level menu
-  const menu = menus.menus.find(m => m.guid === menuGuid);
-  if (menu) {
-    if (menu.menuGroups) {
-      menu.menuGroups.forEach(g => extractGroup(g, g.name));
-    }
-    return items;
-  }
-
-  // Fallback: search for it as a group inside any menu
-  console.log(`Menu ${menuGuid} not found at top level — searching as group...`);
-  for (const m of menus.menus) {
-    const group = findGroupByGuid(m.menuGroups || [], menuGuid);
-    if (group) {
-      console.log(`Found group "${group.name}" inside menu "${m.name}"`);
-
-      extractGroup(group, group.name);
-      return items;
-    }
-  }
-
-  console.log(`Menu/group ${menuGuid} not found anywhere`);
-  return items;
-}
-
-// ─── Wine Extraction ──────────────────────────────────────────────────────────
-
-function extractItemsFromGroup(group, stockMap, topTier, wines) {
-  if (group.menuItems && group.menuItems.length > 0) {
-    group.menuItems.forEach(item => {
-      if (shouldExclude(item.name)) return;
-      const stockInfo = stockMap[item.guid];
-      // Toast marks items out of stock by clearing the visibility array to []
-      const isHiddenByVisibility = Array.isArray(item.visibility) && item.visibility.length === 0;
-      const isAvailable = (!stockInfo || stockInfo.status !== 'OUT_OF_STOCK') && !isHiddenByVisibility;
-
-      if (!wines.find(w => w.id === item.guid)) {
-        wines.push({
-          id: item.guid,
-          name: item.name,
-          price: item.price || null,
-          tier: topTier,
-          subgroup: group.name,
-          available: isAvailable,
-          toastImageUrl: item.image || item.images?.[0] || item.imageUrl || null,
-          masterId: item.masterId
-        });
-      }
-    });
-  }
-  if (group.menuGroups && group.menuGroups.length > 0) {
-    group.menuGroups.forEach(sub => extractItemsFromGroup(sub, stockMap, topTier, wines));
-  }
-}
-
-function extractWines(menus, stockData) {
-  const wines = [];
-  const wineMenu = menus.menus.find(m => m.guid === WINE_MENU_GUID);
-  if (!wineMenu) { console.log('Wine menu not found'); return wines; }
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
-  if (wineMenu.menuGroups) {
-    wineMenu.menuGroups.forEach(g => extractItemsFromGroup(g, stockMap, g.name, wines));
-  }
-  return wines;
-}
-
-// Settings-aware version: accepts any GUID instead of the hardcoded constant
-function extractWinesFromGuid(menus, menuGuid, stockData) {
-  const wines = [];
-  const wineMenu = menus.menus.find(m => m.guid === menuGuid);
-  if (!wineMenu) {
-    // Also search as a group inside any menu
-    for (const m of menus.menus) {
-      const group = findGroupByGuid(m.menuGroups || [], menuGuid);
-      if (group) {
-        const stockMap = {};
-        if (Array.isArray(stockData)) stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-        extractItemsFromGroup(group, stockMap, group.name, wines);
-        return wines;
-      }
-    }
-    console.log(`Wine menu/group ${menuGuid} not found`);
-    return wines;
-  }
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
-  if (wineMenu.menuGroups) {
-    wineMenu.menuGroups.forEach(g => extractItemsFromGroup(g, stockMap, g.name, wines));
-  }
-  return wines;
-}
-
-// ─── Smart Merge Glass/Bottle ─────────────────────────────────────────────────
-
-function mergeGlassBottle(wines) {
-  const merged = [];
-  const processed = new Set();
-
-  wines.forEach(wine => {
-    if (processed.has(wine.id)) return;
-    const isGlass = /\sGLASS$/i.test(wine.name);
-    const isBottle = /\sBOTTLE$/i.test(wine.name) || /\s1L\sBOTTLE$/i.test(wine.name);
-
-    if (isGlass || isBottle) {
-      const baseName = cleanWineName(wine.name);
-      const pair = wines.find(w =>
-        w.id !== wine.id &&
-        !processed.has(w.id) &&
-        cleanWineName(w.name) === baseName &&
-        (/\sGLASS$/i.test(w.name) || /\sBOTTLE$/i.test(w.name) || /\s1L\sBOTTLE$/i.test(w.name))
-      );
-
-      let glassPrice = null;
-      let bottlePrice = null;
-      let primaryId = wine.id;
-      // If either glass or bottle is OOS, the merged wine is OOS
-      let mergedAvailable = wine.available;
-
-      if (isGlass) {
-        glassPrice = wine.price;
-        if (pair) {
-          bottlePrice = pair.price;
-          processed.add(pair.id);
-          primaryId = pair.id;
-          mergedAvailable = wine.available !== false && pair.available !== false;
-        }
-      } else {
-        bottlePrice = wine.price;
-        primaryId = wine.id;
-        if (pair) {
-          glassPrice = pair.price;
-          processed.add(pair.id);
-          mergedAvailable = wine.available !== false && pair.available !== false;
-        }
-      }
-
-      processed.add(wine.id);
-      merged.push({
-        id: primaryId, name: baseName, glassPrice, bottlePrice,
-        tier: wine.tier, subgroup: wine.subgroup, available: mergedAvailable,
-        toastImageUrl: wine.toastImageUrl || null, masterId: wine.masterId
-      });
-    } else {
-      processed.add(wine.id);
-      merged.push({ ...wine, glassPrice: null, bottlePrice: wine.price, price: null });
-    }
+    return true;
   });
-
-  console.log(`Merged: ${wines.length} raw → ${merged.length} wines`);
-  return merged;
 }
 
-// ─── Vintage Parser ───────────────────────────────────────────────────────────
+// ─── Smart Polling Schedule ───────────────────────────────────────────────────
+// Returns the appropriate polling interval in ms based on Snowshoe season & time
+function getPollingInterval() {
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const month = now.getMonth() + 1; // 1–12
+  const day   = now.getDate();
+  const dow   = now.getDay();        // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  const hour  = now.getHours();
 
-function parseVintage(name) {
-  const match = name.match(/\b(19|20)\d{2}\b/);
-  return match ? parseInt(match[0]) : null;
-}
+  const ACTIVE = 2  * 60 * 1000;    // 2 min  — active service hours
+  const SLOW   = 60 * 60 * 1000;    // 60 min — off-hours on an open day
+  const CLOSED = 6  * 60 * 60 * 1000; // 6 hrs  — fully closed season
 
-// ─── Varietal Normalizer ──────────────────────────────────────────────────────
-
-const VARIETAL_MAP = {
-  'cabernet sauvignon': 'Cabernet Sauvignon', 'cabernet': 'Cabernet Sauvignon',
-  'pinot noir': 'Pinot Noir', 'chardonnay': 'Chardonnay', 'merlot': 'Merlot',
-  'malbec': 'Malbec', 'sauvignon blanc': 'Sauvignon Blanc', 'pinot grigio': 'Pinot Grigio',
-  'pinot gris': 'Pinot Grigio', 'riesling': 'Riesling', 'moscato': 'Moscato',
-  'prosecco': 'Prosecco', 'champagne': 'Champagne', 'sparkling': 'Sparkling',
-  'rosé': 'Rosé', 'rose': 'Rosé', 'port': 'Port', 'tawny': 'Port',
-  'zinfandel': 'Zinfandel', 'shiraz': 'Shiraz', 'syrah': 'Shiraz',
-  'viognier': 'Viognier', 'albarino': 'Albariño', 'albariño': 'Albariño',
-  'chianti': 'Sangiovese', 'sangiovese': 'Sangiovese', 'tempranillo': 'Tempranillo',
-  'garnacha': 'Grenache', 'grenache': 'Grenache', 'red blend': 'Red Blend',
-  'bordeaux blend': 'Bordeaux Blend', 'rhône blend': 'Red Blend', 'gsm blend': 'Red Blend',
-  'gsm': 'Red Blend', 'white blend': 'White Blend', 'sparkling blend': 'Sparkling',
-  'port blend': 'Port', 'fortified': 'Port',
-};
-
-function normalizeVarietal(raw) {
-  if (!raw) return null;
-  const lower = raw.toLowerCase().trim();
-  if (VARIETAL_MAP[lower]) return VARIETAL_MAP[lower];
-  for (const [key, val] of Object.entries(VARIETAL_MAP)) {
-    if (lower.includes(key)) return val;
-  }
-  if (lower.includes('/') || lower.includes(',') || lower.includes('&')) {
-    if (lower.includes('white') || lower.includes('blanc') || lower.includes('chardonnay') || lower.includes('viognier')) return 'White Blend';
-    return 'Red Blend';
-  }
-  const words = raw.split(' ');
-  return words.length <= 3 ? raw : 'Red Blend';
-}
-
-// ─── Claude Enrichment — Wine ─────────────────────────────────────────────────
-
-async function enrichWineWithClaude(wineName, vintage, hints = {}) {
-  if (!ANTHROPIC_API_KEY) return null;
-  const vintageNote = vintage ? `The vintage is ${vintage}.` : 'This is a house pour with no specific vintage.';
-
-  // Build hint block from any manager-confirmed fields
-  const hintLines = [];
-  if (hints.region)   hintLines.push(`- Region: "${hints.region}" (confirmed by manager — treat as fact, do not override)`);
-  if (hints.varietal) hintLines.push(`- Varietal: "${hints.varietal}" (confirmed by manager — treat as fact, do not override)`);
-  if (hints.correctedName && hints.correctedName !== wineName) hintLines.push(`- Corrected name: "${hints.correctedName}" (confirmed by manager)`);
-  const hintBlock = hintLines.length > 0
-    ? `\nThe restaurant manager has confirmed the following details — treat these as facts and do not change them:\n${hintLines.join('\n')}\n`
-    : '';
-
-  const prompt = `You are a professional sommelier and wine data expert. I need accurate information about this wine for a restaurant iPad wine list.
-
-Wine: "${wineName}"
-${vintageNote}${hintBlock}
-Tasks:
-1. Identify the correct wine (fix any spelling/capitalization errors in the name)
-2. If you are uncertain what wine this is, set "uncertain" to true. However, if the manager has confirmed the region above, use that to resolve your uncertainty — do not mark as uncertain just because the name is ambiguous.
-
-Respond in JSON only (no other text):
-{
-  "correctedName": "properly spelled and capitalized wine name, or same as input if correct",
-  "uncertain": false,
-  "uncertainReason": null,
-  "varietal": "PRIMARY grape only — use ONE of these exact values: Cabernet Sauvignon, Pinot Noir, Chardonnay, Merlot, Malbec, Sauvignon Blanc, Pinot Grigio, Riesling, Moscato, Prosecco, Champagne, Sparkling, Rosé, Port, Zinfandel, Shiraz, Viognier, Albariño, Sangiovese, Tempranillo, Grenache, Red Blend, Bordeaux Blend, White Blend. Pick the single closest match.",
-  "region": "concise region and country, e.g. Napa Valley, California",
-  "description": "2-3 sentence sommelier tasting note for a restaurant guest. Be evocative and appetizing.",
-  "reviews": "notable critic scores if known, e.g. 92pts Wine Spectator, or null",
-  "labelImageQuery": "Google image search query for a clean flat label image (not bottle), e.g. Duckhorn Merlot 2022 label"
-}`;
-
-  try {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      { model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] },
-      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-    );
-    const text = response.data.content[0].text;
-    const clean = text.replace(/```json|```/g, '').trim();
-    const data = JSON.parse(clean);
-    data.varietal = normalizeVarietal(data.varietal);
-    return data;
-  } catch (e) {
-    console.error(`Claude enrichment failed for ${wineName}:`, e.message);
-    return null;
-  }
-}
-
-// ─── Claude Enrichment — Beer ─────────────────────────────────────────────────
-
-async function enrichBeerWithClaude(beerName, hints = {}) {
-  if (!ANTHROPIC_API_KEY) return null;
-  const hintLines = [];
-  if (hints.brewery) hintLines.push(`- Brewery: "${hints.brewery}" (confirmed by manager — treat as fact)`);
-  if (hints.style)   hintLines.push(`- Style: "${hints.style}" (confirmed by manager — treat as fact)`);
-  const hintBlock = hintLines.length > 0
-    ? `\nThe restaurant manager has confirmed the following:\n${hintLines.join('\n')}\n`
-    : '';
-  const prompt = `You are a craft beer expert. I need accurate information about this beer for a restaurant menu app.
-
-Beer: "${beerName}"${hintBlock}
-
-Respond in JSON only (no other text):
-{
-  "correctedName": "properly spelled and capitalized beer name, or same as input if correct",
-  "uncertain": false,
-  "uncertainReason": null,
-  "style": "beer style, e.g. IPA, Lager, Stout, Wheat, Pale Ale, Pilsner, Sour, Porter",
-  "brewery": "brewery name and location, e.g. Sierra Nevada, Chico CA",
-  "abv": "ABV if known, e.g. 5.6%, or null",
-  "description": "2 sentence tasting note — approachable, appetizing, guest-friendly.",
-  "imageQuery": "Google image search query for this beer can or bottle label, e.g. Sierra Nevada Torpedo IPA can"
-}`;
-
-  try {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
-      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-    );
-    const text = response.data.content[0].text;
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
-  } catch (e) {
-    console.error(`Beer enrichment failed for ${beerName}:`, e.message);
-    return null;
-  }
-}
-
-// ─── Claude Enrichment — Premium Pours ───────────────────────────────────────
-
-async function enrichPourWithClaude(pourName, hints = {}) {
-  if (!ANTHROPIC_API_KEY) return null;
-  const hintLines = [];
-  if (hints.producer)  hintLines.push(`- Producer/Distillery: "${hints.producer}" (confirmed by manager — treat as fact)`);
-  if (hints.category)  hintLines.push(`- Category: "${hints.category}" (confirmed by manager — treat as fact)`);
-  const hintBlock = hintLines.length > 0
-    ? `\nThe restaurant manager has confirmed the following:\n${hintLines.join('\n')}\n`
-    : '';
-  const prompt = `You are a spirits expert. I need accurate information about this spirit for a restaurant premium pours menu.
-
-Spirit: "${pourName}"${hintBlock}
-
-Respond in JSON only (no other text):
-{
-  "correctedName": "properly spelled and capitalized spirit name, or same as input if correct",
-  "uncertain": false,
-  "uncertainReason": null,
-  "category": "spirit category, e.g. Bourbon, Scotch, Rye Whiskey, Tequila, Mezcal, Rum, Gin, Vodka, Cognac, Brandy",
-  "producer": "distillery or producer name and region, e.g. Buffalo Trace, Frankfort KY",
-  "abv": "ABV if known, e.g. 45%, or null",
-  "age": "age statement if known, e.g. 12 Year, or null",
-  "description": "2 sentence tasting note — evocative, guest-friendly, suitable for a premium bar menu.",
-  "imageQuery": "Google image search query for this spirit bottle label, e.g. Buffalo Trace Bourbon bottle"
-}`;
-
-  try {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
-      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-    );
-    const text = response.data.content[0].text;
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
-  } catch (e) {
-    console.error(`Pour enrichment failed for ${pourName}:`, e.message);
-    return null;
-  }
-}
-
-// ─── Main Wine Sync ───────────────────────────────────────────────────────────
-
-exports.syncWineMenu = functions
-  .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('0,30 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Toast API sync...');
-      const settings = await getAppSettings();
-      const wineMenus = getMenusOfType(settings, 'wine');
-      if (wineMenus.length === 0) { console.log('No wine menus configured'); return null; }
-
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-
-      // Merge wines across all configured wine menu GUIDs
-      let allRawWines = [];
-      for (const wm of wineMenus) {
-        const raw = extractWinesFromGuid(menus, wm.guid, stockData);
-        allRawWines = [...allRawWines, ...raw];
-      }
-      const freshWines = mergeGlassBottle(allRawWines);
-
-      const db = admin.database();
-      const enrichmentSnap = await db.ref('wineEnrichment').once('value');
-      const existingEnrichment = enrichmentSnap.val() || {};
-
-      await db.ref('wines').remove();
-      const winesById = {};
-      freshWines.forEach(w => { winesById[w.id] = w; });
-      await db.ref('wines').set(winesById);
-      await db.ref('wineOrder').set(freshWines.map(w => w.id));
-      await db.ref('lastUpdated').set(Date.now());
-      console.log(`Saved ${freshWines.length} merged wines`);
-
-      const toEnrich = freshWines.filter(w => {
-        const existing = existingEnrichment[w.id];
-        if (!existing) return true;
-        // Re-enrich if name changed (clears approved/manuallyEdited via full .set())
-        if (!existing.sourceName || existing.sourceName !== w.name) return true;
-        // Skip if manager has manually edited this wine
-        if (existing.manuallyEdited) return false;
-        return false;
-      });
-      let enrichedCount = 0;
-
-      for (const wine of toEnrich) {
-        const vintage = parseVintage(wine.name);
-        const enrichment = await enrichWineWithClaude(wine.name, vintage);
-        if (enrichment) {
-          await db.ref(`wineEnrichment/${wine.id}`).set({
-            sourceName: wine.name,
-            correctedName: enrichment.correctedName || wine.name,
-            uncertain: enrichment.uncertain || false,
-            uncertainReason: enrichment.uncertainReason || null,
-            varietal: enrichment.varietal || null,
-            region: enrichment.region || null,
-            description: enrichment.description || null,
-            reviews: enrichment.reviews || null,
-            labelImageQuery: enrichment.labelImageQuery || null,
-            vintage: vintage,
-            enrichedAt: Date.now()
-          });
-          enrichedCount++;
-          if (enrichment.uncertain) console.log(`⚠️ UNCERTAIN: ${wine.name} — ${enrichment.uncertainReason}`);
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      console.log(`Wine enrichment complete — ${enrichedCount} wines enriched`);
-      return null;
-    } catch (error) {
-      console.error('Sync error:', error.message);
-      if (error.response) console.error('API response:', JSON.stringify(error.response.data));
-      return null;
+  function nthWeekday(y, m, n, wd) { // nth occurrence of weekday wd in month m
+    let count = 0;
+    for (let d = 1; d <= 31; d++) {
+      const dt = new Date(y, m - 1, d);
+      if (dt.getMonth() !== m - 1) break;
+      if (dt.getDay() === wd) { count++; if (count === n) return dt; }
     }
-  });
-
-// ─── Beer Sync ────────────────────────────────────────────────────────────────
-
-exports.syncBeerMenu = functions
-  .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('3,33 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Beer menu sync...');
-      const settings = await getAppSettings();
-      // beer_pours menus: only sync the ones labelled as beer (first GUID by convention, or all if only one)
-      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
-      // Separate beer from pours by looking for "beer" in the label (case-insensitive), else use first
-      const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
-      const toSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : [{ guid: BEER_MENU_GUID, label: 'Beer List' }]);
-
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-      let freshBeers = [];
-      for (const bm of toSync) {
-        freshBeers = [...freshBeers, ...extractItemsFromMenu(menus, bm.guid, stockData)];
-      }
-
-      const db = admin.database();
-      const enrichmentSnap = await db.ref('beerEnrichment').once('value');
-      const existingEnrichment = enrichmentSnap.val() || {};
-
-      await db.ref('beers').remove();
-      const beersById = {};
-      freshBeers.forEach(b => { beersById[b.id] = b; });
-      await db.ref('beers').set(beersById);
-      await db.ref('beerOrder').set(freshBeers.map(b => b.id));
-      await db.ref('beerLastUpdated').set(Date.now());
-      console.log(`Saved ${freshBeers.length} beers`);
-
-      await purgeOrphanedEnrichment(db, 'beers', 'beerEnrichment', freshBeers.map(b => b.id), 'beer');
-
-      const toEnrich = freshBeers.filter(b => {
-        const existing = existingEnrichment[b.id];
-        if (!existing) return true;
-        if (!existing.sourceName || existing.sourceName !== b.name) return true;
-        if (existing.manuallyEdited) return false;
-        return false;
-      });
-      let enrichedCount = 0;
-
-      for (const beer of toEnrich) {
-        const enrichment = await enrichBeerWithClaude(beer.name);
-        if (enrichment) {
-          await db.ref(`beerEnrichment/${beer.id}`).set({
-            sourceName: beer.name,
-            correctedName: enrichment.correctedName || beer.name,
-            uncertain: enrichment.uncertain || false,
-            uncertainReason: enrichment.uncertainReason || null,
-            style: enrichment.style || null,
-            brewery: enrichment.brewery || null,
-            abv: enrichment.abv || null,
-            description: enrichment.description || null,
-            imageQuery: enrichment.imageQuery || null,
-            enrichedAt: Date.now()
-          });
-          enrichedCount++;
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      console.log(`Beer enrichment complete — ${enrichedCount} beers enriched`);
-      return null;
-    } catch (error) {
-      console.error('Beer sync error:', error.message);
-      return null;
-    }
-  });
-
-// ─── Premium Pours Sync ───────────────────────────────────────────────────────
-
-exports.syncPoursMenu = functions
-  .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('6,36 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Premium Pours sync...');
-      const settings = await getAppSettings();
-      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
-      const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
-      const toSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : [{ guid: POURS_MENU_GUID, label: 'Premium Pours' }]);
-
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-      let freshPours = [];
-      for (const pm of toSync) {
-        freshPours = [...freshPours, ...extractItemsFromMenu(menus, pm.guid, stockData)];
-      }
-
-      const db = admin.database();
-      const enrichmentSnap = await db.ref('poursEnrichment').once('value');
-      const existingEnrichment = enrichmentSnap.val() || {};
-
-      await db.ref('pours').remove();
-      const poursById = {};
-      freshPours.forEach(p => { poursById[p.id] = p; });
-      await db.ref('pours').set(poursById);
-      await db.ref('poursOrder').set(freshPours.map(p => p.id));
-      await db.ref('poursLastUpdated').set(Date.now());
-      console.log(`Saved ${freshPours.length} pours`);
-
-      await purgeOrphanedEnrichment(db, 'pours', 'poursEnrichment', freshPours.map(p => p.id), 'pours');
-
-      const toEnrich = freshPours.filter(p => {
-        const existing = existingEnrichment[p.id];
-        if (!existing) return true;
-        if (!existing.sourceName || existing.sourceName !== p.name) return true;
-        if (existing.manuallyEdited) return false;
-        return false;
-      });
-      let enrichedCount = 0;
-
-      for (const pour of toEnrich) {
-        const enrichment = await enrichPourWithClaude(pour.name);
-        if (enrichment) {
-          await db.ref(`poursEnrichment/${pour.id}`).set({
-            sourceName: pour.name,
-            correctedName: enrichment.correctedName || pour.name,
-            uncertain: enrichment.uncertain || false,
-            uncertainReason: enrichment.uncertainReason || null,
-            category: enrichment.category || null,
-            producer: enrichment.producer || null,
-            abv: enrichment.abv || null,
-            age: enrichment.age || null,
-            description: enrichment.description || null,
-            imageQuery: enrichment.imageQuery || null,
-            enrichedAt: Date.now()
-          });
-          enrichedCount++;
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      console.log(`Pours enrichment complete — ${enrichedCount} pours enriched`);
-      return null;
-    } catch (error) {
-      console.error('Pours sync error:', error.message);
-      return null;
-    }
-  });
-
-// ─── HTTP Endpoint — Wines ────────────────────────────────────────────────────
-
-exports.getWines = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [winesSnap, enrichmentSnap, lastUpdatedSnap, wineOrderSnap] = await Promise.all([
-      db.ref('wines').once('value'),
-      db.ref('wineEnrichment').once('value'),
-      db.ref('lastUpdated').once('value'),
-      db.ref('wineOrder').once('value')
-    ]);
-
-    const winesById = winesSnap.val() || {};
-    const wineOrder = wineOrderSnap.val() || [];
-    const enrichment = enrichmentSnap.val() || {};
-    const lastUpdated = lastUpdatedSnap.val();
-
-    const orderedWines = wineOrder.length > 0
-      ? wineOrder.map(id => winesById[id]).filter(Boolean)
-      : Object.values(winesById);
-
-    const mergedWines = orderedWines.map(wine => {
-      const e = enrichment[wine.id] || {};
-      return {
-        ...wine,
-        name: e.correctedName || wine.name,
-        imageUrl: wine.toastImageUrl || null,
-        varietal: e.varietal || null,
-        region: e.region || null,
-        description: e.description || null,
-        reviews: e.reviews || null,
-        labelImageQuery: e.labelImageQuery || null,
-        vintage: e.vintage || null,
-        uncertain: e.uncertain || false,
-        uncertainReason: e.uncertainReason || null,
-      };
-    });
-
-    // Hide uncertain items from customers, but let manager screen see all via ?admin=1
-    const approvedWines = req.query.admin === '1'
-      ? mergedWines
-      : mergedWines.filter(w => !w.uncertain || enrichment[w.id]?.approved);
-    res.json({ wines: approvedWines, lastUpdated });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
-});
-
-// ─── HTTP Endpoint — Beers ────────────────────────────────────────────────────
-
-exports.getBeers = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [beersSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
-      db.ref('beers').once('value'),
-      db.ref('beerEnrichment').once('value'),
-      db.ref('beerLastUpdated').once('value'),
-      db.ref('beerOrder').once('value')
-    ]);
-
-    const beersById = beersSnap.val() || {};
-    const beerOrder = orderSnap.val() || [];
-    const enrichment = enrichmentSnap.val() || {};
-    const lastUpdated = lastUpdatedSnap.val();
-
-    const ordered = beerOrder.length > 0
-      ? beerOrder.map(id => beersById[id]).filter(Boolean)
-      : Object.values(beersById);
-
-    const merged = ordered.map(beer => {
-      const e = enrichment[beer.id] || {};
-      // Use item price, fall back to group inherited price
-      const price = beer.price || beer.groupPrice || null;
-      return {
-        ...beer,
-        name: e.correctedName || beer.name,
-        price,
-        imageUrl: beer.toastImageUrl || null,
-        style: e.style || null,
-        brewery: e.brewery || null,
-        abv: e.abv || null,
-        description: e.description || null,
-        uncertain: e.uncertain || false,
-        uncertainReason: e.uncertainReason || null,
-      };
-    });
-
-    const approvedBeers = req.query.admin === '1'
-      ? merged
-      : merged.filter(b => !b.uncertain || enrichment[b.id]?.approved);
-    res.json({ beers: approvedBeers, lastUpdated });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── HTTP Endpoint — Premium Pours ───────────────────────────────────────────
-
-exports.getPours = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [poursSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
-      db.ref('pours').once('value'),
-      db.ref('poursEnrichment').once('value'),
-      db.ref('poursLastUpdated').once('value'),
-      db.ref('poursOrder').once('value')
-    ]);
-
-    const poursById = poursSnap.val() || {};
-    const poursOrder = orderSnap.val() || [];
-    const enrichment = enrichmentSnap.val() || {};
-    const lastUpdated = lastUpdatedSnap.val();
-
-    const ordered = poursOrder.length > 0
-      ? poursOrder.map(id => poursById[id]).filter(Boolean)
-      : Object.values(poursById);
-
-    const merged = ordered.map(pour => {
-      const e = enrichment[pour.id] || {};
-      const price = pour.price || pour.groupPrice || null;
-      return {
-        ...pour,
-        name: e.correctedName || pour.name,
-        price,
-        imageUrl: pour.toastImageUrl || null,
-        category: e.category || null,
-        producer: e.producer || null,
-        abv: e.abv || null,
-        age: e.age || null,
-        description: e.description || null,
-        uncertain: e.uncertain || false,
-        uncertainReason: e.uncertainReason || null,
-      };
-    });
-
-    const approvedPours = req.query.admin === '1'
-      ? merged
-      : merged.filter(p => !p.uncertain || enrichment[p.id]?.approved);
-    res.json({ pours: approvedPours, lastUpdated });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Manual Enrichment Trigger ────────────────────────────────────────────────
-
-exports.triggerEnrichment = functions
-  .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    try {
-      const db = admin.database();
-      const winesSnap = await db.ref('wines').once('value');
-      const wines = winesSnap.val();
-      const wineList = Array.isArray(wines) ? wines : Object.values(wines || {});
-
-      const enrichmentSnap = await db.ref('wineEnrichment').once('value');
-      const existingEnrichment = enrichmentSnap.val() || {};
-
-      // LIMITED TO 3 FOR TESTING — remove .slice(0, 3) to enrich all wines
-      const toEnrich = wineList.filter(w => !existingEnrichment[w.id]).slice(0, 3);
-      console.log(`${toEnrich.length} wines to enrich (test mode — max 3)`);
-
-      let enrichedCount = 0;
-      const uncertain = [];
-
-      for (const wine of toEnrich) {
-        const vintage = parseVintage(wine.name);
-        const enrichment = await enrichWineWithClaude(wine.name, vintage);
-        if (enrichment) {
-          await db.ref(`wineEnrichment/${wine.id}`).set({
-            correctedName: enrichment.correctedName || wine.name,
-            uncertain: enrichment.uncertain || false,
-            uncertainReason: enrichment.uncertainReason || null,
-            varietal: enrichment.varietal || null,
-            region: enrichment.region || null,
-            description: enrichment.description || null,
-            reviews: enrichment.reviews || null,
-            labelImageQuery: enrichment.labelImageQuery || null,
-            vintage: vintage,
-            enrichedAt: Date.now()
-          });
-          enrichedCount++;
-          if (enrichment.uncertain) uncertain.push({ name: wine.name, reason: enrichment.uncertainReason });
-          console.log(`✓ ${wine.name} → ${enrichment.correctedName} (${enrichment.varietal})`);
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      res.json({
-        message: 'Test enrichment complete',
-        enriched: enrichedCount,
-        alreadyEnriched: wineList.length - wineList.filter(w => !existingEnrichment[w.id]).length,
-        total: wineList.length,
-        uncertainWines: uncertain,
-        note: 'Remove .slice(0, 3) to enrich all wines'
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  function lastWeekday(y, m, wd) { // last occurrence of weekday wd in month m
+    let last = null;
+    for (let d = 1; d <= 31; d++) {
+      const dt = new Date(y, m - 1, d);
+      if (dt.getMonth() !== m - 1) break;
+      if (dt.getDay() === wd) last = dt;
     }
-  });
+    return last;
+  }
 
-// ─── Food Menu Constants ──────────────────────────────────────────────────────
+  const thanksgiving    = nthWeekday(year, 11, 4, 4);         // 4th Thu of Nov
+  const dayBeforeThanks = new Date(thanksgiving.getTime() - 86400000);   // Wed before
+  const tueBeforeThanks = new Date(thanksgiving.getTime() - 172800000);  // Tue before
+  const memorialDay     = lastWeekday(year, 5, 1);             // last Mon of May
+  const thurBeforeMD    = new Date(memorialDay.getTime() - 345600000);   // Thu before MD
 
-const FOOD_GROUPS = [
-  { name: 'Soups & Salads', guid: 'c12bef8f-e3e0-4a50-8007-7edaddd2f4a2' },
-  { name: 'Starters',       guid: '17cc57c6-8192-42bb-82a4-7a873b2dcf67' },
-  { name: 'Entrees',        guid: '05bad67c-e484-4cca-91a9-59f11ac42628' },
-  { name: 'Dessert',        guid: '3c87ad2b-a3e8-44c4-9fd1-da741d9b0501' },
+  const today = new Date(year, month - 1, day);
+
+  // ── Spring closure: April 1 → Thursday before Memorial Day ─────────────────
+  if (today >= new Date(year, 3, 1) && today <= thurBeforeMD) return CLOSED;
+
+  // ── Fall closure: Nov 1 → Tuesday before Thanksgiving ──────────────────────
+  if (today >= new Date(year, 10, 1) && today <= tueBeforeThanks) return CLOSED;
+
+  // ── Summer season: Memorial Day → Oct 31 ───────────────────────────────────
+  if (today >= memorialDay && today <= new Date(year, 9, 31)) {
+    if (dow === 1 || dow === 2) return CLOSED; // Mon/Tue fully closed
+    const openHour = (dow === 3 || dow === 4) ? 16 : 11; // Wed/Thu open 4 PM; Fri/Sat/Sun 11 AM
+    if (hour >= openHour || hour < 1) return ACTIVE; // active until 1 AM
+    return SLOW;
+  }
+
+  // ── Winter season: day before Thanksgiving → March 31 ──────────────────────
+  // (Catches Jan–Mar automatically, and day-before-Thanksgiving through Dec 31)
+  if (hour >= 11 || hour < 1) return ACTIVE; // 11 AM – 1 AM
+  return SLOW;
+}
+
+// ─── Pairing Loading Messages ─────────────────────────────────────────────────
+
+const SOMMELIER_MESSAGES = [
+  "Your Virtual Sommelier is consulting the cellar…",
+  "Swirling, sniffing, and considering your options…",
+  "Evaluating every bottle on the list…",
+  "Checking tannins, acidity, and flavor bridges…",
+  "Conferring with the cellar master…",
+  "Nose: promising. Palate: almost there…",
+  "Decanting the perfect recommendation…",
 ];
 
-// ─── Food Extraction ──────────────────────────────────────────────────────────
+const KITCHEN_MESSAGES = [
+  "Stepping into the kitchen…",
+  "Consulting with Chef on the perfect match…",
+  "Weighing flavors, textures, and bridges…",
+  "Almost plated and ready…",
+  "Matching the terroir to your table…",
+];
 
-function extractFoodItems(menus, stockData) {
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
+function LoadingMessages({ messages, onAllShown }) {
+  const t = useTheme();
+  const [displayIdx, setDisplayIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const idxRef = useRef(0);
+  const shownRef = useRef(0);
+  const callbackRef = useRef(onAllShown);
+  useEffect(() => { callbackRef.current = onAllShown; }, [onAllShown]);
 
-  const allItems = [];
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        idxRef.current = (idxRef.current + 1) % messages.length;
+        shownRef.current++;
+        setDisplayIdx(idxRef.current);
+        setVisible(true);
+        if (shownRef.current >= messages.length) {
+          shownRef.current = 0; // reset so it loops if needed
+          callbackRef.current?.();
+        }
+      }, 450);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [messages.length]);
 
-  for (const { name: courseName, guid } of FOOD_GROUPS) {
-    // Search all menus for this group GUID
-    let group = null;
-    for (const menu of menus.menus) {
-      group = findGroupByGuid(menu.menuGroups || [], guid);
-      if (group) break;
-    }
-
-    if (!group) {
-      console.log(`Food group "${courseName}" (${guid}) not found`);
-      continue;
-    }
-
-    // Recursively collect all items from this group and its sub-groups
-    function collectItems(g) {
-      if (g.menuItems && g.menuItems.length > 0) {
-        g.menuItems.forEach(item => {
-          const price = item.price || null;
-          // Skip zero-price course markers
-          if (!price || price === 0) return;
-          // Skip out of stock — check both stock inventory API and item's own outOfStock flag
-          const stockInfo = stockMap[item.guid];
-          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-          // Toast marks out of stock by clearing visibility to []
-          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-          // Avoid duplicates
-          if (allItems.find(i => i.id === item.guid)) return;
-
-          allItems.push({
-            id: item.guid,
-            name: item.name,
-            price,
-            course: courseName,
-            description: item.description || null,
-            available: true,
-          });
-        });
-      }
-      if (g.menuGroups && g.menuGroups.length > 0) {
-        g.menuGroups.forEach(sub => collectItems(sub));
-      }
-    }
-
-    collectItems(group);
-    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
-  }
-
-  return allItems;
+  return (
+    <div style={{ textAlign: "center", padding: "32px 16px" }}>
+      <div style={{ fontSize: 28, marginBottom: 16 }}>✦</div>
+      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.45s ease", color: t.accent, fontSize: 15, fontStyle: "italic", fontFamily: t.fontSerif, letterSpacing: "0.5px", lineHeight: 1.6 }}>
+        {messages[displayIdx]}
+      </div>
+    </div>
+  );
 }
 
-// Settings-aware version: accepts a dynamic groups array instead of hardcoded FOOD_GROUPS
-function extractFoodItemsFromGroups(menus, stockData, groups) {
-  const stockMap = {};
-  if (Array.isArray(stockData)) {
-    stockData.forEach(item => { const g = item.guid || item.menuItem?.guid; if (g) stockMap[g] = item; });
-  }
-  const allItems = [];
-  for (const { name: courseName, guid } of groups) {
-    let group = null;
-    for (const menu of menus.menus) {
-      group = findGroupByGuid(menu.menuGroups || [], guid);
-      if (group) break;
-    }
-    if (!group) { console.log(`Food group "${courseName}" (${guid}) not found`); continue; }
-    function collectItems(g) {
-      if (g.menuItems && g.menuItems.length > 0) {
-        g.menuItems.forEach(item => {
-          const price = item.price || null;
-          if (!price || price === 0) return;
-          const stockInfo = stockMap[item.guid];
-          if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-          if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-          if (allItems.find(i => i.id === item.guid)) return;
-          allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true });
-        });
-      }
-      if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub));
-    }
-    collectItems(group);
-    console.log(`Food group "${courseName}" — found ${allItems.filter(i => i.course === courseName).length} items`);
-  }
-  return allItems;
-}
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
 
-// ─── Food Menu Sync ───────────────────────────────────────────────────────────
-exports.syncFoodMenu = functions
-  .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('9,39 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Food menu sync...');
-      const settings = await getAppSettings();
-      const foodMenuConfigs = getMenusOfType(settings, 'food');
+const MENU_TYPES = [
+  { value: "wine",         label: "Wine List",           description: "AI enrichment · glass/bottle merge · bidirectional pairing" },
+  { value: "food",         label: "Food Menu",           description: "Course-grouped · pairing source · no enrichment" },
+  { value: "beer_pours",   label: "Beer & Premium Pours", description: "AI enrichment · labels · food→drink pairing" },
+  { value: "cocktails_na", label: "Cocktails & NA Beverages", description: "No enrichment · labels · food→drink pairing" },
+];
 
-      // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
-      let dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid, locations: m.locations || [] }));
-      if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
+const EMPTY_MENU = {
+  id: null, label: "", guid: "", menuType: "wine", locations: [],
+};
 
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
+function SettingsTab() {
+  const t = useTheme();
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState(null);
+  const [expandedMenu, setExpandedMenu] = useState(null);
+  const [addingMenu, setAddingMenu] = useState(false);
+  const [newMenu, setNewMenu] = useState({ ...EMPTY_MENU });
+  const [syncingMenu, setSyncingMenu] = useState(null);
+  const [toastAvailability, setToastAvailability] = useState({});
 
-      // Temporarily override FOOD_GROUPS for this sync run
-      const freshItems = extractFoodItemsFromGroups(menus, stockData, dynamicFoodGroups);
+  // Location names — editable
+  const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
+  const [editingLocations, setEditingLocations] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({ bar: "Bar", dining: "Dining Room" });
 
-      const db = admin.database();
-      // Merge locations when the same item appears in multiple menu configs
-      // (e.g. AK Entrees subgroup appears in both AK master menu and standalone Tuque's entry)
-      const foodById = {};
-      freshItems.forEach(item => {
-        if (foodById[item.id]) {
-          // Item already seen — merge locations arrays
-          const existing = foodById[item.id].locations || [];
-          const incoming = item.locations || [];
-          const merged = [...new Set([...existing, ...incoming])];
-          foodById[item.id] = { ...foodById[item.id], locations: merged };
-        } else {
-          foodById[item.id] = item;
-        }
-      });
-      await db.ref('foodItems').set(foodById);
-      await db.ref('foodOrder').set([...new Set(freshItems.map(i => i.id))]);
-      await db.ref('foodLastUpdated').set(Date.now());
+  // Device setup — default location and logos
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
+  const [editingDeviceSetup, setEditingDeviceSetup] = useState(false);
+  const [deviceSetupDraft, setDeviceSetupDraft] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
+  const [availableLogos, setAvailableLogos] = useState([{ value: "", label: "— Default logo —" }]);
 
-      console.log(`Food sync complete — saved ${freshItems.length} items`);
-      return null;
-    } catch (error) {
-      console.error('Food sync error:', error.message);
-      return null;
-    }
-  });
-
-// ─── HTTP Endpoint — Food Items ───────────────────────────────────────────────
-
-exports.getFoodItems = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [foodSnap, orderSnap, lastUpdatedSnap, exclusionsSnap] = await Promise.all([
-      db.ref('foodItems').once('value'),
-      db.ref('foodOrder').once('value'),
-      db.ref('foodLastUpdated').once('value'),
-      db.ref('foodExclusions').once('value'),
-    ]);
-
-    const foodById = foodSnap.val() || {};
-    const foodOrder = orderSnap.val() || [];
-    const lastUpdated = lastUpdatedSnap.val();
-    const exclusions = exclusionsSnap.val() || {};
-
-    const ordered = (foodOrder.length > 0
-      ? foodOrder.map(id => foodById[id]).filter(Boolean)
-      : Object.values(foodById)
-    ).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
-
-    res.json({ foodItems: ordered, lastUpdated });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Sommelier Pairing Endpoint ───────────────────────────────────────────────
-
-exports.getPairing = functions
-  .runWith({ timeoutSeconds: 60, memory: '256MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-
-    try {
-      const { type, itemId } = req.body;
-      const db = admin.database();
-
-      // ── Wine → Food ───────────────────────────────────────────────────────
-      if (type === 'wine_to_food') {
-        const [wineSnap, enrichSnap, foodSnap] = await Promise.all([
-          db.ref(`wines/${itemId}`).once('value'),
-          db.ref(`wineEnrichment/${itemId}`).once('value'),
-          db.ref('foodItems').once('value'),
+  useEffect(() => {
+    fetch("/logos/index.json")
+      .then(r => r.json())
+      .then(list => {
+        setAvailableLogos([
+          { value: "", label: "— Default logo —" },
+          ...list
         ]);
-        const wine = wineSnap.val();
-        if (!wine) return res.status(404).json({ error: 'Wine not found' });
-        const enrich = enrichSnap.val() || {};
-        const foodItems = Object.values(foodSnap.val() || {});
-
-        const wineName = enrich.correctedName || wine.name;
-        const foodList = foodItems
-          .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
-          .join('\n');
-
-        const excludeDishes = req.body.excludeDishes || [];
-        const excludeNote = excludeDishes.length > 0
-          ? `\n\nIMPORTANT: Do NOT suggest these dishes — the guest has already seen them: ${excludeDishes.join(', ')}. Choose different dishes if at all possible.`
-          : '';
-
-        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is considering this wine:
-
-Wine: ${wineName}${enrich.varietal ? `\nVarietal: ${enrich.varietal}` : ''}${enrich.region ? `\nRegion: ${enrich.region}` : ''}${enrich.description ? `\nTasting notes: ${enrich.description}` : ''}
-
-From our current menu, suggest exactly 2-3 dishes that pair beautifully with this wine. Choose ONLY from this list:
-${foodList}${excludeNote}
-
-Respond in JSON only (no other text):
-{"pairings":[{"name":"exact dish name","course":"course name","reason":"one evocative sentence why this pairing works"}]}`;
-
-        const response = await axios.post(
-          'https://api.anthropic.com/v1/messages',
-          { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
-          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-        );
-        const text = response.data.content[0].text;
-        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        // Enrich pairings with food item IDs so the frontend can add them to My Menu
-        const foodByName = {};
-        foodItems.forEach(f => { foodByName[f.name.toLowerCase()] = f; });
-        const enrichedPairings = (result.pairings || []).map(p => {
-          const match = foodByName[p.name.toLowerCase()];
-          return match ? { ...p, id: match.id, price: match.price || null } : p;
-        });
-        return res.json({ pairings: enrichedPairings });
-      }
-
-      // ── Food → Wine ───────────────────────────────────────────────────────
-      if (type === 'food_to_wine') {
-        // Accept items with courseRole or fall back to legacy itemIds
-        const itemsWithRoles = req.body.items ||
-          (req.body.itemIds || (itemId ? [itemId] : [])).map(id => ({ id, courseRole: 'main' }));
-        if (itemsWithRoles.length === 0) return res.status(400).json({ error: 'items required' });
-
-        const [winesSnap, enrichSnap] = await Promise.all([
-          db.ref('wines').once('value'),
-          db.ref('wineEnrichment').once('value'),
-        ]);
-        const uniqueIds = [...new Set(itemsWithRoles.map(i => i.id))];
-        const foodSnaps = await Promise.all(uniqueIds.map(id => db.ref(`foodItems/${id}`).once('value')));
-        const foodById = {};
-        foodSnaps.forEach(s => { if (s.val()) foodById[s.key] = s.val(); });
-        if (Object.keys(foodById).length === 0) return res.status(404).json({ error: 'Food items not found' });
-        const food = foodById[uniqueIds[0]]; // backward compat alias
-
-        const winesById = winesSnap.val() || {};
-        const enrichment = enrichSnap.val() || {};
-
-        // Sort wines by price and split into thirds so tiers reflect actual prices
-        const wineObjects = Object.values(winesById)
-          .filter(w => (w.bottlePrice || w.glassPrice) && w.available !== false
-            && !(enrichment[w.id]?.uncertain && !enrichment[w.id]?.approved))
-          .map(w => {
-            const e = enrichment[w.id] || {};
-            return {
-              id: w.id,
-              name: e.correctedName || w.name,
-              varietal: e.varietal || null,
-              region: e.region || null,
-              glassPrice: w.glassPrice || null,
-              bottlePrice: w.bottlePrice || null,
-              toastImageUrl: w.toastImageUrl || null,
-              sortPrice: w.bottlePrice || w.glassPrice || 0
-            };
-          })
-          .sort((a, b) => a.sortPrice - b.sortPrice);
-
-        const third = Math.ceil(wineObjects.length / 3);
-        const tierGroups = {
-          'Value': wineObjects.slice(0, third),
-          'Mid-Range': wineObjects.slice(third, third * 2),
-          'Premium': wineObjects.slice(third * 2)
-        };
-
-        const formatWine = w => {
-          const prices = [];
-          if (w.glassPrice) prices.push(`glass $${Math.round(w.glassPrice)}`);
-          if (w.bottlePrice) prices.push(`bottle $${Math.round(w.bottlePrice)}`);
-          return `- ID:${w.id} | ${w.name}${w.varietal ? ` (${w.varietal})` : ''}${w.region ? `, ${w.region}` : ''} | ${prices.join(', ')}`;
-        };
-
-        const wineListByTier = Object.entries(tierGroups)
-          .map(([tier, ws]) => `${tier.toUpperCase()} WINES (pick one from this section for the ${tier} recommendation):\n${ws.map(formatWine).join('\n')}`)
-          .join('\n\n');
-
-        const excludeWineIds = req.body.excludeWineIds || {};
-        const excludeLines = Object.entries(excludeWineIds)
-          .map(([level, id]) => {
-            const w = wineObjects.find(w => w.id === id);
-            return w ? `${level}: ${w.name}` : null;
-          }).filter(Boolean);
-        const excludeNote = excludeLines.length > 0
-          ? `\n\nIMPORTANT: The guest has already seen these — choose DIFFERENT wines for each tier if at all possible:\n${excludeLines.join('\n')}`
-          : '';
-
-        // Group by guest-selected course role
-        const roleLabels = { first: 'First Course', main: 'Main Course', dessert: 'Dessert' };
-        const courseGroups = {};
-        itemsWithRoles.forEach(({ id, courseRole }) => {
-          const food = foodById[id];
-          if (!food) return;
-          const label = roleLabels[courseRole] || 'Main Course';
-          if (!courseGroups[label]) courseGroups[label] = [];
-          // Avoid duplicate dishes in same group
-          if (!courseGroups[label].find(f => f.id === food.id)) courseGroups[label].push(food);
-        });
-        // Preserve logical course order
-        const courseOrder = ['First Course', 'Main Course', 'Dessert'];
-        const courseNames = courseOrder.filter(c => courseGroups[c]);
-        const isMultiCourse = courseNames.length > 1;
-
-        function enrichPairings(pairings) {
-          return (pairings || []).map(p => {
-            const w = wineObjects.find(wo => wo.id === p.id);
-            return { ...p, imageUrl: w ? (w.toastImageUrl || null) : null, glassPrice: w ? w.glassPrice : p.glassPrice, bottlePrice: w ? w.bottlePrice : p.bottlePrice };
-          });
-        }
-
-        let prompt, maxTokens;
-
-        if (isMultiCourse) {
-          // Build per-course description
-          const courseSections = courseNames.map(course => {
-            const dishes = courseGroups[course];
-            const dishDesc = dishes.map(d => d.name + (d.description ? ` (${d.description})` : '')).join(', ');
-            return `${course.toUpperCase()}: ${dishDesc}`;
-          }).join('\n');
-
-          prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia.
-
-This table is ordering multiple courses:
-${courseSections}
-
-For EACH course, suggest exactly three wines — one Value, one Mid-Range, one Premium — that pair beautifully with that course's dish(es). Choose wines that also flow well together as a progression through the meal. You MUST pick from the correct section for each tier.
-${wineListByTier}${excludeNote}
-
-Respond in JSON only (no other text):
-{"courses":[{"course":"course name","pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}]}`;
-          maxTokens = 2400;
-        } else {
-          const allFoods = itemsWithRoles.map(({ id }) => foodById[id]).filter(Boolean);
-          const dishList = allFoods.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ''}`).join('\n');
-          const tableContext = allFoods.length === 1
-            ? `A guest is ordering:\n${dishList}`
-            : `A table of guests is sharing these dishes:\n${dishList}\n\nSuggest wines that work well across all dishes.`;
-
-          prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. ${tableContext}
-
-Suggest exactly three wines that pair beautifully with ${allFoods.length === 1 ? 'this dish' : 'these dishes'} — one from each price tier below. You MUST pick from the correct section for each tier.
-${wineListByTier}${excludeNote}
-
-Respond in JSON only (no other text):
-{"pairings":[{"level":"Value","id":"wine-id","name":"wine name","varietal":"varietal","region":"region","glassPrice":null,"bottlePrice":null,"reason":"one evocative sentence"},{"level":"Mid-Range",...},{"level":"Premium",...}]}`;
-          maxTokens = 1600;
-        }
-
-        const response = await axios.post(
-          'https://api.anthropic.com/v1/messages',
-          { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] },
-          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-        );
-        const text = response.data.content[0].text;
-        console.log(`food_to_wine response (${isMultiCourse ? 'multi' : 'single'}): ${text.substring(0, 200)}`);
-
-        // Robust JSON extraction — finds the outermost {} even if Claude adds text around it
-        function extractJson(raw) {
-          const stripped = raw.replace(/```json|```/g, '').trim();
-          const start = stripped.indexOf('{');
-          const end = stripped.lastIndexOf('}');
-          if (start !== -1 && end !== -1 && end > start) {
-            return JSON.parse(stripped.substring(start, end + 1));
-          }
-          return JSON.parse(stripped);
-        }
-
-        const result = extractJson(text);
-
-        if (isMultiCourse) {
-          // Claude may return courses under different keys — handle both
-          const rawCourses = result.courses || result.byCourse || result.course_pairings || [];
-          if (rawCourses.length === 0) {
-            // Fallback: if Claude returned flat pairings instead of course structure, treat as single course
-            console.log('Multi-course fallback: no courses key found, using flat pairings');
-            return res.json({ pairings: enrichPairings(result.pairings || []) });
-          }
-          // Normalize Claude's course names to our standard labels regardless of casing
-          function normalizeCourse(name) {
-            const l = (name || '').toLowerCase();
-            if (l.includes('first') || l.includes('starter') || l.includes('appetizer')) return 'First Course';
-            if (l.includes('dessert') || l.includes('sweet')) return 'Dessert';
-            return 'Main Course';
-          }
-          const enrichedCourses = rawCourses.map(c => {
-            const normalizedCourse = normalizeCourse(c.course);
-            return {
-              ...c,
-              course: normalizedCourse,
-              dishes: (courseGroups[normalizedCourse] || courseGroups[c.course] || []).map(d => d.name),
-              pairings: enrichPairings(c.pairings)
-            };
-          });
-          return res.json({ byCourse: enrichedCourses });
-        } else {
-          return res.json({ pairings: enrichPairings(result.pairings) });
-        }
-      }
-
-
-      // ── Drink → Food (Beer & Pours) ──────────────────────────────────────
-      if (type === 'drink_to_food') {
-        const { itemName, itemDescription, itemStyle, itemCategory, itemABV, excludeDishes = [] } = req.body;
-        const [foodSnap, exclusionsSnap] = await Promise.all([
-          db.ref('foodItems').once('value'),
-          db.ref('foodExclusions').once('value'),
-        ]);
-        const exclusions = exclusionsSnap.val() || {};
-        const foodItems = Object.values(foodSnap.val() || {}).filter(f => !exclusions[f.id]);
-        const foodList = foodItems
-          .map(f => `- ${f.name} (${f.course})${f.description ? ': ' + f.description : ''}`)
-          .join('\n');
-        const drinkDesc = [itemStyle || itemCategory, itemABV ? `${itemABV} ABV` : null, itemDescription].filter(Boolean).join(' · ');
-        const excludeNote = excludeDishes.length > 0
-          ? `\n\nIMPORTANT: Do NOT suggest these dishes — the guest has already seen them: ${excludeDishes.join(', ')}. Choose different dishes if at all possible.`
-          : '';
-
-        const prompt = `You are the sommelier at Appalachia Kitchen, an upscale mountain restaurant at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. A guest is considering:
-
-Drink: ${itemName}${drinkDesc ? `\nDetails: ${drinkDesc}` : ''}
-
-From our current menu, suggest exactly 2-3 dishes that pair beautifully with this drink. Choose ONLY from this list:
-${foodList}${excludeNote}
-
-Respond in JSON only (no other text):
-{"pairings":[{"name":"exact dish name","course":"course name","reason":"one evocative sentence why this pairing works"}]}`;
-
-        const response = await axios.post(
-          'https://api.anthropic.com/v1/messages',
-          { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
-          { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } }
-        );
-        const text = response.data.content[0].text;
-        const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-        // Enrich pairings with food item IDs so the frontend can add them to My Menu
-        const drinkFoodByName = {};
-        foodItems.forEach(f => { drinkFoodByName[f.name.toLowerCase()] = f; });
-        const enrichedDrinkPairings = (result.pairings || []).map(p => {
-          const match = drinkFoodByName[p.name.toLowerCase()];
-          return match ? { ...p, id: match.id, price: match.price || null } : p;
-        });
-        return res.json({ pairings: enrichedDrinkPairings });
-      }
-
-      return res.status(400).json({ error: 'Invalid type' });
-    } catch (error) {
-      console.error('Pairing error:', error.message);
-      return res.status(500).json({ error: error.message });
-    }
-  });
-
-// ─── Food Item Exclusion ──────────────────────────────────────────────────────
-
-exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  try {
-    const { itemId, excluded } = req.body;
-    if (!itemId) return res.status(400).json({ error: 'itemId required' });
-    const db = admin.database();
-    // Store in separate node so syncFoodMenu never overwrites it
-    await db.ref(`foodExclusions/${itemId}`).set(excluded === true ? true : null);
-    res.json({ ok: true, itemId, excluded });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Specialty Cocktails Sync ─────────────────────────────────────────────────
-
-const COCKTAILS_MENU_GUID = '618dd517-3de7-456c-b38e-0cd0739947a6';
-const NAB_MENU_GUID = 'fa091def-5bc2-434e-a436-64b29ce7932f';
-
-exports.syncCocktailsMenu = functions
-  .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('12,42 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Specialty Cocktails sync...');
-      const settings = await getAppSettings();
-      const cnMenus = getMenusOfType(settings, 'cocktails_na');
-      const cocktailMenus = cnMenus.filter(m => /cocktail/i.test(m.label));
-      const toSync = cocktailMenus.length > 0 ? cocktailMenus : (cnMenus.length > 0 ? [cnMenus[0]] : [{ guid: COCKTAILS_MENU_GUID }]);
-
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-      let freshItems = [];
-      for (const cm of toSync) freshItems = [...freshItems, ...extractItemsFromMenu(menus, cm.guid, stockData)];
-
-      const db = admin.database();
-      const itemsById = {};
-      freshItems.forEach(i => { itemsById[i.id] = i; });
-      await db.ref('cocktails').set(itemsById);
-      await db.ref('cocktailsOrder').set(freshItems.map(i => i.id));
-      await db.ref('cocktailsLastUpdated').set(Date.now());
-      console.log(`Cocktails sync complete — saved ${freshItems.length} items`);
-      return null;
-    } catch (error) {
-      console.error('Cocktails sync error:', error.message);
-      return null;
-    }
-  });
-
-exports.getCocktails = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
-      db.ref('cocktails').once('value'),
-      db.ref('cocktailsOrder').once('value'),
-      db.ref('cocktailsLastUpdated').once('value'),
-    ]);
-    const byId = snap.val() || {};
-    const order = orderSnap.val() || [];
-    const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
-    res.json({ cocktails: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Non-Alcoholic Beverages Sync ────────────────────────────────────────────
-
-exports.syncNABMenu = functions
-  .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('15,45 * * * *')
-  .onRun(async (context) => {
-    try {
-      console.log('Starting Non-Alcoholic Beverages sync...');
-      const settings = await getAppSettings();
-      const cnMenus = getMenusOfType(settings, 'cocktails_na');
-      const nabMenus = cnMenus.filter(m => /non.?alc|nab|beverage|juice|soda|water/i.test(m.label));
-      const toSync = nabMenus.length > 0 ? nabMenus : (cnMenus.length > 1 ? [cnMenus[1]] : [{ guid: NAB_MENU_GUID }]);
-
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-      let freshItems = [];
-      for (const nm of toSync) freshItems = [...freshItems, ...extractItemsFromMenu(menus, nm.guid, stockData)];
-
-      const db = admin.database();
-      const itemsById = {};
-      freshItems.forEach(i => { itemsById[i.id] = i; });
-      await db.ref('nab').set(itemsById);
-      await db.ref('nabOrder').set(freshItems.map(i => i.id));
-      await db.ref('nabLastUpdated').set(Date.now());
-      console.log(`NAB sync complete — saved ${freshItems.length} items`);
-      return null;
-    } catch (error) {
-      console.error('NAB sync error:', error.message);
-      return null;
-    }
-  });
-
-exports.getNAB = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  try {
-    const db = admin.database();
-    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
-      db.ref('nab').once('value'),
-      db.ref('nabOrder').once('value'),
-      db.ref('nabLastUpdated').once('value'),
-    ]);
-    const byId = snap.val() || {};
-    const order = orderSnap.val() || [];
-    const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
-    res.json({ nab: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Manager Update Enrichment ────────────────────────────────────────────────
-
-exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  try {
-    const { itemId, itemType, updates } = req.body;
-    if (!itemId || !itemType) return res.status(400).json({ error: 'itemId and itemType required' });
-    const db = admin.database();
-
-    if (itemType === 'food') {
-      const snap = await db.ref(`foodItems/${itemId}`).once('value');
-      const existing = snap.val() || {};
-      const { excluded, ...otherUpdates } = updates;
-      // excluded flag lives in foodExclusions/ so it survives syncs
-      if (excluded !== undefined) {
-        await db.ref(`foodExclusions/${itemId}`).set(excluded === true ? true : null);
-      }
-      if (Object.keys(otherUpdates).length > 0) {
-        await db.ref(`foodItems/${itemId}`).set({ ...existing, ...otherUpdates, lastEditedAt: Date.now() });
-      }
-    } else {
-      const enrichPath = itemType === 'wine' ? 'wineEnrichment' : itemType === 'beer' ? 'beerEnrichment' : 'poursEnrichment';
-      const snap = await db.ref(`${enrichPath}/${itemId}`).once('value');
-      const existing = snap.val() || {};
-      await db.ref(`${enrichPath}/${itemId}`).set({
-        ...existing,
-        ...updates,
-        manuallyEdited: true,
-        lastEditedAt: Date.now()
-      });
-    }
-    res.json({ ok: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Force Sync Endpoint ──────────────────────────────────────────────────────
-
-exports.forceSync = functions
-  .runWith({ timeoutSeconds: 60, memory: '256MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-
-    try {
-      const { categories } = req.body;
-      const toRun = Array.isArray(categories) ? categories : ['wine', 'beer', 'pours', 'food', 'cocktails', 'nab'];
-
-      const funcMap = {
-        wine:      'syncWineMenu',
-        beer:      'syncBeerMenu',
-        pours:     'syncPoursMenu',
-        food:      'syncFoodMenu',
-        cocktails: 'syncCocktailsMenu',
-        nab:       'syncNABMenu',
-      };
-
-      // Get GCP access token from metadata server (available in all Cloud Functions)
-      const tokenRes = await axios.get(
-        'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
-        { headers: { 'Metadata-Flavor': 'Google' } }
-      );
-      const accessToken = tokenRes.data.access_token;
-      const projectId = 'corduroy-wine-list';
-
-      const triggered = [];
-      for (const cat of toRun) {
-        const funcName = funcMap[cat];
-        if (!funcName) continue;
-        const topicName = `firebase-schedule-${funcName}-us-central1`;
-        await axios.post(
-          `https://pubsub.googleapis.com/v1/projects/${projectId}/topics/${topicName}:publish`,
-          { messages: [{ data: Buffer.from('{}').toString('base64') }] },
-          { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-        );
-        triggered.push(cat);
-      }
-
-      res.json({ ok: true, triggered, message: `Triggered: ${triggered.join(', ')}. Syncs run in background — check again in ~60 seconds.` });
-    } catch (error) {
-      console.error('forceSync error:', error.message);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-
-// ─── Manual Cleanup Endpoint ──────────────────────────────────────────────────
-// Purges orphaned enrichment/data records across all categories in one shot.
-// Called from the manager dashboard after fixing a miscategorised menu.
-exports.cleanupOrphanedData = functions
-  .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-
-    try {
-      const db = admin.database();
-      const settings = await getAppSettings();
-      const token = await getToastToken();
-      const menus = await getMenus(token);
-      const stockData = await getStockData(token);
-
-      const results = {};
-
-      // Wine
-      const wineMenus = getMenusOfType(settings, 'wine');
-      let allWineIds = new Set();
-      for (const wm of wineMenus) {
-        const raw = extractWinesFromGuid(menus, wm.guid, stockData);
-        mergeGlassBottle(raw).forEach(w => allWineIds.add(w.id));
-      }
-      await purgeOrphanedEnrichment(db, 'wines', 'wineEnrichment', [...allWineIds], 'wine-cleanup');
-      results.wine = allWineIds.size;
-
-      // Beer
-      const beerPourMenus = getMenusOfType(settings, 'beer_pours');
-      const beerMenus = beerPourMenus.filter(m => /beer/i.test(m.label));
-      const beerToSync = beerMenus.length > 0 ? beerMenus : (beerPourMenus.length > 0 ? [beerPourMenus[0]] : []);
-      let allBeerIds = new Set();
-      for (const bm of beerToSync) {
-        extractItemsFromMenu(menus, bm.guid, stockData).forEach(b => allBeerIds.add(b.id));
-      }
-      await purgeOrphanedEnrichment(db, 'beers', 'beerEnrichment', [...allBeerIds], 'beer-cleanup');
-      results.beer = allBeerIds.size;
-
-      // Pours
-      const pourMenus = beerPourMenus.filter(m => /pour|spirit|whiskey|bourbon|tequila|premium/i.test(m.label));
-      const poursToSync = pourMenus.length > 0 ? pourMenus : (beerPourMenus.length > 1 ? [beerPourMenus[1]] : []);
-      let allPourIds = new Set();
-      for (const pm of poursToSync) {
-        extractItemsFromMenu(menus, pm.guid, stockData).forEach(p => allPourIds.add(p.id));
-      }
-      await purgeOrphanedEnrichment(db, 'pours', 'poursEnrichment', [...allPourIds], 'pours-cleanup');
-      results.pours = allPourIds.size;
-
-      return res.json({ ok: true, validCounts: results, message: 'Orphaned records purged across all categories.' });
-    } catch (e) {
-      console.error('cleanupOrphanedData error:', e.message);
-      return res.status(500).json({ error: e.message });
-    }
-  });
-
-// ─── Save Menu ────────────────────────────────────────────────────────────────
-exports.saveMenu = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try {
-    const { favorites } = req.body;
-    if (!favorites || !Array.isArray(favorites)) return res.status(400).json({ error: 'Invalid data' });
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let menuId = '';
-    for (let i = 0; i < 6; i++) menuId += chars[Math.floor(Math.random() * chars.length)];
-    const createdAt = Date.now();
-    await admin.database().ref(`savedMenus/${menuId}`).set({ favorites, createdAt });
-    res.json({ ok: true, menuId, createdAt });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ─── Get Menu ─────────────────────────────────────────────────────────────────
-exports.getMenu = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'No menu ID' });
-  try {
-    const snapshot = await admin.database().ref(`savedMenus/${id}`).once('value');
-    const data = snapshot.val();
-    if (!data) return res.status(404).json({ error: 'not_found' });
-    // Only check expiry for old records that have an expiresAt field
-    if (data.expiresAt && Date.now() > data.expiresAt) {
-      await admin.database().ref(`savedMenus/${id}`).remove();
-      return res.status(410).json({ error: 'expired' });
-    }
-    // Convert compact keys back to full field names for GuestMenuScreen
-    const fullFavorites = (data.favorites || []).map((f, i) => ({
-      id: `shared-${i}`,
-      favoriteType: f.t,
-      name: f.n,
-      courseRole: f.cr,
-      price: f.p,
-      description: f.d,
-      varietal: f.v,
-      region: f.r,
-      glassPrice: f.gp,
-      bottlePrice: f.bp,
-      reason: f.rs,
-      courseLabel: f.cl,
-      fromPairing: f.fp,
-      imageUrl: f.img || null,
-    }));
-    res.json({ ok: true, favorites: fullFavorites, expiresAt: data.expiresAt, createdAt: data.createdAt });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ─── Send Menu Email ──────────────────────────────────────────────────────────
-exports.sendMenuEmail = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try {
-    const { email, menuId } = req.body;
-    if (!email || !menuId) return res.status(400).json({ error: 'Missing email or menu ID' });
-    const snapshot = await admin.database().ref(`savedMenus/${menuId}`).once('value');
-    const data = snapshot.val();
-    if (!data || Date.now() > data.expiresAt) return res.status(410).json({ error: 'expired' });
-    const resendKey = process.env.RESEND_API_KEY;
-    if (!resendKey) return res.status(503).json({ error: 'not_configured' });
-    const menuUrl = `https://corduroy-wine-list.vercel.app/?m=${menuId}`;
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'Appalachia Kitchen <menu@corduroy-inn.com>',
-        to: email,
-        subject: 'Your Menu from Appalachia Kitchen',
-        html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#1e1100;color:#f0e8d8;"><div style="text-align:center;margin-bottom:24px;"><div style="color:#c9a96e;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Your Evening at</div><div style="font-size:22px;margin-bottom:4px;">Appalachia Kitchen</div><div style="color:#5a4030;font-size:12px;">Corduroy Inn &amp; Lodge &middot; Snowshoe Mountain, WV</div></div><p style="color:#9a8060;font-size:14px;line-height:1.6;">Thank you for dining with us. Here is a link to your menu from this evening:</p><div style="text-align:center;margin:24px 0;"><a href="${menuUrl}" style="background:#c9a96e;color:#0d0800;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;">View My Menu</a></div><p style="color:#5a4030;font-size:11px;text-align:center;">We hope to see you again soon.</p></div>`
       })
-    });
-    if (emailRes.ok) res.json({ ok: true });
-    else res.status(500).json({ error: 'send_failed' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+      .catch(() => {}); // silently ignore if index.json not present yet
+  }, []);
 
-// ─── Sommelier Chat Endpoint ──────────────────────────────────────────────────
-// Hard-boxed to F&B at Appalachia Kitchen only. No price comparisons to retail
-// or other restaurants. No off-topic conversation. Polite redirects for anything
-// outside food and beverage.
-
-exports.sommelierChat = functions
-  .runWith({ timeoutSeconds: 30, memory: '256MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-
-    try {
-      const { messages, contextItem, selectedFoods } = req.body;
-      if (!messages || !Array.isArray(messages)) {
-        return res.status(400).json({ error: 'messages array required' });
-      }
-
-      // Load live menu data from Firebase (including settings for availability filtering)
-      const db = admin.database();
-      const [
-        winesSnap, wineEnrichSnap, wineOrderSnap,
-        beersSnap, beerEnrichSnap, beerOrderSnap,
-        poursSnap, poursEnrichSnap, poursOrderSnap,
-        foodSnap, foodOrderSnap, exclusionsSnap,
-        cocktailsSnap, cocktailsOrderSnap,
-        nabSnap, nabOrderSnap,
-        appSettingsSnap,
-      ] = await Promise.all([
-        db.ref('wines').once('value'),
-        db.ref('wineEnrichment').once('value'),
-        db.ref('wineOrder').once('value'),
-        db.ref('beers').once('value'),
-        db.ref('beerEnrichment').once('value'),
-        db.ref('beerOrder').once('value'),
-        db.ref('pours').once('value'),
-        db.ref('poursEnrichment').once('value'),
-        db.ref('poursOrder').once('value'),
-        db.ref('foodItems').once('value'),
-        db.ref('foodOrder').once('value'),
-        db.ref('foodExclusions').once('value'),
-        db.ref('cocktails').once('value'),
-        db.ref('cocktailsOrder').once('value'),
-        db.ref('nab').once('value'),
-        db.ref('nabOrder').once('value'),
-        db.ref('appSettings').once('value'),
-      ]);
-
-      // Check which menu types are currently available per Toast-sourced schedule
-      const appSettings = appSettingsSnap.val() || {};
-      const configuredMenus = appSettings.menus || [];
-      const toastAvailCache = appSettings.toastAvailability || {};
-      function isTypeAvailableNow(menuType) {
-        const menusOfType = configuredMenus.filter(m => m.menuType === menuType);
-        if (menusOfType.length === 0) return true; // not configured — assume available
-        return menusOfType.some(m => isMenuAvailableNow(m, toastAvailCache));
-      }
-      const wineAvailable     = isTypeAvailableNow('wine');
-      const beerPoursAvailable = isTypeAvailableNow('beer_pours');
-      const cocktailsNAAvailable = isTypeAvailableNow('cocktails_na');
-      const foodAvailable     = isTypeAvailableNow('food');
-
-      // Build wine list
-      const winesById = winesSnap.val() || {};
-      const wineEnrich = wineEnrichSnap.val() || {};
-      const wineOrder = wineOrderSnap.val() || [];
-      const orderedWines = (wineOrder.length > 0
-        ? wineOrder.map(id => winesById[id]).filter(Boolean)
-        : Object.values(winesById)
-      ).filter(w => w.available !== false && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
-
-      const wineLines = orderedWines.map(w => {
-        const e = wineEnrich[w.id] || {};
-        const name = e.correctedName || w.name;
-        const prices = [];
-        if (w.glassPrice) prices.push(`$${Math.round(w.glassPrice)} glass`);
-        if (w.bottlePrice) prices.push(`$${Math.round(w.bottlePrice)} bottle`);
-        const meta = [e.varietal, e.region].filter(Boolean).join(', ');
-        return `  - [id:${w.id}] ${name}${meta ? ` (${meta})` : ''}${prices.length ? ' -- ' + prices.join(', ') : ''}${e.description ? ' | ' + e.description : ''}`;
-      });
-
-      // Build beer list
-      const beersById = beersSnap.val() || {};
-      const beerEnrich = beerEnrichSnap.val() || {};
-      const beerOrder = beerOrderSnap.val() || [];
-      const orderedBeers = (beerOrder.length > 0
-        ? beerOrder.map(id => beersById[id]).filter(Boolean)
-        : Object.values(beersById)
-      ).filter(b => b.available !== false);
-
-      const beerLines = orderedBeers.map(b => {
-        const e = beerEnrich[b.id] || {};
-        const price = b.price || b.groupPrice;
-        return `  - ${e.correctedName || b.name}${e.style ? ` (${e.style})` : ''}${e.brewery ? ` -- ${e.brewery}` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
-      });
-
-      // Build premium pours list
-      const poursById = poursSnap.val() || {};
-      const poursEnrich = poursEnrichSnap.val() || {};
-      const poursOrder = poursOrderSnap.val() || [];
-      const orderedPours = (poursOrder.length > 0
-        ? poursOrder.map(id => poursById[id]).filter(Boolean)
-        : Object.values(poursById)
-      ).filter(p => p.available !== false);
-
-      const pourLines = orderedPours.map(p => {
-        const e = poursEnrich[p.id] || {};
-        const price = p.price || p.groupPrice;
-        return `  - ${e.correctedName || p.name}${e.category ? ` (${e.category})` : ''}${e.producer ? ` -- ${e.producer}` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
-      });
-
-      // Build cocktails list
-      const cocktailsById = cocktailsSnap.val() || {};
-      const cocktailsOrder = cocktailsOrderSnap.val() || [];
-      const orderedCocktails = (cocktailsOrder.length > 0
-        ? cocktailsOrder.map(id => cocktailsById[id]).filter(Boolean)
-        : Object.values(cocktailsById)
-      ).filter(c => c.available !== false);
-
-      const cocktailLines = orderedCocktails.map(c => {
-        const price = c.price || c.groupPrice;
-        return `  - ${c.name}${price ? ` -- $${Math.round(price)}` : ''}${c.description ? ' | ' + c.description : ''}`;
-      });
-
-      // Build NAB list
-      const nabById = nabSnap.val() || {};
-      const nabOrder = nabOrderSnap.val() || [];
-      const orderedNAB = (nabOrder.length > 0
-        ? nabOrder.map(id => nabById[id]).filter(Boolean)
-        : Object.values(nabById)
-      ).filter(n => n.available !== false);
-
-      const nabLines = orderedNAB.map(n => {
-        const price = n.price || n.groupPrice;
-        return `  - ${n.name}${n.subgroup ? ` (${n.subgroup})` : ''}${price ? ` -- $${Math.round(price)}` : ''}`;
-      });
-
-      // Build food menu grouped by course
-      const foodById = foodSnap.val() || {};
-      const foodOrder = foodOrderSnap.val() || [];
-      const exclusions = exclusionsSnap.val() || {};
-      const orderedFood = (foodOrder.length > 0
-        ? foodOrder.map(id => foodById[id]).filter(Boolean)
-        : Object.values(foodById)
-      ).filter(f => !exclusions[f.id]);
-
-      const foodByCourse = {};
-      orderedFood.forEach(f => {
-        if (!foodByCourse[f.course]) foodByCourse[f.course] = [];
-        foodByCourse[f.course].push(f);
-      });
-      const foodSection = Object.entries(foodByCourse).map(([course, items]) =>
-        `  ${course}:\n` + items.map(f =>
-          `    - [id:${f.id}] ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ''}${f.description ? ': ' + f.description : ''}`
-        ).join('\n')
-      ).join('\n');
-
-      // Assemble the full menu block — only include sections whose menu type is currently available
-      const menuBlock = [
-        (wineAvailable && wineLines.length)          ? `WINES:\n${wineLines.join('\n')}` : null,
-        (beerPoursAvailable && beerLines.length)      ? `BEERS:\n${beerLines.join('\n')}` : null,
-        (beerPoursAvailable && pourLines.length)      ? `PREMIUM POURS:\n${pourLines.join('\n')}` : null,
-        (cocktailsNAAvailable && cocktailLines.length) ? `SPECIALTY COCKTAILS:\n${cocktailLines.join('\n')}` : null,
-        (cocktailsNAAvailable && nabLines.length)     ? `NON-ALCOHOLIC BEVERAGES:\n${nabLines.join('\n')}` : null,
-        (foodAvailable && foodSection)                ? `FOOD MENU:\n${foodSection}` : null,
-      ].filter(Boolean).join('\n\n');
-
-      let contextLine;
-      if (selectedFoods && selectedFoods.length > 0) {
-        const foodNames = selectedFoods.map(f => f.name).join(', ');
-        contextLine = `The guest has selected the following dishes and wants wine pairing recommendations: ${foodNames}. Use these as your starting point and recommend wines from the menu that pair well with this specific selection.`;
-      } else if (contextItem) {
-        contextLine = `The guest opened this chat from the ${contextItem.name} (${contextItem.type}) detail page. Use that as your starting point.`;
-      } else {
-        contextLine = 'The guest opened this chat from the main menu.';
-      }
-
-      // Build lookup maps keyed by Firebase ID -- names are display-only
-      const wineById = {};
-      orderedWines.forEach(w => {
-        const e = wineEnrich[w.id] || {};
-        wineById[w.id] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
-      });
-      const foodById2 = {};
-      orderedFood.forEach(f => {
-        foodById2[f.id] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
-      });
-
-      // System prompt instructs Claude to return structured JSON so we can
-      // surface every recommendation as an actionable chip -- no fuzzy matching needed
-      const systemPrompt = `You are the virtual sommelier and food & beverage guide at Appalachia Kitchen at Corduroy Inn & Lodge on Snowshoe Mountain, West Virginia. You are knowledgeable, warm, and concise -- you are talking to a guest at the table, not writing an essay.
-
-${contextLine}
-
-You have full access to tonight's complete menu below. Use it to give specific, confident recommendations by name. When a guest asks about food pairings, dietary needs, or what's available, answer directly from the menu -- do not tell guests to ask their server for information you already have here.
-
-TONIGHT'S COMPLETE MENU:
-${menuBlock}
-
-STRICT RULES -- never break these under any circumstances:
-1. NEVER compare our prices to retail wine shop prices, grocery store prices, or prices at other restaurants. If asked, say: "I'm not able to make that comparison, but I'm happy to help you find something you'll love tonight."
-2. NEVER discuss topics outside food and beverage -- sports, news, weather, travel, politics, entertainment, or anything else unrelated to tonight's dining. Politely redirect: "I'm best at helping you find something delicious tonight -- what can I help you with?"
-3. ONLY recommend items that appear in the menu above. Do not invent dishes or beverages.
-4. Keep responses concise and conversational -- 2-4 sentences is right. Guests are at the table.
-5. When asked about dietary needs (gluten-free, vegetarian, etc.), use your knowledge of ingredients to give a helpful answer, and note that the server should confirm for serious allergy concerns.
-
-RESPONSE FORMAT -- you MUST always respond with valid JSON in this exact shape and nothing else:
-{
-  "reply": "Your warm conversational response to the guest here",
-  "recommended": ["id:wine-abc123", "id:food-xyz456"]
-}
-The "recommended" array must contain the [id:...] values of every food dish or wine you mention as a recommendation in this turn, taken exactly from the menu above (e.g. if the menu shows "[id:wine-abc123] Opus One 2021", put "wine-abc123" in the array). If you are not recommending specific items this turn (e.g. asking a clarifying question), use an empty array.`;
-
-      const response = await axios.post(
-        'https://api.anthropic.com/v1/messages',
-        {
-          model: 'claude-sonnet-4-6',
-          max_tokens: 600,
-          system: systemPrompt,
-          messages: messages.map(m => ({ role: m.role, content: m.content })),
-        },
-        {
-          headers: {
-            'x-api-key': ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
+  useEffect(() => {
+    fetch(SETTINGS_URL)
+      .then(r => r.json())
+      .then(data => {
+        setSettings(data.settings || { menus: [] });
+        if (data.settings?.locationNames) {
+          setLocationNames(data.settings.locationNames);
+          setLocationDraft(data.settings.locationNames);
         }
-      );
+        if (data.settings?.deviceSetup) {
+          setDeviceSetup(data.settings.deviceSetup);
+          setDeviceSetupDraft(data.settings.deviceSetup);
+        }
+        // Load any cached Toast availability data
+        if (data.settings?.toastAvailability) {
+          setToastAvailability(data.settings.toastAvailability);
+        }
+        setLoading(false);
+      })
+      .catch(() => { setSettings({ menus: [] }); setLoading(false); });
+  }, []);
 
-      // Parse the structured JSON response
-      let reply = '';
-      let suggestions = [];
+  async function saveSettings(updated) {
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch(SAVE_SETTINGS_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updated })
+      });
+      const data = await res.json();
+      setSaveResult({ ok: data.ok, message: data.ok ? "Settings saved." : (data.error || "Save failed.") });
+      if (data.ok) setSettings(updated);
+    } catch (e) {
+      setSaveResult({ ok: false, message: e.message });
+    }
+    setSaving(false);
+    setTimeout(() => setSaveResult(null), 4000);
+  }
+
+  function updateMenu(idx, fields) {
+    const updated = { ...settings, menus: settings.menus.map((m, i) => i === idx ? { ...m, ...fields } : m) };
+    setSettings(updated);
+  }
+
+  function deleteMenu(idx) {
+    if (!window.confirm("Remove this menu?")) return;
+    const updated = { ...settings, menus: settings.menus.filter((_, i) => i !== idx) };
+    saveSettings(updated);
+  }
+
+  function addMenu() {
+    if (!newMenu.guid.trim()) return;
+    const ta = toastAvailability[newMenu.guid.trim()];
+    const menuTypeLabel = MENU_TYPES.find(t => t.value === newMenu.menuType)?.label || "Menu";
+    const resolvedLabel = newMenu.label.trim() || ta?.name || menuTypeLabel;
+    const entry = { ...newMenu, label: resolvedLabel, id: Date.now().toString(), guid: newMenu.guid.trim() };
+    const updated = { ...settings, menus: [...(settings.menus || []), entry] };
+    setAddingMenu(false);
+    setNewMenu({ ...EMPTY_MENU });
+    saveSettings(updated);
+  }
+
+  function saveEdited() {
+    saveSettings(settings);
+    setExpandedMenu(null);
+  }
+
+  function saveLocationNames() {
+    const updated = { ...settings, locationNames: locationDraft };
+    setLocationNames(locationDraft);
+    setEditingLocations(false);
+    saveSettings(updated);
+  }
+
+  function saveDeviceSetup() {
+    const updated = { ...settings, deviceSetup: deviceSetupDraft };
+    setDeviceSetup(deviceSetupDraft);
+    setEditingDeviceSetup(false);
+    saveSettings(updated);
+  }
+
+  async function syncMenuPreview(menu, idx) {
+    setSyncingMenu(idx);
+    try {
+      const res = await fetch(SAVE_SETTINGS_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "fetchAvailability", guid: menu.guid })
+      });
+      const data = await res.json();
+      if (data.availability) {
+        setToastAvailability(prev => ({ ...prev, [menu.guid]: data.availability }));
+        // Persist it back into settings
+        const updated = {
+          ...settings,
+          toastAvailability: { ...(settings.toastAvailability || {}), [menu.guid]: data.availability }
+        };
+        setSettings(updated);
+        saveSettings(updated);
+      }
+    } catch (e) {}
+    setSyncingMenu(null);
+  }
+
+  function toggleLocation(menuDraft, setDraft, loc) {
+    const locs = menuDraft.locations || [];
+    setDraft(prev => ({
+      ...prev,
+      locations: locs.includes(loc) ? locs.filter(l => l !== loc) : [...locs, loc]
+    }));
+  }
+
+  const inputStyle = {
+    background: t.white08, border: `0.5px solid ${t.borderStrong}`,
+    color: t.textPrimary, padding: "8px 12px", borderRadius: 6,
+    fontFamily: t.fontSerif, fontSize: 12, width: "100%",
+    boxSizing: "border-box", outline: "none"
+  };
+  const labelStyle = { color: t.textMuted, fontSize: 10, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 4, display: "block" };
+  const selectStyle = { ...inputStyle, cursor: "pointer" };
+  const optionStyle = { background: t.bgBase, color: t.textPrimary };
+  const bodyText = { color: t.accent, fontSize: 12, lineHeight: 1.5 };
+  const hintText = { color: t.textMuted, fontSize: 10, marginTop: 4, fontStyle: "italic" };
+
+  function MenuTypeTag({ value }) {
+    const t = MENU_TYPES.find(m => m.value === value);
+    const colors = { wine: t.accent, food: t.success, beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+    const color = colors[value] || t.textDim;
+    return (
+      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${color}`, color, letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
+        {t ? t.label : value}
+      </span>
+    );
+  }
+
+  function AvailabilitySummary({ menu }) {
+    const ta = toastAvailability[menu.guid];
+    const locs = menu.locations || [];
+    const locStr = locs.length === 0 ? "All locations" :
+      locs.map(l => l === "bar" ? locationNames.bar : l === "dining" ? locationNames.dining : l).join(" & ");
+
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+        {ta ? (
+          <>
+            {ta.toastDays && ta.toastDays.length > 0 && (
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}
+              </span>
+            )}
+            {ta.toastHours && (
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                🕐 {ta.toastHours.open} – {ta.toastHours.close}
+              </span>
+            )}
+            {!ta.toastDays && !ta.toastHours && (
+              <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+                📅 Always available (no schedule in Toast)
+              </span>
+            )}
+            <span style={{ fontSize: 10, color: t.success, background: t.successDim, border: "0.5px solid rgba(76,175,125,0.3)", borderRadius: 10, padding: "2px 8px" }}>
+              {ta.itemCount || "?"} items in Toast · checked {ta.checkedAt ? timeAgo(ta.checkedAt) : ""}
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 10, color: t.textMuted, fontStyle: "italic" }}>
+            Tap ⟳ Check to pull availability from Toast
+          </span>
+        )}
+        <span style={{ fontSize: 10, color: t.textMuted, background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 10, padding: "2px 8px" }}>
+          📍 {locStr}
+        </span>
+      </div>
+    );
+  }
+
+  function MenuForm({ draft, setDraft, onSave, onCancel, saveLabel = "Save Menu" }) {
+  const t = useTheme();
+    const ta = toastAvailability[draft.guid];
+    const [guidLookingUp, setGuidLookingUp] = useState(false);
+    const [guidError, setGuidError] = useState(null);
+    const guidDebounceRef = useRef(null);
+
+    async function lookupGuid(guid) {
+      if (!guid || guid.length < 10) return;
+      setGuidLookingUp(true);
+      setGuidError(null);
       try {
-        const raw = response.data.content[0].text;
-        const jsonStart = raw.indexOf('{');
-        const jsonEnd = raw.lastIndexOf('}');
-        const parsed = JSON.parse(jsonStart !== -1 && jsonEnd !== -1 ? raw.slice(jsonStart, jsonEnd + 1) : raw);
-        reply = parsed.reply || '';
-        // Resolve each recommended ID to its full menu item object
-        const recommended = parsed.recommended || [];
-        for (const id of recommended) {
-          if (wineById[id]) {
-            suggestions.push({ type: 'wine', ...wineById[id] });
-          } else if (foodById2[id]) {
-            suggestions.push({ type: 'food', ...foodById2[id] });
+        const res = await fetch(SAVE_SETTINGS_URL, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "fetchAvailability", guid })
+        });
+        const data = await res.json();
+        if (data.availability) {
+          setToastAvailability(prev => ({ ...prev, [guid]: data.availability }));
+          // Auto-populate label from Toast if not already set
+          if (data.availability.name && !draft.label.trim()) {
+            setDraft(p => ({ ...p, label: data.availability.name }));
           }
+        } else {
+          setGuidError("GUID not found in Toast — double-check it");
         }
       } catch (e) {
-        // If JSON parse fails, fall back to plain text with no chips
-        reply = response.data.content[0].text;
-        suggestions = [];
+        setGuidError("Could not reach Toast — check your connection");
       }
-
-      return res.json({ reply, suggestions });
-    } catch (error) {
-      console.error('sommelierChat error:', error.message);
-      return res.status(500).json({ error: error.message });
+      setGuidLookingUp(false);
     }
-  });
 
-// ─── Re-enrich Single Item ────────────────────────────────────────────────────
-// Clears existing enrichment for one item and re-runs it through Claude fresh.
-// This catches items enriched before the uncertain/review system was added.
+    function handleGuidChange(val) {
+      const guid = val.trim();
+      setDraft(p => ({ ...p, guid }));
+      setGuidError(null);
+      if (guidDebounceRef.current) clearTimeout(guidDebounceRef.current);
+      if (guid.length > 10) {
+        guidDebounceRef.current = setTimeout(() => lookupGuid(guid), 800);
+      }
+    }
 
-exports.reenrichItem = functions
-  .runWith({ timeoutSeconds: 60, memory: '256MB' })
-  .https.onRequest(async (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(204).send('');
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
+        {/* GUID — first, since it drives the name */}
+        <div>
+          <label style={labelStyle}>Toast Menu / Group GUID</label>
+          <div style={{ position: "relative" }}>
+            <input style={inputStyle} placeholder="e.g. 2d490bef-759b-447f-9af4-5bf0971948ba"
+              value={draft.guid} onChange={e => handleGuidChange(e.target.value)}
+              onBlur={() => { if (draft.guid && !ta) lookupGuid(draft.guid); }} />
+            {guidLookingUp && (
+              <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: t.accent, fontSize: 11 }}>Looking up…</div>
+            )}
+          </div>
+          <div style={{ ...hintText }}>
+            Found in Toast → Menus → select menu → the GUID appears in the URL or menu details
+          </div>
+          {guidError && <div style={{ color: t.error, fontSize: 11, marginTop: 4 }}>⚠ {guidError}</div>}
+        </div>
+
+        {/* Label — auto-populated from Toast if available, otherwise from menu type */}
+        {(() => {
+          const menuTypeLabel = MENU_TYPES.find(t => t.value === draft.menuType)?.label || "Menu";
+          const effectiveLabel = draft.label.trim() || ta?.name || menuTypeLabel;
+          const isAutoLabel = !draft.label.trim() && ta;
+          return (
+            <div>
+              <label style={labelStyle}>Display Name
+                {isAutoLabel && <span style={{ color: t.success, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400 }}> — using "{effectiveLabel}"</span>}
+              </label>
+              <input style={inputStyle}
+                placeholder={guidLookingUp ? "Looking up…" : ta?.name || menuTypeLabel}
+                value={draft.label}
+                onChange={e => setDraft(p => ({ ...p, label: e.target.value }))} />
+              {isAutoLabel && (
+                <div style={{ ...hintText }}>Leave blank to use the name above, or type to override.</div>
+              )}
+              {ta?.name && draft.label && draft.label !== ta.name && (
+                <div style={{ ...hintText }}>Toast name: {ta.name} · <span style={{ color: t.accent, cursor: "pointer" }} onClick={() => setDraft(p => ({ ...p, label: ta.name }))}>Use Toast name</span></div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Menu Type */}
+        <div>
+          <label style={labelStyle}>Menu Type</label>
+          <select style={selectStyle} value={draft.menuType}
+            onChange={e => setDraft(p => ({ ...p, menuType: e.target.value }))}>
+            {MENU_TYPES.map(t => (
+              <option key={t.value} value={t.value} style={optionStyle}>{t.label}</option>
+            ))}
+          </select>
+          {draft.menuType && (
+            <div style={{ ...hintText }}>
+              {MENU_TYPES.find(t => t.value === draft.menuType)?.description}
+            </div>
+          )}
+        </div>
+
+        {/* Toast Availability — read-only display */}
+        <div>
+          <label style={labelStyle}>Availability (from Toast)</label>
+          {ta ? (
+            <div style={{ background: t.successDim, border: "0.5px solid rgba(76,175,125,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                {ta.toastDays && ta.toastDays.length > 0 ? (
+                  <span style={{ fontSize: 11, color: t.success }}>📅 {ta.toastDays.length === 7 ? "Every day" : ta.toastDays.join(", ")}</span>
+                ) : (
+                  <span style={{ fontSize: 11, color: t.success }}>📅 No day restriction in Toast</span>
+                )}
+              </div>
+              {ta.toastHours ? (
+                <div style={{ fontSize: 11, color: t.success, marginBottom: 4 }}>🕐 {ta.toastHours.open} – {ta.toastHours.close}</div>
+              ) : (
+                <div style={{ fontSize: 11, color: t.success, marginBottom: 4 }}>🕐 No time restriction in Toast</div>
+              )}
+              <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>
+                {ta.itemCount || "?"} items found in Toast · last checked {ta.checkedAt ? timeAgo(ta.checkedAt) : "—"}
+              </div>
+              <div style={{ ...hintText, marginTop: 6 }}>
+                Availability is set in Toast → Menus → select menu → Availability. Tap ⟳ Check to refresh.
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: t.white04, border: `0.5px dashed ${t.borderStrong}`, borderRadius: 8, padding: "10px 12px", color: t.textMuted, fontSize: 11, fontStyle: "italic" }}>
+              {draft.guid ? "Tap ⟳ Check on the menu card to pull availability from Toast." : "Enter a GUID first, then use ⟳ Check to fetch availability."}
+            </div>
+          )}
+        </div>
+
+        {/* Locations */}
+        <div>
+          <label style={labelStyle}>Available Locations</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[{ id: "bar", name: locationNames.bar }, { id: "dining", name: locationNames.dining }].map(loc => {
+              const active = (draft.locations || []).includes(loc.id);
+              return (
+                <button key={loc.id} onClick={() => toggleLocation(draft, setDraft, loc.id)} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: 8,
+                  border: `0.5px solid ${active ? t.accent : t.borderStrong}`,
+                  background: active ? t.accentDim : t.white04,
+                  color: active ? t.textPrimary : t.textMuted, fontSize: 12, cursor: "pointer",
+                  fontFamily: t.fontSerif, textAlign: "center", transition: "all 0.12s"
+                }}>
+                  <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.id === "bar" ? "🍸" : "🍽"}</div>
+                  <div style={{ fontSize: 11 }}>{loc.name}</div>
+                  {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 2 }}>✓ included</div>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ ...hintText }}>
+            Leave both unchecked to show in all locations. Check one or both to restrict by location.
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
+          <button onClick={onSave}
+            disabled={!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || saving || guidLookingUp}
+            style={{ flex: 1, background: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? t.accentDimSm : t.accent, color: (!draft.guid.trim() || (!draft.label.trim() && !toastAvailability[draft.guid]) || guidLookingUp) ? t.textDim : t.bgDeep, border: "none", padding: "11px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>
+            {saving ? "Saving…" : guidLookingUp ? "Looking up…" : saveLabel}
+          </button>
+          <button onClick={onCancel}
+            style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "11px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading settings…</div>;
+
+  const menus = settings?.menus || [];
+
+  return (
+    <div>
+      {/* ── Location Names ── */}
+      <div style={{ background: t.white06, border: `0.5px solid ${t.borderStrong}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingLocations ? 14 : 0 }}>
+          <div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Location Names</div>
+            {!editingLocations && (
+              <div style={{ color: t.accent, fontSize: 12 }}>
+                {locationNames.bar} &nbsp;·&nbsp; {locationNames.dining}
+              </div>
+            )}
+          </div>
+          {!editingLocations && (
+            <button onClick={() => { setLocationDraft({ ...locationNames }); setEditingLocations(true); }}
+              style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+              Edit
+            </button>
+          )}
+        </div>
+        {editingLocations && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>🍸 Location 1 Name</label>
+                <input style={inputStyle} value={locationDraft.bar}
+                  onChange={e => setLocationDraft(p => ({ ...p, bar: e.target.value }))} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>🍽 Location 2 Name</label>
+                <input style={inputStyle} value={locationDraft.dining}
+                  onChange={e => setLocationDraft(p => ({ ...p, dining: e.target.value }))} />
+              </div>
+            </div>
+            <div style={{ ...hintText }}>
+              These names appear on menu location checkboxes throughout settings.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveLocationNames}
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
+                Save Names
+              </button>
+              <button onClick={() => setEditingLocations(false)}
+                style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Device Setup ── */}
+      <div style={{ background: t.white06, border: `0.5px solid ${t.borderStrong}`, borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingDeviceSetup ? 14 : 0 }}>
+          <div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Device Setup</div>
+            {!editingDeviceSetup && (
+              <div style={{ color: t.accent, fontSize: 12 }}>
+                Default: <span style={{ color: t.textPrimary }}>{deviceSetup.defaultLocation === "bar" ? locationNames.bar : locationNames.dining}</span>
+                {(deviceSetup.barLogo || deviceSetup.diningLogo) && <span style={{ color: t.textDim }}> · logos configured</span>}
+              </div>
+            )}
+          </div>
+          {!editingDeviceSetup && (
+            <button onClick={() => { setDeviceSetupDraft({ ...deviceSetup }); setEditingDeviceSetup(true); }}
+              style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+              Edit
+            </button>
+          )}
+        </div>
+        {editingDeviceSetup && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Default Location */}
+            <div>
+              <label style={labelStyle}>Default Location for New Devices</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{ id: "bar", icon: "🍸" }, { id: "dining", icon: "🍽" }].map(loc => {
+                  const active = deviceSetupDraft.defaultLocation === loc.id;
+                  return (
+                    <button key={loc.id} onClick={() => setDeviceSetupDraft(p => ({ ...p, defaultLocation: loc.id }))} style={{
+                      flex: 1, padding: "10px 8px", borderRadius: 8,
+                      border: `0.5px solid ${active ? t.accent : t.borderStrong}`,
+                      background: active ? t.accentDim : t.white04,
+                      color: active ? t.textPrimary : t.textMuted,
+                      fontFamily: t.fontSerif, fontSize: 12, cursor: "pointer", textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 16, marginBottom: 3 }}>{loc.icon}</div>
+                      <div>{loc.id === "bar" ? locationNames.bar : locationNames.dining}</div>
+                      {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 2, letterSpacing: "1px" }}>DEFAULT</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ ...hintText }}>
+                Used on any device that hasn't been assigned a location yet. Set it to your most common room.
+              </div>
+            </div>
+            {/* Logo selectors */}
+            <div>
+              <label style={labelStyle}>{locationNames.bar} Logo</label>
+              <select style={selectStyle} value={deviceSetupDraft.barLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, barLogo: e.target.value }))}>
+                {availableLogos.map(l => (
+                  <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{locationNames.dining} Logo</label>
+              <select style={selectStyle} value={deviceSetupDraft.diningLogo}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningLogo: e.target.value }))}>
+                {availableLogos.map(l => (
+                  <option key={l.value} value={l.value} style={optionStyle}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ ...hintText }}>Add new logos by placing PNG files in /public/logos/ and adding an entry to /public/logos/index.json.</div>
+
+            {/* Theme per location */}
+            <div>
+              <label style={labelStyle}>{locationNames.bar} Theme</label>
+              <select style={selectStyle} value={deviceSetupDraft.barTheme || "charcoalAndMaple"}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, barTheme: e.target.value }))}>
+                {THEME_CATALOGUE.map(th => (
+                  <option key={th.value} value={th.value} style={optionStyle}>{th.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{locationNames.dining} Theme</label>
+              <select style={selectStyle} value={deviceSetupDraft.diningTheme || "espressoAndGold"}
+                onChange={e => setDeviceSetupDraft(p => ({ ...p, diningTheme: e.target.value }))}>
+                {THEME_CATALOGUE.map(th => (
+                  <option key={th.value} value={th.value} style={optionStyle}>{th.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* Preview */}
+            {(deviceSetupDraft.barLogo || deviceSetupDraft.diningLogo) && (
+              <div style={{ display: "flex", gap: 10 }}>
+                {deviceSetupDraft.barLogo && (
+                  <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                    <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.bar.toUpperCase()}</div>
+                    <img src={`/logos/${deviceSetupDraft.barLogo}`} alt="Bar logo preview"
+                      style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
+                      onError={e => { e.target.style.display = "none"; }} />
+                  </div>
+                )}
+                {deviceSetupDraft.diningLogo && (
+                  <div style={{ flex: 1, background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                    <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1px", marginBottom: 6 }}>{locationNames.dining.toUpperCase()}</div>
+                    <img src={`/logos/${deviceSetupDraft.diningLogo}`} alt="Dining logo preview"
+                      style={{ maxWidth: "100%", maxHeight: 60, objectFit: "contain", opacity: 0.9 }}
+                      onError={e => { e.target.style.display = "none"; }} />
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveDeviceSetup}
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
+                Save Device Setup
+              </button>
+              <button onClick={() => setEditingDeviceSetup(false)}
+                style={{ background: "none", border: `0.5px solid ${t.borderStrong}`, color: t.textMuted, padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Menu List ── */}
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>
+        Toast Menus ({menus.length})
+      </div>
+
+      {menus.length === 0 && !addingMenu && (
+        <div style={{ color: t.textMuted, fontSize: 12, fontStyle: "italic", textAlign: "center", padding: "24px 0", marginBottom: 16 }}>
+          No menus configured yet. Add your first menu below.
+        </div>
+      )}
+
+      {menus.map((menu, idx) => {
+        const isExpanded = expandedMenu === idx;
+        const ta = toastAvailability[menu.guid];
+        return (
+          <div key={menu.id || idx} style={{ background: t.white06, border: `0.5px solid ${isExpanded ? t.accent : t.borderStrong}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+            {/* Collapsed row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}
+              onClick={() => setExpandedMenu(isExpanded ? null : idx)}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500 }}>{menu.label || "Unnamed Menu"}</span>
+                  <MenuTypeTag value={menu.menuType} />
+                </div>
+                <div style={{ color: t.textMuted, fontSize: 10, fontFamily: t.fontMono, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menu.guid}</div>
+                <AvailabilitySummary menu={menu} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                <button onClick={e => { e.stopPropagation(); syncMenuPreview(menu, idx); }}
+                  disabled={syncingMenu === idx}
+                  style={{ background: t.successDim, border: "0.5px solid rgba(76,175,125,0.35)", color: t.success, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 10, whiteSpace: "nowrap" }}>
+                  {syncingMenu === idx ? "…" : "⟳ Check"}
+                </button>
+                <button onClick={e => { e.stopPropagation(); deleteMenu(idx); }}
+                  style={{ background: "none", border: "none", color: t.textDim, fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+            </div>
+
+            {/* Expanded edit form */}
+            {isExpanded && (
+              <div style={{ borderTop: `0.5px solid ${t.borderStrong}`, padding: "16px 14px", background: t.white04 }}>
+                <MenuForm
+                  draft={menus[idx]}
+                  setDraft={(updater) => {
+                    const updated = typeof updater === "function" ? updater(menus[idx]) : updater;
+                    updateMenu(idx, updated);
+                  }}
+                  onSave={saveEdited}
+                  onCancel={() => setExpandedMenu(null)}
+                  saveLabel="Save Changes"
+                  onCheckAvailability={() => syncMenuPreview(menus[idx], idx)}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Add New Menu ── */}
+      {addingMenu ? (
+        <div style={{ background: t.white06, border: `0.5px solid ${t.accent}`, borderRadius: 10, padding: "16px 14px", marginBottom: 16 }}>
+          <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 14 }}>Add New Menu</div>
+          <MenuForm
+            draft={newMenu}
+            setDraft={setNewMenu}
+            onSave={addMenu}
+            onCancel={() => { setAddingMenu(false); setNewMenu({ ...EMPTY_MENU }); }}
+            saveLabel="Add Menu"
+            onCheckAvailability={newMenu.guid ? () => syncMenuPreview(newMenu, -1) : null}
+          />
+        </div>
+      ) : (
+        <button onClick={() => setAddingMenu(true)}
+          style={{ width: "100%", background: t.accentDimSm, border: "0.5px dashed rgba(201,169,110,0.4)", color: t.accent, padding: "13px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "0.5px" }}>
+          + Add Menu
+        </button>
+      )}
+
+      {/* ── Save feedback ── */}
+      {saveResult && (
+        <div style={{ marginTop: 14, background: saveResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${saveResult.ok ? t.success : t.error}`, borderRadius: 8, padding: "10px 14px" }}>
+          <div style={{ color: saveResult.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif }}>{saveResult.message}</div>
+        </div>
+      )}
+
+      {/* ── Legend ── */}
+      <div style={{ marginTop: 24, borderTop: `0.5px solid ${t.borderStrong}`, paddingTop: 16 }}>
+        <div style={{ color: t.textMuted, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Menu Type Reference</div>
+        {MENU_TYPES.map(t => {
+          const colors = { wine: t.accent, food: t.success, beer_pours: "#c8860a", cocktails_na: "#6090a0" };
+          return (
+            <div key={t.value} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, border: `0.5px solid ${colors[t.value]}`, color: colors[t.value], whiteSpace: "nowrap", marginTop: 1, flexShrink: 0 }}>{t.label}</span>
+              <span style={{ color: t.accent, fontSize: 11 }}>{t.description}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Sync Tab ─────────────────────────────────────────────────────────────────
+
+function SyncTab() {
+  const t = useTheme();
+  const categories = [
+    { id: "wine", label: "Wine List" },
+    { id: "beer", label: "Beer List" },
+    { id: "pours", label: "Premium Pours" },
+    { id: "food", label: "Food Menu" },
+    { id: "cocktails", label: "Specialty Cocktails" },
+    { id: "nab", label: "Non-Alcoholic Beverages" },
+  ];
+  const [selected, setSelected] = useState(categories.map(c => c.id));
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanResult, setCleanResult] = useState(null);
+
+  async function handleCleanup() {
+    setCleaning(true);
+    setCleanResult(null);
     try {
-      const { itemId, itemType, itemName, hints = {} } = req.body;
-      if (!itemId || !itemType || !itemName) {
-        return res.status(400).json({ error: 'itemId, itemType, and itemName required' });
-      }
+      const res = await fetch(CLEANUP_URL, { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      setCleanResult({ ok: data.ok, message: data.ok ? `✓ ${data.message}` : (data.error || "Cleanup failed") });
+    } catch (e) {
+      setCleanResult({ ok: false, message: e.message });
+    }
+    setCleaning(false);
+  }
 
-      const db = admin.database();
-      let enrichment = null;
-      let enrichPath = null;
-      let enrichData = null;
+  function toggleCat(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+  }
 
-      if (itemType === 'wine') {
-        enrichPath = `wineEnrichment/${itemId}`;
-        const vintage = parseVintage(itemName);
-        enrichment = await enrichWineWithClaude(itemName, vintage, hints);
-        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
-        enrichData = {
-          sourceName: itemName,
-          correctedName: hints.correctedName || enrichment.correctedName || itemName,
-          uncertain: enrichment.uncertain || false,
-          uncertainReason: enrichment.uncertainReason || null,
-          varietal: hints.varietal || enrichment.varietal || null,
-          region: hints.region || enrichment.region || null,
-          description: enrichment.description || null,
-          reviews: enrichment.reviews || null,
-          labelImageQuery: enrichment.labelImageQuery || null,
-          vintage,
-          enrichedAt: Date.now(),
-          reEnrichedAt: Date.now(),
-          manuallyEdited: Object.keys(hints).length > 0,
-          approved: false,
-        };
+  async function handleSync() {
+    if (selected.length === 0) return;
+    setSyncing(true);
+    setResult(null);
+    try {
+      const res = await fetch(FORCE_SYNC_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: selected })
+      });
+      const data = await res.json();
+      setResult({ ok: data.ok, message: data.message || data.error });
+    } catch (e) {
+      setResult({ ok: false, message: e.message });
+    }
+    setSyncing(false);
+  }
 
-      } else if (itemType === 'beer') {
-        enrichPath = `beerEnrichment/${itemId}`;
-        enrichment = await enrichBeerWithClaude(itemName, hints);
-        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
-        enrichData = {
-          sourceName: itemName,
-          correctedName: hints.correctedName || enrichment.correctedName || itemName,
-          uncertain: enrichment.uncertain || false,
-          uncertainReason: enrichment.uncertainReason || null,
-          style: hints.style || enrichment.style || null,
-          brewery: hints.brewery || enrichment.brewery || null,
-          abv: hints.abv || enrichment.abv || null,
-          description: enrichment.description || null,
-          imageQuery: enrichment.imageQuery || null,
-          enrichedAt: Date.now(),
-          reEnrichedAt: Date.now(),
-          manuallyEdited: Object.keys(hints).length > 0,
-          approved: false,
-        };
+  return (
+    <div>
+      <div style={{ color: t.textDim, fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+        Select the menus to sync from Toast, then tap Run Sync. Syncs run in the background — allow ~60 seconds for changes to appear in the app.
+      </div>
 
-      } else if (itemType === 'pour') {
-        enrichPath = `poursEnrichment/${itemId}`;
-        enrichment = await enrichPourWithClaude(itemName, hints);
-        if (!enrichment) return res.status(500).json({ error: 'Claude enrichment returned nothing' });
-        enrichData = {
-          sourceName: itemName,
-          correctedName: hints.correctedName || enrichment.correctedName || itemName,
-          uncertain: enrichment.uncertain || false,
-          uncertainReason: enrichment.uncertainReason || null,
-          category: hints.category || enrichment.category || null,
-          producer: hints.producer || enrichment.producer || null,
-          abv: hints.abv || enrichment.abv || null,
-          age: hints.age || enrichment.age || null,
-          description: enrichment.description || null,
-          imageQuery: enrichment.imageQuery || null,
-          enrichedAt: Date.now(),
-          reEnrichedAt: Date.now(),
-          manuallyEdited: Object.keys(hints).length > 0,
-          approved: false,
-        };
+      <div style={{ marginBottom: 16 }}>
+        {categories.map(c => (
+          <div key={c.id} onClick={() => toggleCat(c.id)}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, background: selected.includes(c.id) ? t.accentDimSm : t.white04, border: `0.5px solid ${selected.includes(c.id) ? t.accentBorder : t.borderMid}`, borderRadius: 8, cursor: "pointer" }}>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: selected.includes(c.id) ? t.accent : "transparent", border: `1.5px solid ${selected.includes(c.id) ? t.accent : t.textDim}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {selected.includes(c.id) && <span style={{ color: t.bgDeep, fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+            </div>
+            <span style={{ color: selected.includes(c.id) ? t.textPrimary : t.textDim, fontSize: 13, fontFamily: t.fontSerif }}>{c.label}</span>
+          </div>
+        ))}
+      </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button onClick={() => setSelected(categories.map(c => c.id))} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Select All</button>
+        <button onClick={() => setSelected([])} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Clear</button>
+      </div>
+
+      <button onClick={handleSync} disabled={syncing || selected.length === 0}
+        style={{ width: "100%", background: syncing || selected.length === 0 ? t.accentDimSm : t.accent, color: syncing || selected.length === 0 ? t.textDim : t.bgDeep, border: "none", padding: "13px", borderRadius: 8, cursor: syncing || selected.length === 0 ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
+        {syncing ? "Triggering sync…" : `⟳ Sync ${selected.length} Menu${selected.length !== 1 ? "s" : ""} Now`}
+      </button>
+
+      {result && (
+        <div style={{ marginTop: 14, background: result.ok ? t.successDim : t.errorDim, border: `0.5px solid ${result.ok ? t.success : t.error}`, borderRadius: 8, padding: "12px 14px" }}>
+          <div style={{ color: result.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif, lineHeight: 1.6 }}>{result.message}</div>
+        </div>
+      )}
+
+      {/* Cleanup section */}
+      <div style={{ marginTop: 24, borderTop: `0.5px solid ${t.borderSubtle}`, paddingTop: 20 }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Data Cleanup</div>
+        <div style={{ color: t.textDim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
+          Removes enrichment records for items that are no longer in any configured menu. Run this after correcting a miscategorised menu or deleting a menu from Settings.
+        </div>
+        <button onClick={handleCleanup} disabled={cleaning}
+          style={{ width: "100%", background: cleaning ? "rgba(232,80,80,0.06)" : "rgba(232,80,80,0.12)", color: cleaning ? t.textDim : t.error, border: "0.5px solid rgba(232,80,80,0.4)", padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
+          {cleaning ? "Cleaning…" : "🗑 Remove Orphaned Data"}
+        </button>
+        {cleanResult && (
+          <div style={{ marginTop: 10, background: cleanResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${cleanResult.ok ? t.success : t.error}`, borderRadius: 8, padding: "10px 14px" }}>
+            <div style={{ color: cleanResult.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif, lineHeight: 1.6 }}>{cleanResult.message}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── All Items Tab ────────────────────────────────────────────────────────────
+
+function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
+  const t = useTheme();
+  const [beers, setBeers] = useState([]);
+  const [pours, setPours] = useState([]);
+  const [food, setFood] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState("wines");
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFields, setEditFields] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [reEnriching, setReEnriching] = useState(false);
+  const [reEnrichResult, setReEnrichResult] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(BEER_URL).then(r => r.json()),
+      fetch(POURS_URL).then(r => r.json()),
+      fetch(FOOD_URL).then(r => r.json()),
+    ]).then(([bData, pData, fData]) => {
+      setBeers(bData.beers || []);
+      setPours(pData.pours || []);
+      setFood(fData.foodItems || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  function openEdit(item, type) {
+    setEditingItem({ ...item, _type: type });
+    if (type === "wine") setEditFields({ correctedName: item.name || "", varietal: item.varietal || "", region: item.region || "", description: item.description || "", reviews: item.reviews || "" });
+    else if (type === "beer") setEditFields({ correctedName: item.name || "", style: item.style || "", brewery: item.brewery || "", abv: item.abv || "", description: item.description || "" });
+    else if (type === "pour") setEditFields({ correctedName: item.name || "", category: item.category || "", producer: item.producer || "", abv: item.abv || "", description: item.description || "" });
+    else if (type === "food") setEditFields({ description: item.description || "", excluded: item.excluded || false });
+  }
+
+  async function handleSave() {
+    if (!editingItem) return;
+    setSaving(true);
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, updates: editFields })
+      });
+      const t = editingItem._type;
+      if (t === "wine") onWineUpdate(editingItem.id, { ...editFields, name: editFields.correctedName });
+      else if (t === "beer") setBeers(prev => prev.map(b => b.id === editingItem.id ? { ...b, ...editFields, name: editFields.correctedName } : b));
+      else if (t === "pour") setPours(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...editFields, name: editFields.correctedName } : p));
+      else if (t === "food") setFood(prev => prev.map(f => f.id === editingItem.id ? { ...f, ...editFields } : f));
+      setEditingItem(null);
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  }
+
+  async function handleReEnrich() {
+    if (!editingItem || editingItem._type === "food") return;
+    setReEnriching(true);
+    setReEnrichResult(null);
+    // Pass current edit fields as hints so Claude respects manager corrections
+    const hints = {};
+    if (editingItem._type === "wine") {
+      if (editFields.region)        hints.region = editFields.region;
+      if (editFields.varietal)      hints.varietal = editFields.varietal;
+      if (editFields.correctedName) hints.correctedName = editFields.correctedName;
+    } else if (editingItem._type === "beer") {
+      if (editFields.brewery) hints.brewery = editFields.brewery;
+      if (editFields.style)   hints.style = editFields.style;
+      if (editFields.abv)     hints.abv = editFields.abv;
+    } else if (editingItem._type === "pour") {
+      if (editFields.producer)  hints.producer = editFields.producer;
+      if (editFields.category)  hints.category = editFields.category;
+      if (editFields.abv)       hints.abv = editFields.abv;
+    }
+    try {
+      const res = await fetch(REENRICH_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: editingItem.id, itemType: editingItem._type, itemName: editingItem.name, hints })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setReEnrichResult({ ok: true, message: data.uncertain ? `⚠️ Re-enriched — flagged for review: ${data.uncertainReason}` : `✓ Re-enriched successfully` });
+        const e = data.enrichment;
+        if (editingItem._type === "wine") {
+          const updates = { correctedName: e.correctedName, varietal: e.varietal, region: e.region, description: e.description, reviews: e.reviews };
+          setEditFields(p => ({ ...p, ...updates }));
+          onWineUpdate(editingItem.id, { ...updates, name: e.correctedName, uncertain: e.uncertain });
+        } else if (editingItem._type === "beer") {
+          const updates = { correctedName: e.correctedName, style: e.style, brewery: e.brewery, abv: e.abv, description: e.description };
+          setEditFields(p => ({ ...p, ...updates }));
+          setBeers(prev => prev.map(b => b.id === editingItem.id ? { ...b, ...updates, name: e.correctedName } : b));
+        } else if (editingItem._type === "pour") {
+          const updates = { correctedName: e.correctedName, category: e.category, producer: e.producer, abv: e.abv, description: e.description };
+          setEditFields(p => ({ ...p, ...updates }));
+          setPours(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...updates, name: e.correctedName } : p));
+        }
       } else {
-        return res.status(400).json({ error: `itemType "${itemType}" does not support enrichment` });
+        setReEnrichResult({ ok: false, message: data.error || "Re-enrichment failed" });
       }
+    } catch (e) {
+      setReEnrichResult({ ok: false, message: e.message });
+    }
+    setReEnriching(false);
+  }
 
-      await db.ref(enrichPath).set(enrichData);
-      console.log(`Re-enriched ${itemType} "${itemName}" (${itemId}) — uncertain: ${enrichData.uncertain}`);
+  const q = managerSearch.toLowerCase();
+  const filterList = list => q ? list.filter(i => (i.name || "").toLowerCase().includes(q)) : list;
 
-      res.json({
-        ok: true,
-        uncertain: enrichData.uncertain,
-        uncertainReason: enrichData.uncertainReason || null,
-        enrichment: enrichData,
+  const categories = [
+    { id: "wines", label: "Wines", list: filterList(wines) },
+    { id: "beer", label: "Beer", list: filterList(beers) },
+    { id: "pours", label: "Pours", list: filterList(pours) },
+    { id: "food", label: "Food", list: filterList(food) },
+  ];
+  const activeList = categories.find(c => c.id === category)?.list || [];
+
+  const inputStyle = { width: "100%", boxSizing: "border-box", background: t.white06, border: `0.5px solid ${t.borderMid}`, color: t.textPrimary, padding: "8px 10px", borderRadius: 6, fontFamily: t.fontSerif, fontSize: 12, outline: "none", marginBottom: 8 };
+  const labelStyle = { color: t.textDim, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading…</div>;
+
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      {/* Category pills */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {categories.map(c => (
+          <button key={c.id} onClick={() => { setCategory(c.id); setEditingItem(null); }} style={{
+            background: category === c.id ? t.accentDim : t.white04,
+            border: `0.5px solid ${category === c.id ? t.accent : t.borderMid}`,
+            color: category === c.id ? t.accent : t.textDim,
+            padding: "5px 14px", borderRadius: 20, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11
+          }}>{c.label} <span style={{ opacity: 0.7 }}>({c.list.length})</span></button>
+        ))}
+      </div>
+
+      {/* Item list */}
+      {activeList.length === 0 ? (
+        <div style={{ color: t.textDim, textAlign: "center", padding: 32 }}>{q ? `No results for "${managerSearch}"` : "No items"}</div>
+      ) : activeList.map(item => (
+        <div key={item.id} onClick={() => openEdit(item, category === "beer" ? "beer" : category === "pours" ? "pour" : category === "food" ? "food" : "wine")}
+          style={{ background: editingItem?.id === item.id ? t.accentDimSm : t.white04, border: `0.5px solid ${editingItem?.id === item.id ? t.accentBorder : t.borderMid}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+          {item.imageUrl && <div style={{ width: 32, height: 44, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
+              <div style={{ color: t.textPrimary, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {item.sourceName || item.name}
+              </div>
+              {item.sourceName && item.name && item.sourceName !== item.name && (
+                <span style={{ flexShrink: 0, fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px", letterSpacing: "0.5px" }}>AI renamed</span>
+              )}
+            </div>
+            {item.sourceName && item.name && item.sourceName !== item.name && (
+              <div style={{ color: t.accent, fontSize: 10, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                → {item.name}
+              </div>
+            )}
+            <div style={{ color: t.textDim, fontSize: 10 }}>
+              {category === "wines" && [item.varietal, item.region].filter(Boolean).join(" · ")}
+              {category === "beer" && [item.style, item.brewery].filter(Boolean).join(" · ")}
+              {category === "pours" && [item.category, item.producer].filter(Boolean).join(" · ")}
+              {category === "food" && item.course}
+              {item.manuallyEdited && <span style={{ color: t.success, marginLeft: 6 }}>✎ edited</span>}
+              {item.excluded && <span style={{ color: t.error, marginLeft: 6 }}>hidden</span>}
+            </div>
+            <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.id}</div>
+          </div>
+          <div style={{ color: t.borderStrong, fontSize: 18 }}>›</div>
+        </div>
+      ))}
+
+      {/* Edit panel */}
+      {editingItem && (
+        <div style={{ position: "sticky", bottom: 0, background: t.bgSurface, border: `0.5px solid ${t.borderMid}`, borderRadius: "12px 12px 0 0", padding: "16px 16px 20px", marginTop: 8, boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+              <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 2 }}>Toast Name</div>
+              <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: editingItem.sourceName && editingItem.name !== editingItem.sourceName ? 4 : 0 }}>
+                {editingItem.sourceName || editingItem.name}
+              </div>
+              {editingItem.sourceName && editingItem.name !== editingItem.sourceName && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px" }}>AI renamed to</span>
+                  <span style={{ color: t.accent, fontSize: 12 }}>{editingItem.name}</span>
+                </div>
+              )}
+              <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginTop: 4 }}>{editingItem.id}</div>
+            </div>
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: t.textDim, fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
+          </div>
+
+          {editingItem._type !== "food" && (
+            <>
+              <label style={labelStyle}>Name</label>
+              <input style={inputStyle} value={editFields.correctedName || ""} onChange={e => setEditFields(p => ({ ...p, correctedName: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "wine" && (
+            <>
+              <label style={labelStyle}>Varietal</label>
+              <input style={inputStyle} value={editFields.varietal || ""} onChange={e => setEditFields(p => ({ ...p, varietal: e.target.value }))} />
+              <label style={labelStyle}>Region</label>
+              <input style={inputStyle} value={editFields.region || ""} onChange={e => setEditFields(p => ({ ...p, region: e.target.value }))} />
+              <label style={labelStyle}>Reviews & Ratings</label>
+              <input style={inputStyle} value={editFields.reviews || ""} onChange={e => setEditFields(p => ({ ...p, reviews: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "beer" && (
+            <>
+              <label style={labelStyle}>Style</label>
+              <input style={inputStyle} value={editFields.style || ""} onChange={e => setEditFields(p => ({ ...p, style: e.target.value }))} />
+              <label style={labelStyle}>Brewery</label>
+              <input style={inputStyle} value={editFields.brewery || ""} onChange={e => setEditFields(p => ({ ...p, brewery: e.target.value }))} />
+              <label style={labelStyle}>ABV</label>
+              <input style={inputStyle} value={editFields.abv || ""} onChange={e => setEditFields(p => ({ ...p, abv: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "pour" && (
+            <>
+              <label style={labelStyle}>Category</label>
+              <input style={inputStyle} value={editFields.category || ""} onChange={e => setEditFields(p => ({ ...p, category: e.target.value }))} />
+              <label style={labelStyle}>Producer</label>
+              <input style={inputStyle} value={editFields.producer || ""} onChange={e => setEditFields(p => ({ ...p, producer: e.target.value }))} />
+              <label style={labelStyle}>ABV</label>
+              <input style={inputStyle} value={editFields.abv || ""} onChange={e => setEditFields(p => ({ ...p, abv: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type !== "food" && (
+            <>
+              <label style={labelStyle}>Tasting Notes</label>
+              <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
+            </>
+          )}
+          {editingItem._type === "food" && (
+            <>
+              <label style={labelStyle}>Description</label>
+              <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <button onClick={() => setEditFields(p => ({ ...p, excluded: !p.excluded }))}
+                  style={{ background: editFields.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${editFields.excluded ? t.errorBorder : t.success}`, color: editFields.excluded ? t.error : t.success, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+                  {editFields.excluded ? "Hidden from guests" : "Visible to guests"}
+                </button>
+                <span style={{ color: t.textDim, fontSize: 11 }}>Toggle to hide/show in pairings</span>
+              </div>
+            </>
+          )}
+          {editingItem._type !== "food" && (
+            <div style={{ color: t.borderStrong, fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
+          )}
+          {/* Re-enrich result message */}
+          {reEnrichResult && (
+            <div style={{ marginBottom: 10, background: reEnrichResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${reEnrichResult.ok ? t.success : t.error}`, borderRadius: 6, padding: "8px 12px" }}>
+              <div style={{ color: reEnrichResult.ok ? t.success : t.error, fontSize: 11, fontFamily: t.fontSerif }}>{reEnrichResult.message}</div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? t.accentDimSm : t.accent, color: saving ? t.textDim : t.bgDeep, border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+            {editingItem._type !== "food" && (
+              <button onClick={handleReEnrich} disabled={reEnriching || saving}
+                title="Clear existing AI enrichment and re-run from scratch through Claude"
+                style={{ background: reEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reEnriching ? "#6070a0" : "#8090c0"}`, color: reEnriching ? "#6070a0" : "#a0b0e0", padding: "10px 12px", borderRadius: 6, cursor: reEnriching ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
+                {reEnriching ? "Re-enriching…" : "✦ Re-enrich"}
+              </button>
+            )}
+            <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "10px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Food Manager Tab ─────────────────────────────────────────────────────────
+
+function FoodManagerTab() {
+  const t = useTheme();
+  const [foodItems, setFoodItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState({});
+
+  useEffect(() => {
+    fetch(FOOD_URL).then(r => r.json())
+      .then(data => { setFoodItems(data.foodItems || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function toggleExclusion(item) {
+    setSaving(prev => ({ ...prev, [item.id]: true }));
+    const newExcluded = !item.excluded;
+    try {
+      await fetch("https://us-central1-corduroy-wine-list.cloudfunctions.net/setFoodExclusion", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, excluded: newExcluded })
+      });
+      setFoodItems(prev => prev.map(f => f.id === item.id ? { ...f, excluded: newExcluded } : f));
+    } catch (e) { console.error(e); }
+    setSaving(prev => ({ ...prev, [item.id]: false }));
+  }
+
+  if (loading) return <div style={{ color: t.textDim, textAlign: "center", padding: 40 }}>Loading food menu…</div>;
+
+  const courseOrder = [...new Map(foodItems.map(f => [f.course, true])).keys()];
+  const byCourse = {};
+  foodItems.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
+
+  return (
+    <div>
+      <div style={{ color: t.textDim, fontSize: 11, marginBottom: 12, lineHeight: 1.5 }}>
+        Toggle items off to exclude them from guest food pairings. Items shown to guests are pulled from Toast — use this to hide course markers, add-ons, or anything that shouldn't appear in pairings.
+      </div>
+      {courseOrder.map(course => (
+        <div key={course} style={{ marginBottom: 16 }}>
+          <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8, paddingBottom: 6, borderBottom: `0.5px solid ${t.borderSubtle}` }}>{course}</div>
+          {byCourse[course].map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: t.white04, border: `0.5px solid ${item.excluded ? "rgba(232,80,80,0.3)" : t.borderMid}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, opacity: item.excluded ? 0.6 : 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: item.excluded ? t.textDim : t.textPrimary, fontSize: 13, marginBottom: 1 }}>{item.name}</div>
+                {item.description && <div style={{ color: t.textDim, fontSize: 11, fontStyle: "italic" }}>{item.description}</div>}
+                <div style={{ color: t.borderStrong, fontSize: 10, marginTop: 2 }}>{formatPrice(item.price)}</div>
+              </div>
+              <button
+                onClick={() => toggleExclusion(item)}
+                disabled={saving[item.id]}
+                style={{ background: item.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${item.excluded ? t.errorBorder : t.success}`, color: item.excluded ? t.error : t.success, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {saving[item.id] ? "…" : item.excluded ? "Excluded" : "Included"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ManagerScreen({ wines, onClose, isAdmin, tabletLocation = "all", onSetLocation, locationNames = { bar: "Bar", dining: "Dining Room" } }) {
+  const t = useTheme();
+  const [activeTab, setActiveTab] = useState("uncertain");
+  const [search, setSearch] = useState("");
+  const [localWines, setLocalWines] = useState(wines);
+  const [allItems, setAllItems] = useState([]); // beers + pours for no-image tab
+
+  useEffect(() => {
+    // Fetch all wines including uncertain ones (admin bypass) + beers + pours
+    Promise.all([
+      fetch(FIREBASE_URL + "?admin=1").then(r => r.json()),
+      fetch(BEER_URL + "?admin=1").then(r => r.json()),
+      fetch(POURS_URL + "?admin=1").then(r => r.json()),
+    ]).then(([wData, bData, pData]) => {
+      if (wData.wines) setLocalWines(Array.isArray(wData.wines) ? wData.wines : Object.values(wData.wines));
+      const beers = (bData.beers || []).map(i => ({ ...i, _type: "beer" }));
+      const pours = (pData.pours || []).map(i => ({ ...i, _type: "pour" }));
+      setAllItems([...beers, ...pours]);
+    }).catch(() => {});
+  }, []);
+
+  function handleWineUpdate(id, fields) {
+    setLocalWines(prev => prev.map(w => w.id === id ? { ...w, ...fields } : w));
+  }
+
+  async function handleApprove(item) {
+    const itemType = item._type || "wine";
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, itemType, updates: { uncertain: false, approved: true } })
+      });
+      if (itemType === "wine") {
+        setLocalWines(prev => prev.map(w => w.id === item.id ? { ...w, uncertain: false, approved: true } : w));
+      } else {
+        // For beer/pours in allItems — just remove from uncertain list on approval
+        setAllItems(prev => prev.map(i => i.id === item.id ? { ...i, uncertain: false, approved: true } : i));
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  const q = search.toLowerCase();
+  const filterBySearch = list => q ? list.filter(w => (w.name || "").toLowerCase().includes(q)) : list;
+
+  const [reviewSubTab, setReviewSubTab] = useState("pending");
+  const [reviewEditingId, setReviewEditingId] = useState(null);
+  const [reviewEditFields, setReviewEditFields] = useState({});
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewReEnriching, setReviewReEnriching] = useState(false);
+  const [reviewEditResult, setReviewEditResult] = useState(null);
+
+  function openReviewEdit(wine) {
+    if (reviewEditingId === wine.id) { setReviewEditingId(null); return; }
+    setReviewEditingId(wine.id);
+    setReviewEditResult(null);
+    const t = wine._type || "wine";
+    if (t === "wine") setReviewEditFields({ correctedName: wine.name || "", varietal: wine.varietal || "", region: wine.region || "", description: wine.description || "", reviews: wine.reviews || "" });
+    else if (t === "beer") setReviewEditFields({ correctedName: wine.name || "", style: wine.style || "", brewery: wine.brewery || "", abv: wine.abv || "", description: wine.description || "" });
+    else if (t === "pour") setReviewEditFields({ correctedName: wine.name || "", category: wine.category || "", producer: wine.producer || "", abv: wine.abv || "", description: wine.description || "" });
+  }
+
+  async function handleReviewSave(wine) {
+    setReviewSaving(true);
+    const itemType = wine._type || "wine";
+    try {
+      await fetch(MANAGER_UPDATE_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: wine.id, itemType, updates: reviewEditFields })
+      });
+      if (itemType === "wine") handleWineUpdate(wine.id, { ...reviewEditFields, name: reviewEditFields.correctedName });
+      else setAllItems(prev => prev.map(i => i.id === wine.id ? { ...i, ...reviewEditFields, name: reviewEditFields.correctedName } : i));
+      setReviewEditResult({ ok: true, message: "✓ Saved" });
+    } catch (e) { setReviewEditResult({ ok: false, message: e.message }); }
+    setReviewSaving(false);
+  }
+
+  async function handleReviewReEnrich(wine) {
+    setReviewReEnriching(true);
+    setReviewEditResult(null);
+    const itemType = wine._type || "wine";
+    const hints = {};
+    if (itemType === "wine") {
+      if (reviewEditFields.region)        hints.region = reviewEditFields.region;
+      if (reviewEditFields.varietal)      hints.varietal = reviewEditFields.varietal;
+      if (reviewEditFields.correctedName) hints.correctedName = reviewEditFields.correctedName;
+    } else if (itemType === "beer") {
+      if (reviewEditFields.brewery) hints.brewery = reviewEditFields.brewery;
+      if (reviewEditFields.style)   hints.style = reviewEditFields.style;
+    } else if (itemType === "pour") {
+      if (reviewEditFields.producer)  hints.producer = reviewEditFields.producer;
+      if (reviewEditFields.category)  hints.category = reviewEditFields.category;
+    }
+    try {
+      const res = await fetch(REENRICH_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: wine.id, itemType, itemName: wine.name, hints })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const e = data.enrichment;
+        if (itemType === "wine") {
+          const updates = { correctedName: e.correctedName, varietal: e.varietal, region: e.region, description: e.description, reviews: e.reviews };
+          setReviewEditFields(p => ({ ...p, ...updates }));
+          handleWineUpdate(wine.id, { ...updates, name: e.correctedName, uncertain: e.uncertain });
+        } else {
+          const updates = itemType === "beer"
+            ? { correctedName: e.correctedName, style: e.style, brewery: e.brewery, abv: e.abv, description: e.description }
+            : { correctedName: e.correctedName, category: e.category, producer: e.producer, abv: e.abv, description: e.description };
+          setReviewEditFields(p => ({ ...p, ...updates }));
+          setAllItems(prev => prev.map(i => i.id === wine.id ? { ...i, ...updates, name: e.correctedName, uncertain: e.uncertain } : i));
+        }
+        setReviewEditResult({ ok: true, message: e.uncertain ? `⚠️ Still uncertain: ${e.uncertainReason || "needs further review"}` : "✓ Re-enriched — no longer flagged" });
+      } else {
+        setReviewEditResult({ ok: false, message: data.error || "Re-enrichment failed" });
+      }
+    } catch (e) { setReviewEditResult({ ok: false, message: e.message }); }
+    setReviewReEnriching(false);
+  }
+
+  const uncertainWines = filterBySearch(localWines.filter(w => w.uncertain && !w.approved));
+  const uncertainOther = q ? allItems.filter(i => i.uncertain && !i.approved && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.uncertain && !i.approved);
+  const uncertain = [...uncertainWines, ...uncertainOther];
+
+  const reviewedWines = filterBySearch(localWines.filter(w => w.approved || w.manuallyEdited));
+  const reviewedOther = q ? allItems.filter(i => (i.approved || i.manuallyEdited) && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => i.approved || i.manuallyEdited);
+  const reviewed = [...reviewedWines, ...reviewedOther];
+  const noImageWines = filterBySearch(localWines.filter(w => !w.imageUrl));
+  const noImageOther = q ? allItems.filter(i => !i.imageUrl && (i.name || "").toLowerCase().includes(q)) : allItems.filter(i => !i.imageUrl);
+  const noImage = [...noImageWines, ...noImageOther];
+  const noPrice = filterBySearch(localWines.filter(w => !w.glassPrice && !w.bottlePrice));
+  const unenriched = filterBySearch(localWines.filter(w => !w.description && !w.varietal));
+  const duplicateGroups = findDuplicates(q ? localWines.filter(w => (w.name || "").toLowerCase().includes(q)) : localWines);
+
+  const tabs = [
+    { id: "uncertain", label: "⚠️ Review", count: uncertain.length + reviewed.length },
+    { id: "noimage", label: "🖼 No Image", count: noImage.length },
+    { id: "noprice", label: "$ No Price", count: noPrice.length },
+    { id: "unenriched", label: "✍️ No Data", count: unenriched.length },
+    { id: "duplicates", label: "♊ Dupes", count: duplicateGroups.length },
+    { id: "food", label: "🍽 Food Menu", count: null },
+    { id: "all", label: "✎ All Items", count: null },
+    { id: "sync", label: "⟳ Sync", count: null },
+    ...(isAdmin ? [{ id: "settings", label: "⚙ Settings", count: null }] : []),
+  ];
+
+  const lists = { uncertain, noimage: noImage, noprice: noPrice, unenriched };
+  const current = lists[activeTab] || [];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 1000, display: "flex", alignItems: "stretch", justifyContent: "center", fontFamily: t.fontSerif }}>
+      <div style={{ background: t.bgBase, display: "flex", flexDirection: "column", width: "100%", maxWidth: 780, height: "100%", boxShadow: "0 0 80px rgba(0,0,0,0.6)", borderLeft: `1px solid ${t.borderStrong}`, borderRight: `1px solid ${t.borderStrong}` }}>
+      {/* Header */}
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Manager</div>
+            <div style={{ color: t.textPrimary, fontSize: 18 }}>Wine List Dashboard</div>
+          </div>
+          <button onClick={onClose} style={{ background: t.accentDim, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
+            Close
+          </button>
+        </div>
+
+        {/* Tablet Location Toggle */}
+        <div style={{ marginTop: 14, background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ color: t.textMuted, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>This Tablet Is In</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { id: "bar", label: locationNames.bar, icon: "🍸" },
+              { id: "dining", label: locationNames.dining, icon: "🍽" },
+            ].map(loc => {
+              const active = tabletLocation === loc.id;
+              return (
+                <button key={loc.id} onClick={() => onSetLocation && onSetLocation(loc.id)} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: 8,
+                  border: `1.5px solid ${active ? t.accent : t.borderStrong}`,
+                  background: active ? t.accentBorderSm : t.white04,
+                  color: active ? t.textPrimary : t.textMuted,
+                  fontFamily: t.fontSerif, fontSize: 12, cursor: "pointer",
+                  transition: "all 0.15s", textAlign: "center"
+                }}>
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{loc.icon}</div>
+                  <div style={{ fontWeight: active ? 600 : 400 }}>{loc.label}</div>
+                  {active && <div style={{ fontSize: 9, color: t.accent, marginTop: 3, letterSpacing: "1px" }}>✓ THIS DEVICE</div>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ color: t.textDim, fontSize: 10, marginTop: 8, fontStyle: "italic" }}>
+            Sets which menus and food items the AI uses for pairing on this device. Persists across restarts.
+          </div>
+        </div>
+
+        {/* Summary row */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              width: "calc(25% - 6px)", boxSizing: "border-box", flexShrink: 0,
+              background: activeTab === t.id ? (t.id === "sync" ? t.successDim : t.accentDim) : t.id === "sync" ? "rgba(76,175,125,0.06)" : t.white04,
+              border: `0.5px solid ${activeTab === t.id ? (t.id === "sync" ? t.success : t.accent) : t.id === "sync" ? t.successDim : t.borderMid}`,
+              borderRadius: 8, padding: "10px 4px", cursor: "pointer", textAlign: "center"
+            }}>
+              <div style={{ color: t.id === "sync" ? t.success : t.count === null ? t.accent : t.count > 0 ? t.warning : t.success, fontSize: t.id === "sync" ? 16 : t.count === null ? 14 : 20, fontWeight: 600, marginBottom: 2 }}>{t.id === "sync" ? "⟳" : t.count === null ? "" : t.count}</div>
+              <div style={{ color: t.id === "sync" ? t.success : t.textMuted, fontSize: 9, letterSpacing: "1px", textTransform: "uppercase" }}>{t.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={{ padding: "8px 20px 4px", background: t.bgSurface }}>
+        <div style={{ position: "relative" }}>
+          <input type="text" placeholder="Search by wine name…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", background: t.white06, border: `0.5px solid ${t.borderMid}`, color: t.textPrimary, padding: "7px 30px 7px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none" }}
+          />
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 16, padding: 0 }}>×</button>}
+        </div>
+      </div>
+
+      {/* List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {/* Review sub-tab switcher — rendered outside ternary to avoid chain break */}
+        {activeTab === "uncertain" && (
+          <div style={{ display: "flex", background: t.white04, borderRadius: 8, padding: 4, marginBottom: 16 }}>
+            <button onClick={() => setReviewSubTab("pending")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, background: reviewSubTab === "pending" ? "rgba(232,160,80,0.2)" : "transparent", color: reviewSubTab === "pending" ? t.warning : t.textDim, fontWeight: reviewSubTab === "pending" ? 600 : 400 }}>
+              ⚠️ Needs Review ({uncertain.length})
+            </button>
+            <button onClick={() => setReviewSubTab("reviewed")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, background: reviewSubTab === "reviewed" ? t.successDim : "transparent", color: reviewSubTab === "reviewed" ? t.success : t.textDim, fontWeight: reviewSubTab === "reviewed" ? 600 : 400 }}>
+              ✓ Reviewed ({reviewed.length})
+            </button>
+          </div>
+        )}
+        {activeTab === "sync" ? (
+          <SyncTab />
+        ) : activeTab === "settings" ? (
+          <SettingsTab />
+        ) : activeTab === "all" ? (
+          <AllItemsTab wines={localWines} onWineUpdate={handleWineUpdate} managerSearch={search} />
+        ) : activeTab === "food" ? (
+          <FoodManagerTab />
+        ) : activeTab === "duplicates" ? (
+          duplicateGroups.length === 0 ? (
+            <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14 }}>No duplicates found</div>
+            </div>
+          ) : duplicateGroups.map((group, gi) => {
+            const hasPriceDiff = group.some(w => {
+              const price = w.glassPrice || w.bottlePrice;
+              return group.some(w2 => (w2.glassPrice || w2.bottlePrice) !== price);
+            });
+            return (
+              <div key={gi} style={{ background: t.white04, border: `0.5px solid ${hasPriceDiff ? t.errorBorder : t.borderMid}`, borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ color: hasPriceDiff ? t.error : t.warning, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
+                  {hasPriceDiff ? "⚠️ Price conflict" : "Duplicate entry"} · {group.length} entries in Toast
+                </div>
+                {group.map((wine, i) => (
+                  <div key={wine.id} style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? `0.5px solid ${t.bgDeep}` : "none" }}>
+                    <div style={{ width: 30, height: 42, borderRadius: 3, background: t.bgCardHover, border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, overflow: "hidden" }}>
+                      {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: t.textPrimary, fontSize: 13 }}>{wine.name}</div>
+                      <div style={{ color: t.textDim, fontSize: 10 }}>
+                        {wine._type === "beer" ? ["Beer", wine.style, wine.brewery].filter(Boolean).join(" · ")
+                          : wine._type === "pour" ? ["Pour", wine.category, wine.producer].filter(Boolean).join(" · ")
+                          : [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      {wine.glassPrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                      {wine.bottlePrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                      {!wine.glassPrice && !wine.bottlePrice && <div style={{ color: t.textDim, fontSize: 11, fontStyle: "italic" }}>No price</div>}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 10, color: t.textDim, fontSize: 11, fontStyle: "italic", borderTop: `0.5px solid ${t.bgDeep}`, paddingTop: 8 }}>
+                  Remove the duplicate{hasPriceDiff ? " and correct the price" : ""} in Toast — it will update on next sync
+                </div>
+              </div>
+            );
+          })
+        ) : (activeTab === "uncertain" && reviewSubTab === "pending" && uncertain.length === 0) ? (
+          <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+            <div style={{ fontSize: 14 }}>Nothing needs review</div>
+          </div>
+        ) : (activeTab === "uncertain" && reviewSubTab === "reviewed" && reviewed.length === 0) ? (
+          <div style={{ textAlign: "center", color: t.textDim, padding: 40 }}>
+            <div style={{ fontSize: 14 }}>No reviewed items yet</div>
+          </div>
+        ) : (activeTab !== "uncertain" && current.length === 0) ? (
+          <div style={{ textAlign: "center", color: t.success, padding: 40 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+            <div style={{ fontSize: 14 }}>All clear</div>
+          </div>
+        ) : (
+          (activeTab === "uncertain" ? (reviewSubTab === "pending" ? uncertain : reviewed) : current).map(wine => {
+            const isEditingThis = reviewEditingId === wine.id;
+            const itemType = wine._type || "wine";
+            const riInputStyle = { width: "100%", boxSizing: "border-box", background: t.white08, border: `0.5px solid ${t.borderStrong}`, color: t.textPrimary, padding: "7px 10px", borderRadius: 6, fontFamily: t.fontSerif, fontSize: 12, outline: "none", marginBottom: 8 };
+            const riLabelStyle = { color: t.textMuted, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
+            return (
+            <div key={wine.id} style={{ background: isEditingThis ? "rgba(201,169,110,0.06)" : t.white04, border: `0.5px solid ${isEditingThis ? t.accent : t.borderSubtle}`, borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+              {/* Main row */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", cursor: activeTab === "uncertain" ? "pointer" : "default" }}
+                onClick={() => activeTab === "uncertain" && openReviewEdit(wine)}>
+                <div style={{ width: 36, height: 50, borderRadius: 3, background: t.bgCardHover, border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, overflow: "hidden" }}>
+                  {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
+                    <div style={{ color: t.textPrimary, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {wine.sourceName || wine.name}
+                    </div>
+                    {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
+                      <span style={{ flexShrink: 0, fontSize: 9, background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, borderRadius: 4, padding: "1px 5px" }}>AI renamed</span>
+                    )}
+                  </div>
+                  {wine.sourceName && wine.name && wine.sourceName !== wine.name && (
+                    <div style={{ color: t.accent, fontSize: 10, marginBottom: 2 }}>→ {wine.name}</div>
+                  )}
+                  <div style={{ color: t.textDim, fontSize: 9, fontFamily: t.fontMono, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.id}</div>
+                  <div style={{ color: t.textDim, fontSize: 10, letterSpacing: "0.5px" }}>
+                    {itemType === "beer" ? [wine.style, wine.brewery].filter(Boolean).join(" · ")
+                      : itemType === "pour" ? [wine.category, wine.producer].filter(Boolean).join(" · ")
+                      : [wine.varietal, wine.region].filter(Boolean).join(" · ") || [wine.subgroup, wine.tier].filter(Boolean).join(" · ")}
+                  </div>
+                  {activeTab === "uncertain" && reviewSubTab === "reviewed" && (
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ color: t.success, fontSize: 10 }}>✓ {wine.manuallyEdited ? "Manually edited" : "Approved"}</span>
+                    </div>
+                  )}
+                  {activeTab === "uncertain" && reviewSubTab === "pending" && wine.uncertainReason && (
+                    <div style={{ color: t.warning, fontSize: 11, marginTop: 4, fontStyle: "italic" }}>{wine.uncertainReason}</div>
+                  )}
+                  {activeTab === "noprice" && <div style={{ color: t.warning, fontSize: 11, marginTop: 4 }}>No price in Toast — update menu item</div>}
+                  {activeTab === "noimage" && <div style={{ color: t.textMuted, fontSize: 11, marginTop: 4 }}>{wine._type === "beer" || wine._type === "pour" ? "Upload image in Toast → item → Image" : "Upload label image in Toast"}</div>}
+                  {activeTab === "unenriched" && <div style={{ color: t.textMuted, fontSize: 11, marginTop: 4 }}>Pending AI enrichment — will auto-populate next sync</div>}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                  <div style={{ textAlign: "right" }}>
+                    {wine.glassPrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.glassPrice)} glass</div>}
+                    {wine.bottlePrice && <div style={{ color: t.accent, fontSize: 12 }}>{formatPrice(wine.bottlePrice)} btl</div>}
+                  </div>
+                  {activeTab === "uncertain" && (
+                    <div style={{ color: t.textDim, fontSize: 10 }}>{isEditingThis ? "▲ close" : "✎ edit"}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Inline edit panel — only on Review tab */}
+              {activeTab === "uncertain" && isEditingThis && (
+                <div style={{ borderTop: `0.5px solid ${t.borderStrong}`, padding: "14px 14px 16px", background: "rgba(0,0,0,0.15)" }}>
+                  {/* Fields by type */}
+                  {itemType !== "food" && (
+                    <>
+                      <label style={riLabelStyle}>Name</label>
+                      <input style={riInputStyle} value={reviewEditFields.correctedName || ""} onChange={e => setReviewEditFields(p => ({ ...p, correctedName: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "wine" && (
+                    <>
+                      <label style={riLabelStyle}>Varietal</label>
+                      <input style={riInputStyle} value={reviewEditFields.varietal || ""} onChange={e => setReviewEditFields(p => ({ ...p, varietal: e.target.value }))} />
+                      <label style={riLabelStyle}>Region</label>
+                      <input style={riInputStyle} value={reviewEditFields.region || ""} onChange={e => setReviewEditFields(p => ({ ...p, region: e.target.value }))} />
+                      <label style={riLabelStyle}>Reviews & Ratings</label>
+                      <input style={riInputStyle} value={reviewEditFields.reviews || ""} onChange={e => setReviewEditFields(p => ({ ...p, reviews: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "beer" && (
+                    <>
+                      <label style={riLabelStyle}>Style</label>
+                      <input style={riInputStyle} value={reviewEditFields.style || ""} onChange={e => setReviewEditFields(p => ({ ...p, style: e.target.value }))} />
+                      <label style={riLabelStyle}>Brewery</label>
+                      <input style={riInputStyle} value={reviewEditFields.brewery || ""} onChange={e => setReviewEditFields(p => ({ ...p, brewery: e.target.value }))} />
+                      <label style={riLabelStyle}>ABV</label>
+                      <input style={riInputStyle} value={reviewEditFields.abv || ""} onChange={e => setReviewEditFields(p => ({ ...p, abv: e.target.value }))} />
+                    </>
+                  )}
+                  {itemType === "pour" && (
+                    <>
+                      <label style={riLabelStyle}>Category</label>
+                      <input style={riInputStyle} value={reviewEditFields.category || ""} onChange={e => setReviewEditFields(p => ({ ...p, category: e.target.value }))} />
+                      <label style={riLabelStyle}>Producer</label>
+                      <input style={riInputStyle} value={reviewEditFields.producer || ""} onChange={e => setReviewEditFields(p => ({ ...p, producer: e.target.value }))} />
+                      <label style={riLabelStyle}>ABV</label>
+                      <input style={riInputStyle} value={reviewEditFields.abv || ""} onChange={e => setReviewEditFields(p => ({ ...p, abv: e.target.value }))} />
+                    </>
+                  )}
+                  <label style={riLabelStyle}>Tasting Notes</label>
+                  <textarea style={{ ...riInputStyle, height: 64, resize: "vertical", marginBottom: 10 }} value={reviewEditFields.description || ""} onChange={e => setReviewEditFields(p => ({ ...p, description: e.target.value }))} />
+
+                  {/* Re-enrich hint */}
+                  <div style={{ color: t.textMuted, fontSize: 10, fontStyle: "italic", marginBottom: 10, lineHeight: 1.5 }}>
+                    Fill in Region (and any other known fields) above, then tap ✦ Re-enrich — Claude will use your corrections as facts and write a fresh description.
+                  </div>
+
+                  {/* Result message */}
+                  {reviewEditResult && (
+                    <div style={{ marginBottom: 10, background: reviewEditResult.ok ? t.successDim : t.errorDim, border: `0.5px solid ${reviewEditResult.ok ? t.success : t.error}`, borderRadius: 6, padding: "7px 12px" }}>
+                      <div style={{ color: reviewEditResult.ok ? t.success : t.error, fontSize: 11 }}>{reviewEditResult.message}</div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => handleReviewSave(wine)} disabled={reviewSaving || reviewReEnriching}
+                      style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "9px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600 }}>
+                      {reviewSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button onClick={() => handleReviewReEnrich(wine)} disabled={reviewReEnriching || reviewSaving}
+                      style={{ background: reviewReEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reviewReEnriching ? "#6070a0" : "#8090c0"}`, color: "#a0b0e0", padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
+                      {reviewReEnriching ? "Re-enriching…" : "✦ Re-enrich"}
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: t.successDim, border: `0.5px solid ${t.success}`, color: t.success, padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
+                      ✓ Approve
+                    </button>
+                    <button onClick={() => { setReviewEditingId(null); setReviewEditResult(null); }}
+                      style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "9px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12 }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Approve button on collapsed pending items */}
+              {activeTab === "uncertain" && reviewSubTab === "pending" && !isEditingThis && (
+                <div style={{ padding: "0 14px 12px" }}>
+                  {wine.correctedName && wine.correctedName !== wine.name && (
+                    <div style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                      <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Suggested name</div>
+                      <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 6 }}>{wine.correctedName}</div>
+                      <CopyButton text={wine.correctedName} />
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => openReviewEdit(wine)}
+                      style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", color: t.accent, padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+                      ✎ Edit & Re-enrich
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); handleApprove(wine); }}
+                      style={{ background: t.successDim, border: "0.5px solid #4caf7d", color: t.success, padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+                      Looks Good ✓
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ background: t.bgSurface, borderTop: `1px solid ${t.borderSubtle}`, padding: "12px 20px", textAlign: "center" }}>
+        <div style={{ color: t.borderStrong, fontSize: 10, letterSpacing: "1px" }}>
+          {wines.length} total wines · {isAdmin ? "Admin access" : "Manager access"} · Tap AK logo 5× to access this screen
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN Screen ───────────────────────────────────────────────────────────────
+
+function PinScreen({ onSuccess, onCancel }) {
+  const t = useTheme();
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
+
+  function handleDigit(d) {
+    if (pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    setError(false);
+    if (next.length === 4) {
+      if (next === ADMIN_PIN) {
+        onSuccess("admin");
+      } else if (next === MANAGER_PIN) {
+        onSuccess("manager");
+      } else {
+        setTimeout(() => { setPin(""); setError(true); }, 300);
+      }
+    }
+  }
+
+  function handleDelete() { setPin(p => p.slice(0, -1)); setError(false); }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
+      <div style={{ background: t.bgSurface, border: `1px solid ${t.borderSubtle}`, borderRadius: 16, padding: "32px 28px", width: 280, textAlign: "center" }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Staff Access</div>
+        <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 24 }}>Enter PIN</div>
+
+        {/* PIN dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 24 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{
+              width: 14, height: 14, borderRadius: "50%",
+              background: i < pin.length ? (error ? t.error : t.accent) : "transparent",
+              border: `2px solid ${error ? t.error : i < pin.length ? t.accent : t.borderStrong}`,
+              transition: "all 0.15s"
+            }} />
+          ))}
+        </div>
+
+        {error && <div style={{ color: t.error, fontSize: 12, marginBottom: 16 }}>Incorrect PIN</div>}
+
+        {/* Keypad */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+          {[1,2,3,4,5,6,7,8,9].map(d => (
+            <button key={d} onClick={() => handleDigit(String(d))} style={{
+              background: t.white06, border: `0.5px solid ${t.borderSubtle}`,
+              color: t.textPrimary, fontSize: 20, padding: "14px", borderRadius: 10,
+              cursor: "pointer", fontFamily: t.fontSerif
+            }}>{d}</button>
+          ))}
+          <button onClick={onCancel} style={{ background: "transparent", border: `0.5px solid ${t.borderSubtle}`, color: t.textDim, fontSize: 12, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif }}>Cancel</button>
+          <button onClick={() => handleDigit("0")} style={{ background: t.white06, border: `0.5px solid ${t.borderSubtle}`, color: t.textPrimary, fontSize: 20, padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: t.fontSerif }}>0</button>
+          <button onClick={handleDelete} style={{ background: "transparent", border: `0.5px solid ${t.borderSubtle}`, color: t.textDim, fontSize: 18, padding: "14px", borderRadius: 10, cursor: "pointer" }}>⌫</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared List Sub-Components ──────────────────────────────────────────────
+// Edit these once and changes apply to Wine, Beer, Cocktails, Pours, NAB
+
+function ListScreenHeader({ title, onBack, favorites, onShowShortlist, children }) {
+  const t = useTheme();
+  return (
+    <div style={{ background: t.bgBase, padding: "0 20px" }}>
+      <div style={{ padding: "10px 0 6px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: t.textPrimary, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+          ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>Main Menu</span>
+        </button>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ color: t.accent, fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>{title}</div>
+        </div>
+        <div style={{ width: 80, textAlign: "right" }}>
+          {favorites.length > 0 && (
+            <button onClick={onShowShortlist} style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+              ★ {favorites.length}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${t.accent}44, transparent)`, marginBottom: 10 }} />
+      {children}
+    </div>
+  );
+}
+
+function ListSectionHeading({ label, borderTop }) {
+  const t = useTheme();
+  return (
+    <div style={{ padding: "18px 20px 6px", borderTop: borderTop ? `0.5px solid ${t.borderSubtle}` : "none" }}>
+      <div style={{ color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase" }}>{label}</div>
+    </div>
+  );
+}
+
+function ListCountBar({ left, right }) {
+  const t = useTheme();
+  return (
+    <div style={{ background: t.bgSurface, padding: "5px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ color: t.textDim, fontSize: 11, letterSpacing: "1px" }}>{left}</span>
+      {right && <span style={{ color: t.textDim, fontSize: 10, fontStyle: "italic" }}>{right}</span>}
+    </div>
+  );
+}
+
+// ─── Generic Item List Screen (Beer, Pours, Cocktails, NAB) ──────────────────
+
+function ItemListScreen({ title, allLabel, endpoint, dataKey, accentColor, onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+  const t = useTheme();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeGroup, setActiveGroup] = useState("All");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+  const [zoomedLabel, setZoomedLabel] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatContext, setChatContext] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
+
+  useEffect(() => {
+    fetch(endpoint)
+      .then(r => r.json())
+      .then(data => {
+        setItems(data[dataKey] || []);
+        setLoading(false);
+        setTimeout(() => setVisible(true), 50);
+      })
+      .catch(e => { setError(e.message || "Unable to load menu"); setLoading(false); });
+
+    // Silent background poll — interval adjusts to season/time
+    let pollTimer;
+    function scheduleNext() {
+      pollTimer = setTimeout(() => {
+        fetch(endpoint).then(r => r.json())
+          .then(data => { setItems(data[dataKey] || []); })
+          .catch(() => {});
+        scheduleNext();
+      }, getPollingInterval());
+    }
+    scheduleNext();
+    return () => clearTimeout(pollTimer);
+  }, [endpoint, dataKey]);
+
+  const available = items.filter(i => i.available !== false);
+  const groupOrder = [...new Map(available.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
+  const groups = ["All", ...groupOrder];
+  const filtered = activeGroup === "All" ? available : available.filter(i => i.subgroup === activeGroup || i.tier === activeGroup);
+
+  const searchFiltered = itemSearch.trim() === ""
+    ? filtered
+    : filtered.filter(i => {
+        const q = itemSearch.toLowerCase();
+        return (i.name || "").toLowerCase().includes(q)
+          || (i.description || "").toLowerCase().includes(q)
+          || (i.style || "").toLowerCase().includes(q)
+          || (i.category || "").toLowerCase().includes(q);
       });
 
-    } catch (error) {
-      console.error('reenrichItem error:', error.message);
-      res.status(500).json({ error: error.message });
+  const grouped = {};
+  searchFiltered.forEach(item => {
+    const key = item.subgroup || item.tier || "Menu";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(item);
+  });
+  const filteredGroupOrder = [...new Map(searchFiltered.map(i => [i.subgroup || i.tier || "Menu", true])).keys()];
+
+  if (loading) return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <div style={{ color: accentColor, fontSize: 13, letterSpacing: "3px", textTransform: "uppercase", fontFamily: t.fontSerif }}>Loading {title}...</div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
+      <div style={{ textAlign: "center", maxWidth: 400 }}>
+        <div style={{ color: accentColor, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Unable to load {title}</div>
+        <div style={{ color: t.textDim, fontSize: 12, marginBottom: 8 }}>Endpoint: {endpoint}</div>
+        <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 6, padding: "10px 14px", marginBottom: 16, textAlign: "left" }}>
+          <div style={{ color: t.textDim, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>Error</div>
+          <div style={{ color: t.textSecondary, fontSize: 12, fontFamily: t.fontMono, wordBreak: "break-all" }}>{error}</div>
+        </div>
+        <button onClick={() => window.location.reload()} style={{ background: accentColor, color: t.bgBase, border: "none", padding: "8px 20px", borderRadius: 6, fontFamily: t.fontSerif, cursor: "pointer" }}>Try Again</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {/* Shared header — edit ListScreenHeader to change all list screens */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
+        <ListScreenHeader title={title} onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {groups.map(g => (
+              <button key={g} onClick={() => { setActiveGroup(g); setSelectedItem(null); }} style={{
+                background: activeGroup === g ? accentColor : t.white08,
+                border: `0.5px solid ${activeGroup === g ? accentColor : "rgba(255,255,255,0.15)"}`,
+                color: activeGroup === g ? t.bgBase : t.accent,
+                fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
+                fontFamily: t.fontSerif, whiteSpace: "nowrap",
+                fontWeight: activeGroup === g ? 600 : 400
+              }}>{g === "All" ? (allLabel || `All ${title}`) : g}</button>
+            ))}
+          </div>
+          <div style={{ padding: "4px 0 10px", position: "relative" }}>
+            <input type="text" placeholder={`Search ${title.toLowerCase()}…`} value={itemSearch}
+              onChange={e => setItemSearch(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: t.white08, border: "0.5px solid rgba(201,169,110,0.25)", color: t.textPrimary, padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+            />
+            {itemSearch && <button onClick={() => setItemSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+          </div>
+        </ListScreenHeader>
+      </div>
+
+      <ListCountBar
+        left={`${searchFiltered.length} ${searchFiltered.length === 1 ? "item" : "items"}${itemSearch ? ` · "${itemSearch}"` : ""}`}
+        right="☆ Star to save to My Menu"
+      />
+
+      <div style={{ background: t.bgSurface }}>
+        {filteredGroupOrder.map((group, gi) => (
+          <div key={group}>
+            <ListSectionHeading label={group} borderTop={gi > 0} />
+            <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
+              {grouped[group].map(item => (
+                <div key={item.id} onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    background: selectedItem === item.id ? t.textPrimary : "transparent",
+                    borderLeft: selectedItem === item.id ? `2px solid ${accentColor}` : "2px solid transparent",
+                    borderRadius: 8, padding: "11px 8px", cursor: "pointer", transition: "all 0.15s"
+                  }}>
+                  <div
+                    onClick={item.imageUrl ? e => { e.stopPropagation(); setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }); } : undefined}
+                    style={{ width: 40, height: 56, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${item.imageUrl ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
+                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                    {(item.style || item.category) && (
+                      <div style={{ color: accentColor, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
+                        {item.style || item.category}{(item.brewery || item.producer) ? ` · ${item.brewery || item.producer}` : ""}{item.abv ? ` · ${item.abv}` : ""}
+                      </div>
+                    )}
+                    {item.description ? (
+                      <div style={{ color: t.textMuted, fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description} <span style={{ color: accentColor, fontSize: 11 }}>Details ›</span></div>
+                    ) : (
+                      <div style={{ color: accentColor, fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <button onClick={e => { e.stopPropagation(); onToggleFavorite(item); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: favorites.some(f => f.id === item.id) ? accentColor : t.textSecondary, padding: "2px 0", lineHeight: 1 }}>
+                      {favorites.some(f => f.id === item.id) ? "★" : "☆"}
+                    </button>
+                    <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
+                    {item.price ? (
+                      <>
+                        <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>${Math.round(item.price)}</div>
+                        <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>each</div>
+                      </>
+                    ) : (
+                      <span style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>Ask</span>
+                    )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ color: t.textSecondary, textAlign: "center", padding: 40, fontSize: 14 }}>
+            {items.length === 0 ? "Menu coming soon" : "No items in this selection"}
+          </div>
+        )}
+      </div>
+
+      {/* Expanded detail panel */}
+      {selectedItem && (() => {
+        const item = items.find(i => i.id === selectedItem);
+        if (!item) return null;
+        return (
+          <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)" }}>
+            <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+              <div
+                onClick={item.imageUrl ? () => setZoomedLabel({ name: item.name, varietal: item.style || item.category, region: item.brewery || item.producer, imageUrl: item.imageUrl }) : undefined}
+                style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${item.imageUrl ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden", cursor: item.imageUrl ? "zoom-in" : "default" }}>
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : (dataKey === "beers" ? "🍺" : dataKey === "cocktails" ? "🍹" : dataKey === "nab" ? ((item.subgroup || "").toLowerCase() === "mocktails" ? "🍹" : "🥤") : "🥃")}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: t.textPrimary, fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{item.name}</div>
+                {(item.style || item.category) && <div style={{ color: accentColor, fontSize: 11, marginBottom: 2 }}>{item.style || item.category}</div>}
+                {(item.brewery || item.producer) && <div style={{ color: t.textMuted, fontSize: 11 }}>{item.brewery || item.producer}</div>}
+                <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                  {item.abv && <span style={{ color: t.textMuted, fontSize: 11 }}>{item.abv} ABV</span>}
+                  {item.age && <span style={{ color: t.textMuted, fontSize: 11 }}>{item.age}</span>}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {item.price && <div style={{ color: t.textPrimary, fontSize: 18, fontWeight: 500 }}>${Math.round(item.price)}</div>}
+              </div>
+            </div>
+            {item.description && (
+              <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.6, fontStyle: "italic", borderTop: "0.5px solid #e8e0d0", paddingTop: 10, marginBottom: 12 }}>
+                {item.description}
+              </div>
+            )}
+            <ItemPairingButton item={item} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+          </div>
+        );
+      })()}
+
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
+      <div style={{ height: 32 }} />
+    </div>
+  );
+}
+
+// ─── My Menu QR Code Helpers ─────────────────────────────────────────────────
+
+function encodeFavorites(favorites) {
+  const compact = favorites.map(f => {
+    if (f.favoriteType === 'food') return { t: 'food', n: f.name, cr: f.courseRole, p: f.price, d: (f.description || '').slice(0, 80) };
+    if (f.favoriteType === 'wine') return { t: 'wine', n: f.name, v: f.varietal, r: f.region, gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || '').slice(0, 140), cl: f.courseLabel, fp: f.fromPairing, img: f.imageUrl || null };
+    return { t: f.favoriteType, n: f.name, p: f.price };
+  });
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, dt: Date.now(), items: compact })))); } catch(e) { return null; }
+}
+
+function decodeFavorites(encoded) {
+  const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  // Handle both new format { v, dt, items } and old format (plain array)
+  const compact = Array.isArray(parsed) ? parsed : (parsed.items || []);
+  const savedAt = Array.isArray(parsed) ? null : (parsed.dt || null);
+  const favorites = compact.map((f, i) => ({
+    id: `shared-${i}`,
+    favoriteType: f.t,
+    name: f.n,
+    courseRole: f.cr,
+    price: f.p,
+    description: f.d,
+    varietal: f.v,
+    region: f.r,
+    glassPrice: f.gp,
+    bottlePrice: f.bp,
+    reason: f.rs,
+    courseLabel: f.cl,
+    fromPairing: f.fp,
+  }));
+  return Object.assign(favorites, { _savedAt: savedAt });
+}
+
+// ─── Guest Menu Loader (fetches saved menu from DB by short code) ─────────────
+
+function GuestMenuLoader({ menuCode }) {
+  const t = useTheme();
+  const [state, setState] = useState("loading"); // loading | ready | expired | error
+  const [favorites, setFavorites] = useState([]);
+  const [savedAt, setSavedAt] = useState(null);
+
+  useEffect(() => {
+    fetch(`${GET_MENU_URL}?id=${menuCode}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.favorites) { setFavorites(data.favorites); setSavedAt(data.createdAt || null); setState("ready"); }
+        else if (data.error === "expired") setState("expired");
+        else setState("error");
+      })
+      .catch(() => setState("error"));
+  }, [menuCode]);
+
+  if (state === "loading") return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.fontSerif }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ color: t.accent, fontSize: 22, marginBottom: 12 }}>✦</div>
+        <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>Loading your menu…</div>
+      </div>
+    </div>
+  );
+
+  if (state === "expired") return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: t.fontSerif }}>
+      <div style={{ textAlign: "center", maxWidth: 360 }}>
+        <div style={{ color: t.accent, fontSize: 28, marginBottom: 16 }}>✦</div>
+        <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 12 }}>Appalachia Kitchen</div>
+        <div style={{ color: t.textPrimary, fontSize: 18, marginBottom: 12 }}>This menu link has expired</div>
+        <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.6 }}>Menu QR codes are valid for 24 hours. We hope your evening was wonderful — we'd love to welcome you back soon.</div>
+        <div style={{ color: t.borderStrong, fontSize: 11, marginTop: 24, letterSpacing: "1px" }}>CORDUROY INN & LODGE · SNOWSHOE MOUNTAIN, WV</div>
+      </div>
+    </div>
+  );
+
+  if (state === "error") return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: t.fontSerif }}>
+      <div style={{ textAlign: "center", color: t.textDim, fontSize: 14 }}>Menu not found. Please ask your server for assistance.</div>
+    </div>
+  );
+
+  return <GuestMenuScreen favorites={favorites} savedAt={savedAt} />;
+}
+
+// ─── Guest Menu Screen (read-only, opened via QR code on guest's phone) ───────
+
+function GuestMenuScreen({ favorites, savedAt }) {
+  const t = useTheme();
+  const courseOrder  = ["first", "main", "dessert"];
+  const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+
+  const foodItems  = favorites.filter(f => f.favoriteType === "food");
+  const wineItems  = favorites.filter(f => f.favoriteType === "wine");
+  const drinkItems = favorites.filter(f => f.favoriteType !== "food" && f.favoriteType !== "wine");
+
+  const foodByCourse = {};
+  foodItems.forEach(f => { const r = f.courseRole || "main"; if (!foodByCourse[r]) foodByCourse[r] = []; foodByCourse[r].push(f); });
+  const foodCourses = courseOrder.filter(r => foodByCourse[r]);
+
+  const winesByCourseLabel = {};
+  const standaloneWines = [];
+  wineItems.forEach(w => {
+    if (w.fromPairing && w.courseLabel) {
+      if (!winesByCourseLabel[w.courseLabel]) winesByCourseLabel[w.courseLabel] = [];
+      winesByCourseLabel[w.courseLabel].push(w);
+    } else { standaloneWines.push(w); }
+  });
+
+  const SectionHeader = ({ label }) => (
+    <div style={{ background: t.bgCardHover, padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    </div>
+  );
+
+  const WineCard = ({ item }) => (
+    <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        {item.imageUrl
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: `0.5px solid ${t.accent}` }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: t.textPrimary, fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            {item.glassPrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: t.textSecondary }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: t.textSecondary }}>bottle</span></div>}
+          </div>
+        </div>
+      </div>
+      {item.reason && <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 480, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "24px 20px 20px", textAlign: "center" }}>
+        <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 6 }}>My Menu</div>
+        <div style={{ color: t.textPrimary, fontSize: 20, marginBottom: 4 }}>Appalachia Kitchen</div>
+        <div style={{ color: t.textSecondary, fontSize: 11, letterSpacing: "1px" }}>Corduroy Inn & Lodge · Snowshoe Mountain, WV</div>
+        {savedAt && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>
+            <div style={{ color: t.accent, fontSize: 12, letterSpacing: "0.5px" }}>
+              {new Date(savedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "16px 16px 48px" }}>
+        {foodCourses.map(role => {
+          const label = courseLabels[role];
+          const courseWines = winesByCourseLabel[label] || [];
+          return (
+            <div key={role}>
+              <SectionHeader label={label} />
+              {foodByCourse[role].map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                    {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{item.description}</div>}
+                    {item.price && <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                  </div>
+                </div>
+              ))}
+              {courseWines.map(item => <WineCard key={item.id} item={item} />)}
+            </div>
+          );
+        })}
+
+        {standaloneWines.length > 0 && (
+          <div>
+            <SectionHeader label="Wines" />
+            {standaloneWines.map(item => <WineCard key={item.id} item={item} />)}
+          </div>
+        )}
+
+        {drinkItems.length > 0 && (
+          <div>
+            <SectionHeader label="Drinks" />
+            {drinkItems.map(item => (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
+                <div style={{ fontSize: 20, flexShrink: 0 }}>
+                  {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                </div>
+                {item.price && <div style={{ color: t.textSecondary, fontSize: 12 }}>{formatPrice(item.price)}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ textAlign: "center", padding: "24px 20px 40px", margin: "8px 16px 0", borderTop: "0.5px solid rgba(201,169,110,0.15)" }}>
+        <div style={{ color: t.accent, fontSize: 13, marginBottom: 12 }}>Enjoyed your evening?</div>
+        <a href={RESERVATION_URL} target="_blank" rel="noopener noreferrer"
+          style={{ display: "inline-block", background: t.accent, color: t.bgDeep, textDecoration: "none", padding: "10px 24px", borderRadius: 8, fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 16 }}>
+          Book Your Next Visit
+        </a>
+        <div style={{ color: t.textDim, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+          Corduroy Inn & Lodge · Snowshoe Mountain, WV
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shortlist Screen ─────────────────────────────────────────────────────────
+
+function ShortlistScreen({ favorites, onRemove, onClose }) {
+  const t = useTheme();
+  const courseOrder  = ["first", "main", "dessert"];
+  const courseLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+
+  const foodItems  = favorites.filter(f => f.favoriteType === "food");
+  const wineItems  = favorites.filter(f => f.favoriteType === "wine");
+  const drinkItems = favorites.filter(f => f.favoriteType !== "food" && f.favoriteType !== "wine");
+
+  const foodByCourse = {};
+  foodItems.forEach(f => {
+    const r = f.courseRole || "main";
+    if (!foodByCourse[r]) foodByCourse[r] = [];
+    foodByCourse[r].push(f);
+  });
+  const foodCourses = courseOrder.filter(r => foodByCourse[r]);
+
+  // Wines from AI pairing embed in their course; wines from wine list sit standalone
+  const winesByCourseLabel = {};
+  const standaloneWines = [];
+  wineItems.forEach(w => {
+    if (w.fromPairing && w.courseLabel) {
+      if (!winesByCourseLabel[w.courseLabel]) winesByCourseLabel[w.courseLabel] = [];
+      winesByCourseLabel[w.courseLabel].push(w);
+    } else {
+      standaloneWines.push(w);
     }
   });
 
-// ─── Get App Settings ─────────────────────────────────────────────────────────
+  const hasCourses = foodCourses.length > 0;
 
-exports.getSettings = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
-  try {
-    const db = admin.database();
-    const snap = await db.ref('appSettings').once('value');
-    res.json({ settings: snap.val() || { menus: [] } });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  const [showQR, setShowQR]     = useState(false);
+  const [qrSaving, setQrSaving] = useState(false);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
+  const [menuCode, setMenuCode] = useState(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailState, setEmailState] = useState("idle"); // idle | sending | sent | error
+
+  async function handleOpenQR() {
+    setShowQR(true);
+    if (menuCode) return; // already saved this session
+    setQrSaving(true);
+    try {
+      const compact = favorites.map(f => ({
+        t: f.favoriteType, n: f.name, cr: f.courseRole, p: f.price,
+        d: (f.description || "").slice(0, 80), v: f.varietal, r: f.region,
+        gp: f.glassPrice, bp: f.bottlePrice, rs: (f.reason || "").slice(0, 140),
+        cl: f.courseLabel, fp: f.fromPairing, img: f.imageUrl || null,
+      }));
+      const res = await fetch(SAVE_MENU_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ favorites: compact })
+      });
+      const data = await res.json();
+      if (data.ok) setMenuCode(data.menuId);
+    } catch(e) { /* fail silently — QR just won't show */ }
+    setQrSaving(false);
   }
-});
 
-// ─── Save App Settings ────────────────────────────────────────────────────────
+  async function handleSendEmail() {
+    if (!emailInput || !menuCode) return;
+    setEmailState("sending");
+    try {
+      const res = await fetch(SEND_EMAIL_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput, menuId: menuCode })
+      });
+      const data = await res.json();
+      setEmailState(data.ok ? "sent" : "error");
+    } catch(e) { setEmailState("error"); }
+  }
 
-exports.saveSettings = functions.https.onRequest(async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).send('');
+  const SectionHeader = ({ label }) => (
+    <div style={{ background: t.bgCardHover, padding: "8px 16px", marginBottom: 10, marginTop: 6, borderRadius: 6 }}>
+      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600 }}>✦ {label}</div>
+    </div>
+  );
 
-  try {
-    const { action, settings, guid } = req.body;
+  const RemoveBtn = ({ item }) => (
+    <button onClick={() => onRemove(item.id)} style={{ background: "none", border: "none", color: t.borderStrong, cursor: "pointer", fontSize: 20, padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}>×</button>
+  );
 
-    // ── Fetch Toast availability for a single GUID (used by Settings "Check" button) ──
-    if (action === 'fetchAvailability') {
-      if (!guid) return res.status(400).json({ error: 'guid required' });
-      try {
-        const token = await getToastToken();
-        const menus = await getMenus(token);
-        // Find menu or group matching this GUID
-        let found = menus.menus.find(m => m.guid === guid);
-        let itemCount = 0;
-        let menuName = null;
-        let availSchedule = null;
+  const WineCard = ({ item }) => (
+    <div style={{ background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        {item.imageUrl
+          ? <div onClick={() => setZoomedLabel(item)} style={{ width: 36, height: 50, borderRadius: 3, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", border: `0.5px solid ${t.accent}` }}><img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+          : <div style={{ fontSize: 22, flexShrink: 0 }}>🍷</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: t.textPrimary, fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+          {(item.varietal || item.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 4 }}>{[item.varietal, item.region].filter(Boolean).join(" · ")}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            {item.glassPrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.glassPrice)} <span style={{ color: t.textSecondary }}>glass</span></div>}
+            {item.bottlePrice && <div style={{ color: t.textSecondary, fontSize: 11 }}>{formatPrice(item.bottlePrice)} <span style={{ color: t.textSecondary }}>bottle</span></div>}
+          </div>
+        </div>
+        <RemoveBtn item={item} />
+      </div>
+      {item.reason && <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", lineHeight: 1.6, marginTop: 10, paddingTop: 10, borderTop: "0.5px solid rgba(201,169,110,0.2)" }}>"{item.reason}"</div>}
+    </div>
+  );
 
-        if (found) {
-          menuName = found.name;
-          availSchedule = found.availabilitySchedules || null;
-          // Count all items recursively
-          function countItems(group) {
-            let c = (group.menuItems || []).length;
-            (group.menuGroups || []).forEach(sg => { c += countItems(sg); });
-            return c;
-          }
-          (found.menuGroups || []).forEach(g => { itemCount += countItems(g); });
-        } else {
-          // Search as a group — inherit availability from parent menu since
-          // Toast does not set availabilitySchedules at the group level
-          for (const m of menus.menus) {
-            const group = findGroupByGuid(m.menuGroups || [], guid);
-            if (group) {
-              found = group;
-              menuName = group.name;
-              // Groups never have their own schedule in Toast — always inherit from parent menu
-              availSchedule = (m.availabilitySchedules && m.availabilitySchedules.length > 0)
-                ? m.availabilitySchedules
-                : null;
-              function countGrpItems(g) {
-                let c = (g.menuItems || []).length;
-                (g.menuGroups || []).forEach(sg => { c += countGrpItems(sg); });
-                return c;
-              }
-              itemCount = countGrpItems(group);
-              break;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "center" }}>
+    <div style={{ width: "100%", maxWidth: 680, background: t.bgBase, display: "flex", flexDirection: "column", fontFamily: t.fontSerif, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ background: t.bgSurface, borderBottom: `1px solid ${t.borderSubtle}`, padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: t.accent, fontSize: 12, letterSpacing: "3px", textTransform: "uppercase" }}>My Menu</div>
+            <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 2 }}>Your evening's selections</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {favorites.length > 0 && (
+            <button onClick={handleOpenQR} style={{ background: t.accentDim, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+              Save ↗
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "1px", padding: "4px 0" }}>‹ Back</button>
+          </div>
+        </div>
+        <div style={{ borderTop: "0.5px solid rgba(201,169,110,0.2)", paddingTop: 8, color: t.accent, fontSize: 11, fontStyle: "italic", textAlign: "center" }}>
+          Ready to order? Your server will be happy to help.
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 32px" }}>
+        {favorites.length === 0 ? (
+          <div style={{ color: t.textDim, textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: 36, marginBottom: 16 }}>☆</div>
+            <div style={{ fontSize: 14 }}>Star wines, dishes, and drinks to build your menu for the evening</div>
+          </div>
+        ) : (
+          <>
+            {/* Food by course, with paired wines embedded */}
+            {hasCourses && foodCourses.map(role => {
+              const label = courseLabels[role];
+              const courseWines = winesByCourseLabel[label] || [];
+              return (
+                <div key={role}>
+                  <SectionHeader label={label} />
+                  {foodByCourse[role].map(item => (
+                    <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
+                      <div style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>🍽️</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                        {item.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 2, lineHeight: 1.4 }}>{item.description}</div>}
+                        {item.price && <div style={{ color: t.textSecondary, fontSize: 11, marginTop: 3 }}>{formatPrice(item.price)}</div>}
+                      </div>
+                      <RemoveBtn item={item} />
+                    </div>
+                  ))}
+                  {courseWines.map(item => <WineCard key={item.id} item={item} />)}
+                </div>
+              );
+            })}
+
+            {/* Standalone wines — added from wine list, not from a course pairing */}
+            {standaloneWines.length > 0 && (
+              <div>
+                <SectionHeader label="Wines" />
+                {standaloneWines.map(item => <WineCard key={item.id} item={item} />)}
+              </div>
+            )}
+
+            {/* Other drinks */}
+            {drinkItems.length > 0 && (
+              <div>
+                <SectionHeader label="Drinks" />
+                {drinkItems.map(item => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.white04, border: `0.5px solid ${t.borderSubtle}`, borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ fontSize: 20, flexShrink: 0 }}>
+                      {item.favoriteType === "beer" ? "🍺" : item.favoriteType === "cocktail" ? "🍹" : item.favoriteType === "nab" ? "🥤" : "🥃"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: t.textPrimary, fontSize: 14 }}>{item.name}</div>
+                      <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginTop: 2 }}>
+                        {item.favoriteType === "beer" ? (item.style || "Beer") : item.favoriteType === "cocktail" ? "Cocktail" : item.favoriteType === "nab" ? "Non-Alcoholic" : "Premium Pour"}
+                      </div>
+                    </div>
+                    {item.price && <div style={{ color: t.textSecondary, fontSize: 12, flexShrink: 0 }}>{formatPrice(item.price)}</div>}
+                    <RemoveBtn item={item} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      {showQR && (
+        <div style={{ position: "fixed", inset: 0, background: t.bgOverlay, zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: t.bgSurface, border: `1px solid ${t.borderMid}`, borderRadius: 16, padding: "28px 24px", maxWidth: 340, width: "100%", textAlign: "center" }}>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 8 }}>Your Menu is Ready</div>
+
+            {qrSaving ? (
+              <div style={{ padding: "40px 0", color: t.accent, fontSize: 12, letterSpacing: "2px" }}>Saving your menu…</div>
+            ) : menuCode ? (
+              <>
+                <div style={{ color: t.textPrimary, fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>Scan to view your menu while you dine</div>
+                <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginBottom: 16, lineHeight: 1.5 }}>No cell service? Connect to <span style={{ color: t.accent }}>Corduroy Guest</span> WiFi first</div>
+                <div style={{ background: "#ffffff", borderRadius: 12, padding: 14, display: "inline-block", marginBottom: 10 }}>
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(`${window.location.origin}/?m=${menuCode}`)}`} alt="QR Code" style={{ width: 200, height: 200, display: "block" }} />
+                </div>
+                <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>Scan anytime — this code does not expire</div>
+                <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 20, wordBreak: "break-all" }}>
+                  <span style={{ color: t.textSecondary, fontSize: 9 }}>{`${window.location.origin}/?m=${menuCode}`}</span>
+                </div>
+
+                {/* Email section — coming soon, code preserved for when Resend is configured */}
+              </>
+            ) : (
+              <div style={{ color: t.textDim, padding: "24px 0", fontSize: 13 }}>Unable to save menu. Please ask your server.</div>
+            )}
+
+            <button onClick={() => setShowQR(false)} style={{ marginTop: 20, background: t.accent, color: t.bgDeep, border: "none", padding: "10px 32px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+    </div>
+  );
+}
+
+// ─── Sommelier Chat ───────────────────────────────────────────────────────────
+// A slide-up chat drawer that opens from any pairing entry point.
+// The backend system prompt hard-boxes the AI to F&B at Appalachia Kitchen only.
+//
+// Props:
+//   isOpen       — controls visibility
+//   onClose      — called when user taps X or backdrop
+//   contextItem  — { name, type } of the wine/beer/pour/food that opened the chat
+//                  used to personalise the opening message; null for generic open
+
+function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favorites = [], onToggleFavorite, onShowShortlist, tabletLocation = null }) {
+  const t = useTheme();
+  const restaurantName = tabletLocation === "bar" ? "Tuque's Bar & Grill" : "Appalachia Kitchen";
+  function buildOpener() {
+    if (selectedFoods.length > 0) {
+      const names = selectedFoods.map(f => f.name).join(", ");
+      return `I can see you're considering ${names}. Before I find wine pairings, is there anything I should know about your preferences — a style you love, something you'd like to avoid, or a budget in mind?`;
+    }
+    if (contextItem) {
+      return `I see you're looking at the ${contextItem.name}. Before I start searching, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or anything else?`;
+    }
+    return "Before I start my search, is there anything I should know about your preferences — dietary restrictions, flavor dislikes, or budget?";
+  }
+
+  const [messages, setMessages]       = useState([]);
+  const [input, setInput]             = useState("");
+  const [sending, setSending]         = useState(false);
+  const [addedThisSession, setAddedThisSession] = useState([]);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
+  const bottomRef                     = useRef(null);
+  const inputRef                      = useRef(null);
+
+  // Reset session state when drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      setMessages([{ role: "assistant", text: buildOpener(), suggestions: [] }]);
+      setInput("");
+      setAddedThisSession([]);
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
+  }, [isOpen, contextItem?.name, selectedFoods.map(f=>f.id).join(',')]); // intentional: re-seed when item/foods change
+
+  useEffect(() => {
+    if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || sending) return;
+    const newMessages = [...messages, { role: "user", text, suggestions: [] }];
+    setMessages(newMessages);
+    setInput("");
+    setSending(true);
+    try {
+      const res = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.text })),
+          contextItem: contextItem || null,
+          selectedFoods: selectedFoods.length > 0 ? selectedFoods.map(f => ({ id: f.id, name: f.name, courseRole: f.courseRole })) : [],
+          location: tabletLocation || undefined,
+        }),
+      });
+      const data = await res.json();
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: data.reply || "I'm not sure — please ask your server.",
+        suggestions: data.suggestions || [],
+      }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please ask your server for help.", suggestions: [] }]);
+    }
+    setSending(false);
+  }
+
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+
+  function handleAddToMenu(suggestion) {
+    if (!onToggleFavorite) return;
+    const alreadyAdded = favorites.some(f => f.id === suggestion.id);
+    if (suggestion.type === "wine") {
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, varietal: suggestion.varietal || null, region: suggestion.region || null, glassPrice: suggestion.glassPrice || null, bottlePrice: suggestion.bottlePrice || null, imageUrl: suggestion.imageUrl || null, fromPairing: false }, "wine");
+    } else if (suggestion.type === "food") {
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, price: suggestion.price || null, course: suggestion.course || null, description: suggestion.description || null, courseRole: "main" }, "food");
+    }
+    // Track what was added this session (only additions, not removals)
+    if (!alreadyAdded) {
+      setAddedThisSession(prev => prev.some(a => a.id === suggestion.id) ? prev : [...prev, suggestion]);
+    }
+  }
+
+  // When closing, fire toast if anything was added
+  function handleClose() {
+    onClose(addedThisSession.length > 0 ? addedThisSession : null);
+  }
+
+  if (!isOpen) return null;
+
+  const hasAdded = addedThisSession.length > 0;
+  let lastSuggestionMsgIndex = -1;
+  messages.forEach((m, i) => { if (m.role === "assistant" && m.suggestions?.length > 0) lastSuggestionMsgIndex = i; });
+
+  return <>
+    <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: t.bgOverlay, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, background: t.bgBase, borderRadius: "16px 16px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", maxHeight: "80vh", fontFamily: t.fontSerif }}>
+
+        {/* Header — X becomes "Done ✓" once something has been added */}
+        <div style={{ background: t.bgSurface, borderRadius: "16px 16px 0 0", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: t.accent, fontSize: 10, letterSpacing: "3px", textTransform: "uppercase", marginBottom: 2 }}>Virtual Sommelier</div>
+            <div style={{ color: t.textPrimary, fontSize: 13 }}>Appalachia Kitchen</div>
+          </div>
+          <button
+            onClick={handleClose}
+            style={{ background: hasAdded ? t.accent : t.accentDim, border: hasAdded ? "none" : "0.5px solid rgba(201,169,110,0.4)", color: hasAdded ? t.bgDeep : t.accent, height: 32, borderRadius: hasAdded ? 8 : "50%", width: hasAdded ? "auto" : 32, padding: hasAdded ? "0 12px" : 0, cursor: "pointer", fontSize: hasAdded ? 12 : 18, fontFamily: t.fontSerif, fontWeight: hasAdded ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", whiteSpace: "nowrap" }}
+          >{hasAdded ? "Done ✓" : "×"}</button>
+        </div>
+
+        {/* Message list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", background: t.bgBase }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? t.accentDim : t.bgCard, color: t.textPrimary, border: m.role === "user" ? `0.5px solid ${t.accentBorder}` : `0.5px solid ${t.borderMid}`, borderRadius: m.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                  {m.text}
+                </div>
+              </div>
+
+              {/* Suggestion chips */}
+              {m.role === "assistant" && m.suggestions && m.suggestions.length > 0 && (
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4 }}>
+                  {m.suggestions.map((s, si) => {
+                    const isAdded = favorites.some(f => f.id === s.id);
+                    const sub = s.type === "wine" ? [s.varietal, s.region].filter(Boolean).join(" · ") : s.course;
+                    const hasImage = s.type === "wine" && s.imageUrl;
+                    return (
+                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, background: isAdded ? t.successDim : t.bgSurface, border: `0.5px solid ${isAdded ? t.success : t.accentBorder}`, borderRadius: 10, padding: "8px 12px" }}>
+                        {/* Label thumbnail or emoji fallback */}
+                        <div
+                          onClick={hasImage ? () => setZoomedLabel(s) : undefined}
+                          style={{ width: 36, height: 50, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${hasImage ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: hasImage ? "zoom-in" : "default" }}
+                        >
+                          {hasImage
+                            ? <img src={s.imageUrl} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : (s.type === "wine" ? "🍷" : "🍽")}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: t.textPrimary, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          {sub && <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "0.5px" }}>{sub}</div>}
+                          {hasImage && <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
+                        </div>
+                        <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? t.successDim : t.bgSurface, border: isAdded ? `0.5px solid ${t.success}` : "none", color: isAdded ? t.success : t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>
+                          {isAdded ? "★ Added" : "☆ Add to My Menu"}
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Hint text — only on the last message with suggestions, only if not yet added anything */}
+                  {i === lastSuggestionMsgIndex && !hasAdded && (
+                    <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                      Tap ☆ Add to My Menu to save, or keep chatting below.
+                    </div>
+                  )}
+                  {/* Hint text — once something added, encourage close */}
+                  {i === lastSuggestionMsgIndex && hasAdded && (
+                    <div style={{ color: t.textMuted, fontSize: 11, fontStyle: "italic", paddingLeft: 4, paddingTop: 2 }}>
+                      Saved! Tap <strong>Done ✓</strong> when you're finished, or keep chatting.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {sending && (
+            <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 10 }}>
+              <div style={{ background: t.bgSurface, border: `0.5px solid ${t.borderMid}`, borderRadius: "14px 14px 14px 2px", padding: "10px 16px" }}>
+                <span style={{ color: t.accent, fontSize: 18, letterSpacing: 4 }}>• • •</span>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input bar */}
+        <div style={{ padding: "8px 12px 16px", borderTop: `0.5px solid ${t.borderMid}`, background: t.bgBase, flexShrink: 0, display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Keep chatting…" rows={1}
+            style={{ flex: 1, background: t.bgCard, border: `0.5px solid ${t.borderMid}`, borderRadius: 20, padding: "10px 14px", fontFamily: t.fontSerif, fontSize: 13, color: t.textPrimary, outline: "none", resize: "none", lineHeight: 1.5, maxHeight: 90, overflowY: "auto" }} />
+          <button onClick={handleSend} disabled={!input.trim() || sending}
+            style={{ background: input.trim() && !sending ? t.accent : t.accentDim, border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() && !sending ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+            <span style={{ color: input.trim() && !sending ? t.bgDeep : t.accent, fontSize: 16, lineHeight: 1 }}>›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    {zoomedLabel && (
+      <div onClick={() => setZoomedLabel(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: t.bgOverlay, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, cursor: "pointer" }}>
+        <img src={zoomedLabel.imageUrl} alt={zoomedLabel.name} style={{ maxHeight: "72vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 48px rgba(0,0,0,0.7)" }} onClick={e => e.stopPropagation()} />
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <div style={{ color: t.textPrimary, fontSize: 16, fontFamily: t.fontSerif, marginBottom: 4 }}>{zoomedLabel.name}</div>
+          {(zoomedLabel.varietal || zoomedLabel.region) && (
+            <div style={{ color: t.accent, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: t.fontSerif }}>
+              {[zoomedLabel.varietal, zoomedLabel.region].filter(Boolean).join(" · ")}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </>;
+}
+
+// ─── Sommelier Toast ──────────────────────────────────────────────────────────
+function SommelierToast({ items, onViewMenu, onDismiss }) {
+  const t = useTheme();
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!items || items.length === 0) return null;
+  const label = items.length === 1
+    ? `★ "${items[0].name}" added to My Menu`
+    : `★ ${items.length} items added to My Menu`;
+
+  return (
+    <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1000, display: "flex", alignItems: "center", gap: 12, background: t.bgBase, border: `0.5px solid ${t.accent}`, borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", fontFamily: t.fontSerif, maxWidth: "90vw", animation: "toastIn 0.3s ease" }}>
+      <style>{`@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
+      <span style={{ color: t.textPrimary, fontSize: 13, flex: 1 }}>{label}</span>
+      <button onClick={onViewMenu} style={{ background: t.accent, border: "none", color: t.bgDeep, fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap" }}>
+        View →
+      </button>
+      <button onClick={onDismiss} style={{ background: "none", border: "none", color: t.textDim, fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+    </div>
+  );
+}
+
+// ─── Sommelier Done Modal ─────────────────────────────────────────────────────
+// Shown when chat closes with additions AND food is already selected —
+// strong signal the guest has finished building their menu.
+
+function SommelierDoneModal({ foodCount, wineCount, onViewMenu, onKeepBrowsing }) {
+  const t = useTheme();
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: t.bgOverlay, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: t.fontSerif }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", textAlign: "center" }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>★</div>
+        <div style={{ color: t.bgSurface, fontSize: 20, fontWeight: 600, marginBottom: 10 }}>You're all set!</div>
+        <div style={{ color: t.textDim, fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
+          You've selected <strong>{foodCount}</strong> {foodCount === 1 ? "dish" : "dishes"} and added <strong>{wineCount}</strong> {wineCount === 1 ? "wine" : "wines"} to your menu.<br/>Ready to review your evening's selections?
+        </div>
+        <button onClick={onViewMenu}
+          style={{ width: "100%", background: t.bgSurface, color: t.accent, border: "none", padding: "14px", borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: t.fontSerif, letterSpacing: "0.5px", marginBottom: 10 }}>
+          View My Menu →
+        </button>
+        <button onClick={onKeepBrowsing}
+          style={{ width: "100%", background: "none", border: "0.5px solid #d8cfc0", color: t.textSecondary, padding: "12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: t.fontSerif }}>
+          Keep Browsing
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Item Pairing Button (Beer & Pours) ──────────────────────────────────────
+
+function ItemPairingButton({ item, onOpenChat, favorites = [], onToggleFavorite }) {
+  const t = useTheme();
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [shownDishes, setShownDishes] = useState([]);
+  const pendingResult = useRef(null);
+  const [msgReady, setMsgReady] = useState(false);
+
+  function handleMsgComplete() {
+    if (pendingResult.current !== null) {
+      setResult(pendingResult.current);
+      setLoading(false);
+      pendingResult.current = null;
+    }
+    setMsgReady(true);
+  }
+
+  async function handlePairing() {
+    pendingResult.current = null;
+    setMsgReady(false);
+    setLoading(true);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "drink_to_food",
+          itemId: item.id,
+          itemName: item.name,
+          itemDescription: item.description || null,
+          itemStyle: item.style || null,
+          itemCategory: item.category || null,
+          itemABV: item.abv || null,
+          excludeDishes: shownDishes,
+          location: tabletLocation !== "all" ? tabletLocation : undefined
+        })
+      });
+      const data = await res.json();
+      const pairings = data.pairings || [];
+      setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
+      pendingResult.current = pairings;
+      if (msgReady) { setResult(pairings); setLoading(false); pendingResult.current = null; }
+    } catch (e) {
+      pendingResult.current = [];
+      if (msgReady) { setResult([]); setLoading(false); pendingResult.current = null; }
+    }
+  }
+
+  return (
+    <div>
+      {!loading && (
+        <div style={{ display: "flex", gap: 8, marginBottom: result ? 12 : 0 }}>
+          <button onClick={() => onOpenChat && onOpenChat({ name: item.name, type: item.style || item.category || "beverage" })}
+            style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+            ✦ Chat with Our<br/>Virtual Sommelier
+          </button>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: t.bgSurface, color: t.accent, border: `0.5px solid ${t.accent}`, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+            Instant Pairing<br/>Suggestions
+          </button>
+        </div>
+      )}
+      {loading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleMsgComplete} />}
+      {result && result.length > 0 && (
+        <div style={{ marginTop: 2 }}>
+          <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Pairs beautifully with</div>
+          {result.map((p, i) => {
+            const isStarred = favorites.some(f => f.id === p.id);
+            return (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, paddingBottom: 8, borderBottom: i < result.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+                <div style={{ fontSize: 16, flexShrink: 0 }}>🍽</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name}</div>
+                  <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>{p.course}</div>
+                  <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  {p.id && onToggleFavorite && (
+                    <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
+                      style={{ background: isStarred ? t.accentDim : t.accentDimSm, border: `0.5px solid ${isStarred ? t.accent : t.accentBorder}`, color: t.accent, fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif }}>
+                      {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {result && result.length === 0 && (
+        <div style={{ color: t.textSecondary, fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Label Zoom Modal ─────────────────────────────────────────────────────────
+
+function LabelModal({ wine, onClose }) {
+  const t = useTheme();
+  if (!wine) return null;
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 800,
+      background: t.bgOverlay,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: 32, cursor: "pointer"
+    }}>
+      <img
+        src={wine.imageUrl}
+        alt={wine.name}
+        style={{
+          maxHeight: "72vh", maxWidth: "80vw",
+          objectFit: "contain", borderRadius: 8,
+          boxShadow: "0 8px 48px rgba(0,0,0,0.7)"
+        }}
+        onClick={e => e.stopPropagation()}
+      />
+      <div style={{ marginTop: 20, textAlign: "center" }}>
+        <div style={{ color: t.textPrimary, fontSize: 16, fontFamily: t.fontSerif, marginBottom: 4 }}>{wine.name}</div>
+        {(wine.varietal || wine.region) && (
+          <div style={{ color: t.accent, fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", fontFamily: t.fontSerif }}>
+            {[wine.varietal, wine.region].filter(Boolean).join(" · ")}
+          </div>
+        )}
+      </div>
+      <div style={{ marginTop: 24, color: t.textDim, fontSize: 11, fontFamily: t.fontSerif, letterSpacing: "1px" }}>
+        TAP ANYWHERE TO CLOSE
+      </div>
+    </div>
+  );
+}
+
+// ─── Wine Detail Panel ────────────────────────────────────────────────────────
+
+function WineDetailPanel({ wine, onClose, onOpenChat, favorites = [], onToggleFavorite, tabletLocation = "all" }) {
+  const t = useTheme();
+  const [pairingLoading, setPairingLoading] = useState(false);
+  const [pairingResult, setPairingResult] = useState(null);
+
+  const [shownDishes, setShownDishes] = useState([]);
+  const pendingDishes = useRef(null);
+  const [dishMessagesReady, setDishMessagesReady] = useState(false);
+
+  function handleDishMessagesComplete() {
+    if (pendingDishes.current !== null) {
+      setPairingResult(pendingDishes.current);
+      setPairingLoading(false);
+      pendingDishes.current = null;
+    }
+    setDishMessagesReady(true);
+  }
+
+  async function handlePairing() {
+    pendingDishes.current = null;
+    setDishMessagesReady(false);
+    setPairingLoading(true);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "wine_to_food", itemId: wine.id, excludeDishes: shownDishes, location: tabletLocation !== "all" ? tabletLocation : undefined })
+      });
+      const data = await res.json();
+      const pairings = data.pairings || [];
+      setShownDishes(prev => [...new Set([...prev, ...pairings.map(p => p.name)])]);
+      pendingDishes.current = pairings;
+      if (dishMessagesReady) { setPairingResult(pairings); setPairingLoading(false); pendingDishes.current = null; }
+    } catch (e) {
+      pendingDishes.current = [];
+      if (dishMessagesReady) { setPairingResult([]); setPairingLoading(false); pendingDishes.current = null; }
+    }
+  }
+
+  return (
+    <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e8e0d0", padding: "18px 20px", boxShadow: "0 -8px 32px rgba(0,0,0,0.10)", maxHeight: "70vh", overflowY: "auto" }}>
+      <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+        <div style={{ width: 52, height: 72, borderRadius: 4, background: "#f5ede0", border: `0.5px solid ${t.borderSubtle}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+          {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} /> : "🍷"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 3, lineHeight: 1.3 }}>{wine.name}</div>
+          <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>
+            {[wine.varietal, wine.region, wine.vintage ? `${wine.vintage}` : null].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: t.textSecondary, fontSize: 22, cursor: "pointer", padding: "0 4px", alignSelf: "flex-start", lineHeight: 1 }}>×</button>
+      </div>
+
+      {wine.description ? (
+        <div style={{ color: t.textDim, fontSize: 13, lineHeight: 1.8, marginBottom: 12 }}>{wine.description}</div>
+      ) : (
+        <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic", marginBottom: 12 }}>Ask your server for tasting notes</div>
+      )}
+
+      {wine.reviews && wine.reviews !== "null" && (
+        <div style={{ background: "#f5ede0", border: `0.5px solid ${t.borderSubtle}`, borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+          <div style={{ color: t.accent, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 3 }}>Reviews &amp; Ratings</div>
+          <div style={{ color: t.textDim, fontSize: 12, lineHeight: 1.6 }}>{wine.reviews}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 24, marginBottom: 14, paddingBottom: 14, borderBottom: "0.5px solid #e8e0d0" }}>
+        {wine.glassPrice && (
+          <div>
+            <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Glass</div>
+            <div style={{ color: t.textPrimary, fontSize: 22 }}>{formatPrice(wine.glassPrice)}</div>
+          </div>
+        )}
+        {wine.bottlePrice && (
+          <div>
+            <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 2 }}>Bottle</div>
+            <div style={{ color: t.textPrimary, fontSize: 22 }}>{formatPrice(wine.bottlePrice)}</div>
+          </div>
+        )}
+        {!wine.glassPrice && !wine.bottlePrice && (
+          <div style={{ color: t.textSecondary, fontSize: 13, fontStyle: "italic", alignSelf: "center" }}>Ask your server for pricing</div>
+        )}
+      </div>
+
+      {!pairingLoading && (
+        <div style={{ display: "flex", gap: 8, marginBottom: pairingResult ? 14 : 0 }}>
+          <button onClick={() => onOpenChat && onOpenChat({ name: wine.name, type: wine.varietal || "wine" })}
+            style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+            ✦ Chat with Our<br/>Virtual Sommelier
+          </button>
+          <button onClick={handlePairing}
+            style={{ flex: 1, background: t.bgSurface, color: t.accent, border: `0.5px solid ${t.accent}`, padding: "12px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+            Instant Pairing<br/>Suggestions
+          </button>
+        </div>
+      )}
+      {pairingLoading && <LoadingMessages messages={KITCHEN_MESSAGES} onAllShown={handleDishMessagesComplete} />}
+
+      {pairingResult && pairingResult.length > 0 && (
+        <div>
+          <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 10 }}>Pairs beautifully with</div>
+          {pairingResult.map((p, i) => {
+            const isStarred = favorites.some(f => f.id === p.id);
+            return (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: i < pairingResult.length - 1 ? "0.5px solid #f0e8e0" : "none" }}>
+                <div style={{ fontSize: 18, flexShrink: 0 }}>🍽</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ color: t.textSecondary, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>{p.course}</div>
+                  <div style={{ color: t.textDim, fontSize: 12, fontStyle: "italic", lineHeight: 1.5, marginBottom: p.id ? 6 : 0 }}>{p.reason}</div>
+                  {p.id && onToggleFavorite && (
+                    <button onClick={() => onToggleFavorite({ id: p.id, name: p.name, course: p.course, description: p.reason, courseRole: "main" }, "food")}
+                      style={{ background: isStarred ? t.accentDim : t.accentDimSm, border: `0.5px solid ${isStarred ? t.accent : t.accentBorder}`, color: t.accent, fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif }}>
+                      {isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {pairingResult && pairingResult.length === 0 && (
+        <div style={{ color: t.textSecondary, fontSize: 12, textAlign: "center", padding: "8px 0" }}>Unable to find pairings — please ask your server.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sommelier Screen ─────────────────────────────────────────────────────────
+
+function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, onShowShortlist = () => {}, tabletLocation = "all" }) {
+  const t = useTheme();
+  const [foodItems, setFoodItems] = useState([]);
+  const [loadingFood, setLoadingFood] = useState(true);
+  const [activeCourse, setActiveCourse] = useState("All");
+  const [selectedFoods, setSelectedFoods] = useState([]);
+  const [pairingResult, setPairingResult] = useState(null);
+  const [pairingLoading, setPairingLoading] = useState(false);
+  const [view, setView] = useState("pick");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatFoods, setChatFoods] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [doneModal, setDoneModal] = useState(null);
+
+  useEffect(() => {
+    const locParam = tabletLocation !== "all" ? `?location=${tabletLocation}` : "";
+    fetch(FOOD_URL + locParam).then(r => r.json())
+      .then(data => { setFoodItems(data.foodItems || []); setLoadingFood(false); })
+      .catch(() => setLoadingFood(false));
+  }, [tabletLocation]);
+
+  const [lastShownIds, setLastShownIds] = useState({});
+  const pendingPairing = useRef(null);
+  const [messagesReady, setMessagesReady] = useState(false);
+  const [zoomedLabel, setZoomedLabel] = useState(null);
+
+  function handleMessagesComplete() {
+    if (pendingPairing.current !== null) {
+      setPairingResult(pendingPairing.current);
+      setPairingLoading(false);
+      pendingPairing.current = null;
+    }
+    setMessagesReady(true);
+  }
+
+  function handleFoodToggle(food, role) {
+    const hasRole = selectedFoods.some(f => f.id === food.id && f.courseRole === role);
+    let newSelected;
+    if (hasRole) {
+      newSelected = selectedFoods.filter(f => !(f.id === food.id && f.courseRole === role));
+    } else {
+      newSelected = [...selectedFoods, { ...food, courseRole: role }];
+    }
+    setSelectedFoods(newSelected);
+    // Add to shortlist when first selection for this dish; remove when all selections cleared
+    const hadAny = selectedFoods.some(f => f.id === food.id);
+    const hasAny = newSelected.some(f => f.id === food.id);
+    const isFav = favorites.some(f => f.id === food.id);
+    if (!hadAny && hasAny && !isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course, courseRole: role, description: food.description }, "food");
+    if (hadAny && !hasAny && isFav) onToggleFavorite({ id: food.id, name: food.name, price: food.price, course: food.course, courseRole: role, description: food.description }, "food");
+  }
+
+  function storeResult(data) {
+    const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+    if (data.byCourse) {
+      // Embed courseLabel directly on each pairing so it travels with the data
+      const taggedCourses = data.byCourse.map(c => ({
+        ...c,
+        pairings: (c.pairings || []).map(p => ({ ...p, courseLabel: c.course }))
+      }));
+      const ids = {};
+      taggedCourses.forEach(c => c.pairings?.forEach(p => { if (p.id) ids[`${c.course}-${p.level}`] = p.id; }));
+      setLastShownIds(ids);
+      const result = { byCourse: taggedCourses };
+      pendingPairing.current = result;
+      if (messagesReady) { setPairingResult(result); setPairingLoading(false); pendingPairing.current = null; }
+    } else {
+      // Single course — determine course label from selected foods
+      const roles = [...new Set(selectedFoods.map(f => f.courseRole || "main"))];
+      const singleCourseLabel = roles.length === 1 ? (roleLabels[roles[0]] || null) : null;
+      const pairings = (data.pairings || []).map(p => ({ ...p, courseLabel: singleCourseLabel }));
+      const ids = {};
+      pairings.forEach(p => { if (p.id) ids[p.level] = p.id; });
+      setLastShownIds(ids);
+      pendingPairing.current = pairings;
+      if (messagesReady) { setPairingResult(pairings); setPairingLoading(false); pendingPairing.current = null; }
+    }
+  }
+
+  async function handleGetPairings() {
+    if (selectedFoods.length === 0) return;
+    setPairingLoading(true);
+    setPairingResult(null);
+    pendingPairing.current = null;
+    setMessagesReady(false);
+    setLastShownIds({});
+    setView("result");
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), location: tabletLocation !== "all" ? tabletLocation : undefined })
+      });
+      storeResult(await res.json());
+    } catch (e) {
+      pendingPairing.current = [];
+      if (messagesReady) { setPairingResult([]); setPairingLoading(false); pendingPairing.current = null; }
+    }
+  }
+
+  async function handleDifferentOptions() {
+    if (selectedFoods.length === 0) return;
+    setPairingLoading(true);
+    setPairingResult(null);
+    pendingPairing.current = null;
+    setMessagesReady(false);
+    try {
+      const res = await fetch(PAIRING_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "food_to_wine", items: selectedFoods.map(f => ({ id: f.id, courseRole: f.courseRole })), excludeWineIds: lastShownIds, location: tabletLocation !== "all" ? tabletLocation : undefined })
+      });
+      storeResult(await res.json());
+    } catch (e) {
+      pendingPairing.current = [];
+      if (messagesReady) { setPairingResult([]); setPairingLoading(false); pendingPairing.current = null; }
+    }
+  }
+
+  const availableFood = foodItems.filter(f => !f.excluded);
+  const courses = ["All", ...new Set(availableFood.map(f => f.course))];
+  const filtered = activeCourse === "All" ? availableFood : availableFood.filter(f => f.course === activeCourse);
+
+  return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ background: t.bgBase, padding: "0 20px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ padding: "10px 0 10px", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={view === "result" ? () => { setView("pick"); setPairingResult(null); } : onBack}
+            style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+            ‹ <span style={{ textTransform: "uppercase", letterSpacing: "2px" }}>{view === "result" ? "Back" : "Main Menu"}</span>
+          </button>
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ color: t.accent, fontSize: 14, letterSpacing: "4px", textTransform: "uppercase" }}>Wine Pairing</div>
+          </div>
+          <div style={{ width: 80, textAlign: "right" }}>
+            {favorites.length > 0 && (
+              <button onClick={onShowShortlist} style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.4)", color: t.accent, padding: "4px 10px", borderRadius: 12, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+                ★ {favorites.length}
+              </button>
+            )}
+          </div>
+        </div>
+        <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${t.accent}44, transparent)`, marginBottom: 10 }} />
+        {view === "pick" && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {courses.map(c => (
+              <button key={c} onClick={() => setActiveCourse(c)} style={{
+                background: activeCourse === c ? t.accent : t.white08,
+                border: `0.5px solid ${activeCourse === c ? t.accent : "rgba(255,255,255,0.15)"}`,
+                color: activeCourse === c ? t.bgBase : t.accent,
+                fontSize: 11, padding: "5px 13px", borderRadius: 20, cursor: "pointer",
+                fontFamily: t.fontSerif, whiteSpace: "nowrap", fontWeight: activeCourse === c ? 600 : 400
+              }}>{c}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {view === "pick" && (
+        <>
+        <div>
+          <div style={{ background: t.bgSurface, padding: "8px 16px 10px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ flex: 1, color: t.accent, fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
+            </div>
+            <div style={{ color: t.textSecondary, fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+              For larger parties, run the sommelier a second time to capture additional guests' selections.
+            </div>
+          </div>
+          <div style={{ background: t.bgSurface }}>
+            {loadingFood ? (
+              <div style={{ color: t.textSecondary, textAlign: "center", padding: 40 }}>Loading menu…</div>
+            ) : (() => {
+              const courseOrder = [...new Map(filtered.map(f => [f.course, true])).keys()];
+              const byCourse = {};
+              filtered.forEach(f => { if (!byCourse[f.course]) byCourse[f.course] = []; byCourse[f.course].push(f); });
+              return courseOrder.map(course => (
+                <div key={course}>
+                  <div style={{ padding: "8px 16px 6px 20px", background: t.bgDeep, display: "flex", alignItems: "center" }}>
+                    <div style={{ flex: 1, color: t.accent, fontSize: 9, letterSpacing: "3px", textTransform: "uppercase", fontWeight: 600 }}>{course}</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <div style={{ width: 22, textAlign: "center", color: t.textSecondary, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: (course !== "Entrees" && course !== "Dessert") ? "visible" : "hidden" }}>1ST</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.textSecondary, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course !== "Dessert" ? "visible" : "hidden" }}>MAIN</div>
+                      <div style={{ width: 22, textAlign: "center", color: t.accent, fontSize: 8, letterSpacing: "1px", textTransform: "uppercase", visibility: course === "Dessert" ? "visible" : "hidden" }}>DES</div>
+                    </div>
+                  </div>
+                  {byCourse[course].map(food => {
+                    const isEntree = food.course === "Entrees";
+                    const isDessert = food.course === "Dessert";
+                    const chkFirst   = selectedFoods.some(f => f.id === food.id && f.courseRole === "first");
+                    const chkMain    = selectedFoods.some(f => f.id === food.id && f.courseRole === "main");
+                    const chkDessert = selectedFoods.some(f => f.id === food.id && f.courseRole === "dessert");
+                    const anySelected = chkFirst || chkMain || chkDessert;
+                    // Enforce max 4 per course
+                    const firstCount   = selectedFoods.filter(f => f.courseRole === "first").length;
+                    const mainCount    = selectedFoods.filter(f => f.courseRole === "main").length;
+                    const dessertCount = selectedFoods.filter(f => f.courseRole === "dessert").length;
+
+                    const Chk = ({ checked, role, disabled }) => (
+                      <div onClick={disabled ? null : () => handleFoodToggle(food, role)}
+                        style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked ? t.accent : disabled ? "transparent" : t.textSecondary}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                        {checked && <span style={{ color: t.bgDeep, fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                      </div>
+                    );
+
+                    return (
+                          <div key={food.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px 11px 20px", borderBottom: `0.5px solid ${t.borderSubtle}`, background: anySelected ? t.accentDimSm : t.bgSurface, transition: "background 0.15s" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                              {food.description && <div style={{ color: t.textSecondary, fontSize: 11, lineHeight: 1.3 }}>{food.description}</div>}
+                            </div>
+                            <div style={{ color: t.textSecondary, fontSize: 12, flexShrink: 0, marginRight: 4 }}>{formatPrice(food.price)}</div>
+                            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                              <Chk checked={chkFirst}   role="first"   disabled={isEntree || isDessert || (!chkFirst && firstCount >= 4)} />
+                              <Chk checked={chkMain}    role="main"    disabled={isDessert || (!chkMain && mainCount >= 4)} />
+                              <Chk checked={chkDessert} role="dessert" disabled={!isDessert || (!chkDessert && dessertCount >= 4)} />
+                            </div>
+                          </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+
+        {/* Sticky Find Pairings button */}
+        {selectedFoods.length > 0 && (
+          <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 16px" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {selectedFoods.map(f => (
+                <div key={f.id} style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 14, padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: t.textPrimary, fontSize: 11 }}>{f.name}</span>
+                  {f.courseRole !== "main" && <span style={{ color: t.textSecondary, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.courseRole === "first" ? "1st" : "Dessert"}</span>}
+                  <span onClick={e => { e.stopPropagation(); handleFoodToggle(f, f.courseRole); }} style={{ color: t.textDim, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>×</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }}
+                style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, lineHeight: 1.3, textAlign: "center" }}>
+                ✦ Chat with Our<br/>Virtual Sommelier
+              </button>
+              <button onClick={handleGetPairings}
+                style={{ flex: 1, background: t.accent, color: t.bgDeep, border: "none", padding: "14px 8px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, fontWeight: 600, lineHeight: 1.3, textAlign: "center" }}>
+                Instant Pairing Suggestions →
+              </button>
+            </div>
+          </div>
+        )}
+        {selectedFoods.length === 0 && (
+          <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 14px", textAlign: "center" }}>
+            <button onClick={() => { setChatFoods([]); setChatOpen(true); }}
+              style={{ background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>
+              ✦ Chat with Our Virtual Sommelier Instead
+            </button>
+          </div>
+        )}
+        </>
+      )}
+
+      {view === "result" && (
+        <div style={{ padding: "20px 20px", background: t.bgBase }}>
+          {selectedFoods.length > 0 && pairingLoading && (() => {
+            const roleOrder = ["first", "main", "dessert"];
+            const roleLabels = { first: "First Course", main: "Main Course", dessert: "Dessert" };
+            const grouped = {};
+            selectedFoods.forEach(f => {
+              const r = f.courseRole || "main";
+              if (!grouped[r]) grouped[r] = [];
+              grouped[r].push(f);
+            });
+            const courses = roleOrder.filter(r => grouped[r]);
+            return (
+              <div style={{ background: "rgba(201,169,110,0.06)", border: "0.5px solid rgba(201,169,110,0.2)", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+                <div style={{ color: t.textSecondary, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>
+                  Your table's selections
+                </div>
+                {courses.map((role, ci) => (
+                  <div key={role} style={{ marginBottom: ci < courses.length - 1 ? 14 : 0 }}>
+                    <div style={{ color: t.accent, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>{roleLabels[role]}</div>
+                    {grouped[role].map((f, i) => (
+                      <div key={`${f.id}-${role}`} style={{ marginBottom: i < grouped[role].length - 1 ? 6 : 0, paddingLeft: 10, borderLeft: "1.5px solid rgba(201,169,110,0.25)" }}>
+                        <div style={{ color: t.textPrimary, fontSize: 13 }}>{f.name}</div>
+                        {f.description && <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>{f.description}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {pairingLoading && (
+            <LoadingMessages messages={SOMMELIER_MESSAGES} onAllShown={handleMessagesComplete} />
+          )}
+
+          {(() => {
+            const pairings = Array.isArray(pairingResult) ? pairingResult : null;
+            const byCourse = pairingResult?.byCourse || null;
+            const hasResults = pairings?.length > 0 || byCourse?.length > 0;
+            const isEmpty = pairingResult && !pairingLoading && !hasResults;
+
+            const WineCard = (p, i) => (
+              <div key={i} style={{ background: t.white06, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 10, padding: "16px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div style={{ background: t.accentDim, border: "0.5px solid rgba(201,169,110,0.3)", borderRadius: 12, padding: "3px 10px" }}>
+                    <span style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>{p.level}</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {p.glassPrice && <div style={{ color: t.textPrimary, fontSize: 13 }}>{formatPrice(p.glassPrice)} <span style={{ color: t.accent, fontSize: 10 }}>glass</span></div>}
+                    {p.bottlePrice && <div style={{ color: t.textPrimary, fontSize: 13 }}>{formatPrice(p.bottlePrice)} <span style={{ color: t.accent, fontSize: 10 }}>bottle</span></div>}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  {p.imageUrl && <div onClick={() => setZoomedLabel({ name: p.name, varietal: p.varietal, region: p.region, imageUrl: p.imageUrl })} style={{ width: 52, height: 72, borderRadius: 4, flexShrink: 0, overflow: "hidden", border: `0.5px solid ${t.accent}`, cursor: "zoom-in" }}><img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#f5ede0", fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+                    {(p.varietal || p.region) && <div style={{ color: t.accent, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>{[p.varietal, p.region].filter(Boolean).join(" · ")}</div>}
+                  </div>
+                </div>
+                <div style={{ color: t.textSecondary, fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{p.reason}</div>
+                {p.id && (() => {
+                  const wineObj = { id: p.id, name: p.name, varietal: p.varietal, region: p.region, glassPrice: p.glassPrice, bottlePrice: p.bottlePrice, imageUrl: p.imageUrl || null, reason: p.reason || null, level: p.level || null, courseLabel: p.courseLabel || null, fromPairing: true };
+                  const isStarred = favorites.some(f => f.id === p.id);
+                  return <button onClick={() => onToggleFavorite(wineObj)} style={{ marginTop: 10, background: isStarred ? t.accentDim : t.accentDimSm, border: `1px solid ${isStarred ? t.accent : t.accent}`, color: t.accent, padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 12, display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>{isStarred ? "★ Added to My Menu" : "☆ Add to My Menu"}</button>;
+                })()}
+              </div>
+            );
+
+            return (
+              <>
+                {/* Single course */}
+                {pairings?.map((p, i) => WineCard(p, i))}
+
+                {/* Multi-course */}
+                {byCourse?.map((courseResult, ci) => (
+                  <div key={ci} style={{ marginBottom: 24 }}>
+                    <div style={{ background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.35)", borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+                      <div style={{ color: t.accent, fontSize: 13, letterSpacing: "2px", textTransform: "uppercase", fontWeight: 600, marginBottom: courseResult.dishes?.length > 0 ? 6 : 0 }}>
+                        ✦ {courseResult.course}
+                      </div>
+                      {courseResult.dishes?.length > 0 && (
+                        <div style={{ color: t.textSecondary, fontSize: 12, fontStyle: "italic" }}>
+                          {courseResult.dishes.join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                    {courseResult.pairings?.map((p, i) => WineCard(p, `${ci}-${i}`))}
+                  </div>
+                ))}
+
+                {!pairingLoading && hasResults && (
+                  <div style={{ marginBottom: 8 }} />
+                )}
+
+                {isEmpty && <div style={{ color: t.textSecondary, textAlign: "center", padding: "40px 0", fontSize: 14 }}>Unable to find pairings — please ask your server.</div>}
+              </>
+            );
+          })()}
+
+          {!pairingLoading && pairingResult && (
+            <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 16px", marginTop: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button onClick={() => { setChatFoods(selectedFoods); setChatOpen(true); }} style={{ flex: 1, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+                  ✦ Chat with Our<br/>Virtual Sommelier
+                </button>
+                <button onClick={handleDifferentOptions} style={{ flex: 1, background: t.accentDimSm, border: "0.5px solid rgba(201,169,110,0.3)", color: t.accent, padding: "11px 8px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: t.fontSerif, lineHeight: 1.3, textAlign: "center" }}>
+                  Get Different<br/>Pairings
+                </button>
+              </div>
+              <button onClick={onShowShortlist}
+                style={{ width: "100%", background: t.accent, color: t.bgDeep, border: "none", padding: "13px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 14, fontWeight: 600, letterSpacing: "0.5px", marginBottom: 6 }}>
+                ★ Go to My Menu
+              </button>
+              <div style={{ color: t.textDim, fontSize: 10, textAlign: "center", fontStyle: "italic", lineHeight: 1.5 }}>
+                If suggestions repeat, it reflects the limits of our current wine selection for this dish.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => {
+          setChatOpen(false);
+          if (added) {
+            if (selectedFoods.length > 0) {
+              // Guest has food selected + just added wines — strong signal they're done
+              setDoneModal({ wineCount: added.length });
+            } else {
+              setToast(added);
             }
           }
-        }
+        }} contextItem={null} selectedFoods={chatFoods} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
+      {doneModal && (
+        <SommelierDoneModal
+          foodCount={selectedFoods.length}
+          wineCount={doneModal.wineCount}
+          onViewMenu={() => { setDoneModal(null); onShowShortlist(); }}
+          onKeepBrowsing={() => setDoneModal(null)}
+        />
+      )}
+    </div>
+  );
+}
 
-        if (!found) return res.json({ availability: null, error: 'GUID not found in Toast' });
+function HomeScreen({ onNavigate, favorites = [], onShowShortlist = () => {}, onAdminTap = () => {}, tabletLocation = "bar", deviceSetup = {}, locationNames = {}, settings = null }) {
+  const t = useTheme();
+  const [visible, setVisible] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimer = useRef(null);
 
-        // Parse Toast availability schedule if present
-        let toastDays = null;
-        let toastHours = null;
-        if (availSchedule && Array.isArray(availSchedule) && availSchedule.length > 0) {
-          const sched = availSchedule[0];
-          toastDays = sched.availableDays || null;
-          if (sched.timeRanges && sched.timeRanges.length > 0) {
-            toastHours = { open: sched.timeRanges[0].startTime, close: sched.timeRanges[0].endTime };
-          }
-        }
-
-        return res.json({
-          availability: {
-            name: menuName,
-            itemCount,
-            toastDays,
-            toastHours,
-            guid,
-            checkedAt: Date.now()
-          }
-        });
-      } catch (e) {
-        return res.json({ availability: null, error: e.message });
-      }
-    }
-
-    // ── Save full settings ──
-    if (!settings) return res.status(400).json({ error: 'settings required' });
-    const db = admin.database();
-    await db.ref('appSettings').set({ ...settings, updatedAt: Date.now() });
-    res.json({ ok: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  function handleLogoTap() {
+    const next = tapCount + 1;
+    setTapCount(next);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (next >= 5) { setTapCount(0); onAdminTap(); }
+    else { tapTimer.current = setTimeout(() => setTapCount(0), 2000); }
   }
-});
 
-// ─── Cleanup Expired Menus (runs daily at 3 AM) ───────────────────────────────
-exports.cleanupExpiredMenus = functions
-  .pubsub.schedule('0 3 * * *')
-  .onRun(async (context) => {
-    const snapshot = await admin.database().ref('savedMenus').once('value');
-    const menus = snapshot.val();
-    if (!menus) return null;
-    const now = Date.now();
-    const updates = {};
-    Object.entries(menus).forEach(([id, data]) => { if (data.expiresAt < now) updates[id] = null; });
-    if (Object.keys(updates).length > 0) await admin.database().ref('savedMenus').update(updates);
-    return null;
+  useEffect(() => {
+    setTimeout(() => setVisible(true), 50);
+    return () => { if (tapTimer.current) clearTimeout(tapTimer.current); };
+  }, []);
+
+  // Determine which menu buttons to show based on location assignment in settings
+  const ALL_BUTTONS = [
+    { id: "wine",      label: "Wine List",                 icon: "🍷", menuType: "wine" },
+    { id: "beer",      label: "Beer List",                 icon: "🍺", menuType: "beer_pours" },
+    { id: "pours",     label: "Premium Pours",             icon: "🥃", menuType: "beer_pours" },
+    { id: "cocktails", label: "Specialty Cocktails",       icon: "🍸", menuType: "cocktails_na" },
+    { id: "nab",       label: "Non-Alcoholic Beverages",   icon: "🥤", menuType: "cocktails_na" },
+    { id: "sommelier", label: "Get a Wine Pairing",        icon: "✦", menuType: null },
+  ];
+
+  function menuTypeAvailableAtLocation(menuType) {
+    if (!settings || !settings.menus || !menuType) return true; // no settings yet — show all
+    const menusOfType = settings.menus.filter(m => m.menuType === menuType);
+    if (menusOfType.length === 0) return false; // type not configured at all
+    // Check if any menu of this type is assigned to current location (or all locations)
+    return menusOfType.some(m => {
+      const locs = m.locations || [];
+      return locs.length === 0 || locs.includes(tabletLocation);
+    });
+  }
+
+  const buttons = ALL_BUTTONS
+    .filter(btn => menuTypeAvailableAtLocation(btn.menuType))
+    .map(btn => ({ ...btn, available: true }));
+
+  return (
+    <div style={{
+      background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "flex-start", padding: "48px 32px 40px",
+      opacity: visible ? 1 : 0, transition: "opacity 0.6s ease",
+      maxWidth: 680, margin: "0 auto"
+    }}>
+      {/* Ambient glow */}
+      <div style={{
+        position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)",
+        width: 600, height: 300, pointerEvents: "none",
+        background: "radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.08) 0%, transparent 70%)"
+      }} />
+
+      {/* Logo — tap 5x for manager access */}
+      <div onClick={handleLogoTap} style={{ marginBottom: 40, textAlign: "center", cursor: "default", userSelect: "none" }}>
+        {(() => {
+          const barLogo = deviceSetup.barLogo;
+          const diningLogo = deviceSetup.diningLogo;
+          const src = tabletLocation === "bar" && barLogo ? `/logos/${barLogo}`
+            : tabletLocation === "dining" && diningLogo ? `/logos/${diningLogo}`
+            : "/logos/Appalachia Kitchen Logo White App.png";
+          const alt = tabletLocation === "bar" ? (locationNames.bar || "Bar")
+            : tabletLocation === "dining" ? (locationNames.dining || "Dining Room")
+            : "Appalachia Kitchen";
+          // Light theme (bar/Tuque's): logo is designed for light bg — render as-is
+          // Dark theme (dining/AK): logo is white version — boost brightness slightly
+          const isLightTheme = t.name === "charcoalAndMaple";
+          const imgFilter = isLightTheme ? "none" : "brightness(1.5) contrast(1.05)";
+          const imgOpacity = isLightTheme ? 1 : 0.95;
+          return <img src={src} alt={alt} style={{ width: "min(340px, 80vw)", opacity: imgOpacity, filter: imgFilter }} />;
+        })()}
+      </div>
+
+      {/* Menu buttons */}
+      <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 14 }}>
+        {buttons.map(btn => (
+          <button
+            key={btn.id}
+            onClick={() => btn.available && onNavigate(btn.id)}
+            style={{
+              background: btn.id === "sommelier"
+                ? t.accentDim
+                : btn.available ? t.white06 : t.white04,
+              border: btn.id === "sommelier"
+                ? `1px solid ${t.accentBorder}`
+                : `0.5px solid ${btn.available ? t.accentBorderSm : t.white08}`,
+              borderRadius: 8, padding: "18px 24px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              cursor: btn.available ? "pointer" : "default",
+              transition: "all 0.2s", width: "100%",
+              opacity: btn.available ? 1 : 0.35,
+            }}
+            onMouseEnter={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? t.accentDim : t.accentDimSm; }}
+            onMouseLeave={e => { if (btn.available) e.currentTarget.style.background = btn.id === "sommelier" ? t.accentDim : t.white06; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ fontSize: 20 }}>{btn.icon}</span>
+              <span style={{
+                color: btn.id === "sommelier" ? t.accent : btn.available ? t.textPrimary : t.textVeryDim,
+                fontSize: btn.id === "sommelier" ? 14 : btn.id === "nab" ? 13 : 15,
+                letterSpacing: btn.id === "sommelier" ? "1.5px" : btn.id === "nab" ? "1px" : "2px",
+                textTransform: "uppercase", fontFamily: t.fontSerif,
+                textAlign: "left", lineHeight: 1.3
+              }}>
+                {btn.label}
+              </span>
+            </div>
+            {btn.available ? (
+              <span style={{ color: t.accent, fontSize: 18, lineHeight: 1 }}>›</span>
+            ) : (
+              <span style={{ color: t.textMuted, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" }}>Soon</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Shortlist button */}
+      {favorites.length > 0 && (
+        <button onClick={onShowShortlist} style={{ marginTop: 24, background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "10px 28px", borderRadius: 24, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13, letterSpacing: "1px", display: "flex", alignItems: "center", gap: 8 }}>
+          ★ My Menu <span style={{ background: t.accentBorderSm, borderRadius: 10, padding: "1px 8px", fontSize: 12 }}>{favorites.length}</span>
+        </button>
+      )}
+
+      {/* Footer */}
+      <div style={{ marginTop: 32, color: t.textSecondary, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase" }}>
+        Corduroy Inn & Lodge · Snowshoe Mountain
+      </div>
+    </div>
+  );
+}
+
+// ─── Wine List Screen ─────────────────────────────────────────────────────────
+
+function WineListScreen({ wines, favorites, onToggleFavorite, onBack, onShowShortlist, tabletLocation = "all" }) {
+  const t = useTheme();
+  const [activeTier, setActiveTier]       = useState("All");
+  const [activeSubgroup, setActiveSubgroup] = useState("All");
+  const [activeVarietal, setActiveVarietal] = useState("All");
+  const [selectedWine, setSelectedWine]   = useState(null);
+  const [wineSearch, setWineSearch]       = useState("");
+  const [visible, setVisible]             = useState(false);
+  const [zoomedLabel, setZoomedLabel]     = useState(null);
+  const [chatOpen, setChatOpen]           = useState(false);
+  const [chatContext, setChatContext]      = useState(null);
+  const [toast, setToast]                 = useState(null);
+  useEffect(() => { setTimeout(() => setVisible(true), 50); }, []);
+
+  function handleOpenChat(ctx) { setChatContext(ctx); setChatOpen(true); }
+
+  const availableWines = wines.filter(w => w.available !== false);
+  const tierOrder   = [...new Map(availableWines.map(w => [w.tier, true])).keys()];
+  const tiers       = ["All", ...tierOrder];
+  const filteredByTier = activeTier === "All" ? availableWines : availableWines.filter(w => w.tier === activeTier);
+  const subgroupOrder  = [...new Map(filteredByTier.map(w => [w.subgroup, true])).keys()].filter(Boolean);
+  const subgroups      = ["All", ...subgroupOrder];
+  const filteredBySubgroup = activeSubgroup === "All" ? filteredByTier : filteredByTier.filter(w => w.subgroup === activeSubgroup);
+  const varietalSet    = new Set(filteredBySubgroup.map(w => consolidateVarietal(w.varietal)).filter(Boolean));
+  const varietals      = ["All", ...Array.from(varietalSet).sort()];
+
+  const allMatchingWines = wines.filter(w => {
+    if (activeTier !== "All" && w.tier !== activeTier) return false;
+    if (activeSubgroup !== "All" && w.subgroup !== activeSubgroup) return false;
+    if (activeVarietal !== "All" && consolidateVarietal(w.varietal) !== activeVarietal) return false;
+    return true;
   });
+  const searchFiltered = wineSearch.trim() === ""
+    ? allMatchingWines
+    : allMatchingWines.filter(w => {
+        const q = wineSearch.toLowerCase();
+        return (w.name || "").toLowerCase().includes(q)
+          || (w.varietal || "").toLowerCase().includes(q)
+          || (w.region || "").toLowerCase().includes(q)
+          || (w.description || "").toLowerCase().includes(q);
+      });
+
+  const grouped = {};
+  const sortedForGrouping = [
+    ...searchFiltered.filter(w => w.available !== false),
+    ...searchFiltered.filter(w => w.available === false),
+  ];
+  sortedForGrouping.forEach(wine => {
+    const key = wine.subgroup || wine.tier || "Wine";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(wine);
+  });
+  const groupOrder = [...new Map(sortedForGrouping.map(w => [w.subgroup || w.tier || "Wine", true])).keys()];
+
+  const availCount = searchFiltered.filter(w => w.available !== false).length;
+  const oosCount   = searchFiltered.filter(w => w.available === false).length;
+  const countLeft  = `${availCount} ${availCount === 1 ? "wine" : "wines"}${oosCount > 0 ? ` · ${oosCount} out of stock` : ""}${wineSearch ? ` · "${wineSearch}"` : activeVarietal !== "All" ? ` · ${activeVarietal}` : activeSubgroup !== "All" ? ` · ${activeSubgroup}` : activeTier !== "All" ? ` · ${TIER_LABELS[activeTier] || activeTier}` : ""}`;
+
+  return (
+    <div style={{ background: t.bgBase, minHeight: "100vh", fontFamily: t.fontSerif, maxWidth: 680, margin: "0 auto", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease" }}>
+      {/* Shared header — edit ListScreenHeader to change all list screens */}
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        <ListScreenHeader title="Wine List" onBack={onBack} favorites={favorites} onShowShortlist={onShowShortlist}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {tiers.map(t => (
+              <FilterBtn key={t} label={t === "All" ? "All Wines" : TIER_LABELS[t] || t}
+                active={activeTier === t}
+                onClick={() => { setActiveTier(t); setActiveSubgroup("All"); setActiveVarietal("All"); setSelectedWine(null); }} />
+            ))}
+          </div>
+          {activeTier !== "All" && subgroups.length > 2 && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ color: t.textDim, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Type</span>
+              {subgroups.map(s => (
+                <FilterBtn key={s} small label={s === "All" ? "All" : s.replace(/^(Cellar |House )/, "")}
+                  active={activeSubgroup === s}
+                  onClick={() => { setActiveSubgroup(s); setActiveVarietal("All"); setSelectedWine(null); }} />
+              ))}
+            </div>
+          )}
+          {varietals.length > 2 && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ color: t.textMuted, fontSize: 9, letterSpacing: "2px", textTransform: "uppercase", marginRight: 2 }}>Grape</span>
+              {varietals.map(v => (
+                <FilterBtn key={v} small label={v === "All" ? "All Grapes" : v}
+                  active={activeVarietal === v}
+                  onClick={() => { setActiveVarietal(v); setSelectedWine(null); }} />
+              ))}
+            </div>
+          )}
+          <div style={{ padding: "4px 0 10px", position: "relative" }}>
+            <input type="text" placeholder="Search wines, grapes, regions…" value={wineSearch}
+              onChange={e => setWineSearch(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", background: t.white08, border: "0.5px solid rgba(201,169,110,0.25)", color: t.textPrimary, padding: "8px 32px 8px 12px", borderRadius: 20, fontFamily: t.fontSerif, fontSize: 12, outline: "none", letterSpacing: "0.3px" }}
+            />
+            {wineSearch && <button onClick={() => setWineSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textDim, cursor: "pointer", fontSize: 18, padding: 0 }}>×</button>}
+          </div>
+        </ListScreenHeader>
+      </div>
+
+      <ListCountBar left={countLeft} right="☆ Star to save to My Menu" />
+
+      <div style={{ background: t.bgSurface }}>
+        {groupOrder.map((group, gi) => (
+          <div key={group}>
+            <ListSectionHeading label={group} borderTop={gi > 0} />
+            <div style={{ padding: "0 14px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
+              {grouped[group].map(wine => (
+                <WineCard key={wine.id} wine={wine} selected={selectedWine === wine.id}
+                  onSelect={() => setSelectedWine(selectedWine === wine.id ? null : wine.id)}
+                  isFavorited={favorites.some(f => f.id === wine.id)}
+                  onToggleFavorite={onToggleFavorite}
+                  onZoomLabel={wine.imageUrl ? () => setZoomedLabel(wine) : null} />
+              ))}
+            </div>
+          </div>
+        ))}
+        {searchFiltered.length === 0 && (
+          <div style={{ color: t.textSecondary, textAlign: "center", padding: 40, fontSize: 14 }}>
+            {wineSearch ? `No wines matching "${wineSearch}"` : "No wines in this selection"}
+          </div>
+        )}
+      </div>
+
+      {selectedWine && (() => { const wine = wines.find(w => w.id === selectedWine); return wine ? <WineDetailPanel wine={wine} onClose={() => setSelectedWine(null)} onOpenChat={handleOpenChat} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} /> : null; })()}
+      <LabelModal wine={zoomedLabel} onClose={() => setZoomedLabel(null)} />
+      <SommelierChat isOpen={chatOpen} onClose={(added) => { setChatOpen(false); if (added) setToast(added); }} contextItem={chatContext} favorites={favorites} onToggleFavorite={onToggleFavorite} tabletLocation={tabletLocation} />
+      {toast && <SommelierToast items={toast} onViewMenu={() => { setToast(null); onShowShortlist(); }} onDismiss={() => setToast(null)} />}
+      <div style={{ height: 32 }} />
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
+function AppContent() {
+  const [screen, setScreen] = useState("home");
+  const [wines, setWines] = useState([]);
+  const [tabletLocation, setTabletLocationState] = useState(() => localStorage.getItem("tabletLocation") || null);
+  const [locationNames, setLocationNames] = useState({ bar: "Bar", dining: "Dining Room" });
+  const [deviceSetup, setDeviceSetup] = useState({ defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" });
+  const [appSettings, setAppSettings] = useState(null);
+  function setTabletLocationPersist(loc) { localStorage.setItem("tabletLocation", loc); setTabletLocationState(loc); }
+  const resolvedLocation = tabletLocation || "bar";
+  const barThemeKey = deviceSetup.barTheme || "charcoalAndMaple";
+  const diningThemeKey = deviceSetup.diningTheme || "espressoAndGold";
+  const activeThemeKey = resolvedLocation === "bar" ? barThemeKey : diningThemeKey;
+  const activeTheme = THEMES[activeThemeKey] || THEMES.espressoAndGold;
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showPin, setShowPin] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+  const [accessLevel, setAccessLevel] = useState(null); // "manager" | "admin"
+  const idleTimer = useRef(null);
+  const [favorites, setFavorites] = useState([]);
+  const [showShortlist, setShowShortlist] = useState(false);
+
+  useEffect(() => {
+    // Inject Google Fonts for Playfair Display (Tuque's theme)
+    if (!document.getElementById('theme-fonts')) {
+      const link = document.createElement('link');
+      link.id = 'theme-fonts';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch(SETTINGS_URL).then(r => r.json()).then(data => {
+      if (data.settings) setAppSettings(data.settings);
+      if (data.settings?.locationNames) setLocationNames(data.settings.locationNames);
+      const ds = data.settings?.deviceSetup || { defaultLocation: "bar", barLogo: "", diningLogo: "", barTheme: "charcoalAndMaple", diningTheme: "espressoAndGold" };
+      setDeviceSetup(ds);
+      // If this device has never been assigned a location, apply the configured default
+      if (!localStorage.getItem("tabletLocation")) {
+        const def = ds.defaultLocation || "bar";
+        localStorage.setItem("tabletLocation", def);
+        setTabletLocationState(def);
+      }
+    }).catch(() => {
+      if (!localStorage.getItem("tabletLocation")) {
+        localStorage.setItem("tabletLocation", "bar");
+        setTabletLocationState("bar");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchWines();
+    let pollTimer;
+    function scheduleNext() {
+      pollTimer = setTimeout(() => { fetchWines(true); scheduleNext(); }, getPollingInterval());
+    }
+    scheduleNext();
+    return () => clearTimeout(pollTimer);
+  }, []);
+
+  useEffect(() => {
+    function resetApp() {
+      setScreen("home");
+      setFavorites([]);
+      setShowShortlist(false);
+    }
+    function resetIdle() {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(() => window.location.reload(), 15 * 60 * 1000);
+    }
+    const events = ["touchstart", "touchmove", "click", "scroll"];
+    events.forEach(e => document.addEventListener(e, resetIdle, { passive: true }));
+    resetIdle();
+    return () => {
+      events.forEach(e => document.removeEventListener(e, resetIdle));
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  function toggleFavorite(item, itemType) {
+    setFavorites(prev => {
+      const exists = prev.find(f => f.id === item.id);
+      if (exists) return prev.filter(f => f.id !== item.id);
+      return [...prev, { ...item, favoriteType: itemType }];
+    });
+  }
+
+  async function fetchWines() {
+    try {
+      const res = await fetch(FIREBASE_URL);
+      const data = await res.json();
+      if (data.wines) {
+        setWines(Array.isArray(data.wines) ? data.wines : Object.values(data.wines));
+        setLastUpdated(data.lastUpdated);
+      }
+      setError(null);
+    } catch (e) { setError("Unable to load wine list"); }
+    finally { setLoading(false); }
+  }
+
+  // Wine filtering is now handled inside WineListScreen
+  // Wine filtering moved to WineListScreen
+
+  const shortlistOverlay = (
+    <>
+      {showShortlist && <ShortlistScreen favorites={favorites} onRemove={(id) => setFavorites(prev => prev.filter(f => f.id !== id))} onClose={() => setShowShortlist(false)} />}
+      {showPin && <PinScreen onSuccess={(level) => { setAccessLevel(level); setShowPin(false); setShowManager(true); }} onCancel={() => setShowPin(false)} />}
+      {showManager && <ManagerScreen wines={wines} isAdmin={accessLevel === "admin"} onClose={() => { setShowManager(false); setAccessLevel(null); }} tabletLocation={tabletLocation} onSetLocation={setTabletLocationPersist} locationNames={locationNames} />}
+    </>
+  );
+
+  const wrapTheme = (el) => <ThemeContext.Provider value={activeTheme}>{el}</ThemeContext.Provider>;
+  if (screen === "home") return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
+  if (screen === "wine") return wrapTheme(<>{shortlistOverlay}<WineListScreen wines={wines} favorites={favorites} onToggleFavorite={(w) => toggleFavorite(w, "wine")} onBack={() => setScreen("home")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "sommelier") return wrapTheme(<>{shortlistOverlay}<SommelierScreen onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item, type = "wine") => toggleFavorite(item, type)} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "cocktails") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Specialty Cocktails" endpoint={COCKTAILS_URL} dataKey="cocktails" accentColor="#b06090" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "cocktail")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "nab") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Non-Alcoholic Beverages" allLabel="All Beverages" endpoint={NAB_URL} dataKey="nab" accentColor="#6090a0" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "nab")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "beer") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Beer List" allLabel="All Beers" endpoint={BEER_URL} dataKey="beers" accentColor="#c8860a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "beer")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+  if (screen === "pours") return wrapTheme(<>{shortlistOverlay}<ItemListScreen title="Premium Pours" endpoint={POURS_URL} dataKey="pours" accentColor="#9a6e3a" onBack={() => setScreen("home")} favorites={favorites} onToggleFavorite={(item) => toggleFavorite(item, "pour")} onShowShortlist={() => setShowShortlist(true)} tabletLocation={tabletLocation} /></>);
+
+  // AppContent no longer renders the wine list directly
+  // All screens accounted for above — return home as fallback
+  return wrapTheme(<>{shortlistOverlay}<HomeScreen onNavigate={setScreen} favorites={favorites} onShowShortlist={() => setShowShortlist(true)} onAdminTap={() => setShowPin(true)} tabletLocation={tabletLocation || deviceSetup.defaultLocation || "bar"} deviceSetup={deviceSetup} locationNames={locationNames} settings={appSettings} /></>);
+}
+
+function WineCard({ wine, selected, onSelect, isFavorited, onToggleFavorite, onZoomLabel }) {
+  const t = useTheme();
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div onClick={onSelect} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
+      display: "flex", alignItems: "center", gap: 12,
+      background: selected ? "rgba(240,235,224,0.08)" : hovered ? "rgba(240,235,224,0.05)" : "transparent",
+      borderLeft: selected ? `2px solid ${t.accent}` : "2px solid transparent",
+      borderRadius: 8, padding: "11px 8px", cursor: "pointer",
+      transition: "all 0.15s", opacity: wine.available === false ? 0.4 : 1
+    }}>
+      <div
+        onClick={onZoomLabel ? e => { e.stopPropagation(); onZoomLabel(); } : undefined}
+        style={{ width: 40, height: 56, borderRadius: 3, background: "#f5ede0", border: `0.5px solid ${onZoomLabel ? t.accent : t.textPrimary}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, overflow: "hidden", cursor: onZoomLabel ? "zoom-in" : "default" }}>
+        {wine.imageUrl ? <img src={wine.imageUrl} alt={wine.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🍷"}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: t.textPrimary, fontSize: 16, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wine.name}</div>
+        {wine.varietal && (
+          <div style={{ color: t.accent, fontSize: 12, letterSpacing: "0.3px", marginBottom: 2 }}>
+            {wine.varietal}{wine.region ? ` · ${wine.region}` : ""}
+          </div>
+        )}
+        {wine.description ? (
+          <div style={{ color: t.textMuted, fontSize: 13, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{wine.description} <span style={{ color: t.accent, fontSize: 11 }}>Details ›</span></div>
+        ) : (
+          <div style={{ color: t.accent, fontSize: 11, fontStyle: "italic" }}>Tap for details ›</div>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <button onClick={e => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(wine); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: isFavorited ? t.accent : t.textSecondary, padding: "2px 0", lineHeight: 1, flexShrink: 0 }}>
+          {isFavorited ? "★" : "☆"}
+        </button>
+        <div style={{ textAlign: "right", flexShrink: 0, minWidth: 44 }}>
+        {wine.available === false ? (
+          <div style={{ background: "#f5ede0", color: "#c0706a", fontSize: 10, padding: "3px 8px", borderRadius: 10, letterSpacing: "1px", textTransform: "uppercase", border: "0.5px solid #e0c8c8" }}>Out of Stock</div>
+        ) : wine.glassPrice && wine.bottlePrice ? (
+          <div style={{ color: t.textPrimary, fontSize: 13, fontWeight: 500, textAlign: "right" }}>{formatPrice(wine.glassPrice)}<span style={{ color: t.textSecondary }}>/</span>{Math.round(wine.bottlePrice)}</div>
+        ) : wine.glassPrice ? (
+          <>
+            <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.glassPrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>glass</div>
+          </>
+        ) : wine.bottlePrice ? (
+          <>
+            <div style={{ color: t.textPrimary, fontSize: 14, fontWeight: 500 }}>{formatPrice(wine.bottlePrice)}</div>
+            <div style={{ color: t.textSecondary, fontSize: 10, marginTop: 1 }}>bottle</div>
+          </>
+        ) : (
+          <span style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic" }}>Ask</span>
+        )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Root Export ─────────────────────────────────────────────────────────────
+// Checks for shared menu QR link BEFORE rendering AppContent (avoids hook violations)
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("App crashed:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      const err = this.state.error;
+      const stack = this.state.errorInfo?.componentStack || "";
+      return (
+        <div style={{ minHeight: "100vh", background: "#0e0b09", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Georgia, serif" }}>
+          <div style={{ maxWidth: 480, width: "100%" }}>
+            <div style={{ color: "#c85050", fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>⚠ App Error</div>
+            <div style={{ color: "#ede8e0", fontSize: 18, marginBottom: 16, lineHeight: 1.4 }}>{err?.message || "Something went wrong"}</div>
+            <div style={{ background: "#1a1410", border: "0.5px solid #3e2c1e", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+              <div style={{ color: "#7a6858", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Stack Trace</div>
+              <pre style={{ color: "#b0a090", fontSize: 10, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+                {err?.stack || "No stack available"}
+              </pre>
+            </div>
+            {stack && (
+              <div style={{ background: "#1a1410", border: "0.5px solid #3e2c1e", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+                <div style={{ color: "#7a6858", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Component Stack</div>
+                <pre style={{ color: "#b0a090", fontSize: 10, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>{stack}</pre>
+              </div>
+            )}
+            <button onClick={() => { this.setState({ hasError: false, error: null, errorInfo: null }); window.location.reload(); }}
+              style={{ background: "rgba(200,150,50,0.14)", border: "0.5px solid rgba(200,150,50,0.38)", color: "#c89632", padding: "10px 20px", borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 13 }}>
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  // Short DB-backed code: ?m=ABC123
+  const menuCode = urlParams.get('m');
+  if (menuCode) return <GuestMenuLoader menuCode={menuCode} />;
+  // Legacy long-URL code: ?menu=BASE64 (kept for backward compatibility)
+  const menuParam = urlParams.get('menu');
+  if (menuParam) {
+    try {
+      const sharedFavorites = decodeFavorites(menuParam);
+      if (sharedFavorites && sharedFavorites.length > 0) return <GuestMenuScreen favorites={sharedFavorites} savedAt={sharedFavorites._savedAt} />;
+    } catch(e) {}
+  }
+  return <ErrorBoundary><AppContent /></ErrorBoundary>;
+}
