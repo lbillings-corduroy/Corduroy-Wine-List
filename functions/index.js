@@ -125,6 +125,26 @@ async function getStockData(token) {
 
 // ─── Generic Item Extraction (Beer, Pours, Cocktails) ────────────────────────
 
+
+async function purgeOrphanedEnrichment(db, itemsNode, enrichmentNode, activeIds, label) {
+  try {
+    const activeSet = new Set(activeIds);
+    const enrichSnap = await db.ref(enrichmentNode).once('value');
+    const enrichData = enrichSnap.val() || {};
+    const orphanedKeys = Object.keys(enrichData).filter(k => !activeSet.has(k));
+    if (orphanedKeys.length > 0) {
+      const updates = {};
+      orphanedKeys.forEach(k => { updates[k] = null; });
+      await db.ref(enrichmentNode).update(updates);
+      console.log(`[purge-${label}] Removed ${orphanedKeys.length} orphaned enrichment records`);
+    } else {
+      console.log(`[purge-${label}] No orphaned records found`);
+    }
+  } catch (e) {
+    console.error(`[purge-${label}] Error:`, e.message);
+  }
+}
+
 function findGroupByGuid(groups, guid) {
   for (const group of groups) {
     if (group.guid === guid) return group;
@@ -1053,7 +1073,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
       if (group) break;
     }
     if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName, sortOrder ?? 0, guid);
+    collectItems(group, configName, (sortOrder ?? 0) * 1000, guid);
     console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
