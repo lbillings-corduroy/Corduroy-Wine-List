@@ -2791,13 +2791,13 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
-  function handleAddToMenu(suggestion) {
+  function handleAddToMenu(suggestion, courseRole) {
     if (!onToggleFavorite) return;
     const alreadyAdded = favorites.some(f => f.id === suggestion.id);
     if (suggestion.type === "wine") {
-      onToggleFavorite({ id: suggestion.id, name: suggestion.name, varietal: suggestion.varietal || null, region: suggestion.region || null, glassPrice: suggestion.glassPrice || null, bottlePrice: suggestion.bottlePrice || null, imageUrl: suggestion.imageUrl || null, fromPairing: false }, "wine");
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, varietal: suggestion.varietal || null, region: suggestion.region || null, glassPrice: suggestion.glassPrice || null, bottlePrice: suggestion.bottlePrice || null, imageUrl: suggestion.imageUrl || null, description: suggestion.description || null, fromPairing: false }, "wine");
     } else if (suggestion.type === "food") {
-      onToggleFavorite({ id: suggestion.id, name: suggestion.name, price: suggestion.price || null, course: suggestion.course || null, description: suggestion.description || null, courseRole: "main" }, "food");
+      onToggleFavorite({ id: suggestion.id, name: suggestion.name, price: suggestion.price || null, course: suggestion.course || null, description: suggestion.description || null, courseRole: courseRole || "main" }, "food");
     }
     // Track what was added this session (only additions, not removals)
     if (!alreadyAdded) {
@@ -2903,9 +2903,29 @@ function SommelierChat({ isOpen, onClose, contextItem, selectedFoods = [], favor
                           {s.description && <div style={{ color: t.textDim, fontSize: 11, lineHeight: 1.4, marginTop: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{s.description}</div>}
                           {hasImage && <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.5px", marginTop: 2 }}>Tap label to enlarge</div>}
                         </div>
-                        <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? t.successDim : t.bgSurface, border: isAdded ? `0.5px solid ${t.success}` : "none", color: isAdded ? t.success : t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>
-                          {isAdded ? "★ Added" : "☆ Add to My Menu"}
-                        </button>
+                        {s.type === "food" && !isAdded ? (
+                          // For food: show 1ST / MAIN role buttons (skip for Dessert/Entrees which lock to one role)
+                          (() => {
+                            const isDessert = (s.course || "").toLowerCase().includes("dessert");
+                            const isEntree  = (s.course || "").toLowerCase().includes("entree");
+                            if (isDessert) return (
+                              <button onClick={() => handleAddToMenu(s, "dessert")} style={{ background: t.bgSurface, border: "none", color: t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>☆ Add</button>
+                            );
+                            if (isEntree) return (
+                              <button onClick={() => handleAddToMenu(s, "main")} style={{ background: t.bgSurface, border: "none", color: t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>☆ Add</button>
+                            );
+                            return (
+                              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                <button onClick={() => handleAddToMenu(s, "first")} style={{ background: t.bgSurface, border: `0.5px solid ${t.accentBorder}`, color: t.accent, fontSize: 10, padding: "4px 7px", borderRadius: 5, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap" }}>☆ 1ST</button>
+                                <button onClick={() => handleAddToMenu(s, "main")} style={{ background: t.bgSurface, border: `0.5px solid ${t.accentBorder}`, color: t.accent, fontSize: 10, padding: "4px 7px", borderRadius: 5, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap" }}>☆ MAIN</button>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <button onClick={() => handleAddToMenu(s)} style={{ background: isAdded ? t.successDim : t.bgSurface, border: isAdded ? `0.5px solid ${t.success}` : "none", color: isAdded ? t.success : t.accent, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, whiteSpace: "nowrap", flexShrink: 0 }}>
+                            {isAdded ? "★ Added" : "☆ Add to My Menu"}
+                          </button>
+                        )}
                       </div>
                     );
                   })}
