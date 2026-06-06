@@ -1951,7 +1951,7 @@ exports.sommelierChat = functions
     if (req.method === 'OPTIONS') return res.status(204).send('');
 
     try {
-      const { messages, contextItem, selectedFoods } = req.body;
+      const { messages, contextItem, selectedFoods, location: chatLocation } = req.body;
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'messages array required' });
       }
@@ -2084,16 +2084,27 @@ exports.sommelierChat = functions
         : Object.values(foodById)
       ).filter(f => !exclusions[f.id]);
 
+      // Filter food to only items available at this tablet's location
+      const locationFilteredFood = chatLocation
+        ? orderedFood.filter(f => {
+            const locs = f.locations || [];
+            return locs.length === 0 || locs.includes(chatLocation);
+          })
+        : orderedFood;
+
       const foodByCourse = {};
-      orderedFood.forEach(f => {
+      locationFilteredFood.forEach(f => {
         if (!foodByCourse[f.course]) foodByCourse[f.course] = [];
         foodByCourse[f.course].push(f);
       });
       const foodSection = Object.entries(foodByCourse).map(([course, items]) =>
-        `  ${course}:\n` + items.map(f =>
-          `    - [id:${f.id}] ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ''}${f.description ? ': ' + f.description : ''}`
-        ).join('\n')
-      ).join('\n');
+        `  ${course}:
+` + items.map(f =>
+          `    - [id:${f.id}] ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ""}${f.description ? ": " + f.description : ""}`
+        ).join("
+")
+      ).join("
+");
 
       // Assemble the full menu block — only include sections whose menu type is currently available
       const menuBlock = [
@@ -2122,7 +2133,7 @@ exports.sommelierChat = functions
         wineById[w.id] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
       });
       const foodById2 = {};
-      orderedFood.forEach(f => {
+      locationFilteredFood.forEach(f => {
         foodById2[f.id] = { id: f.id, name: f.name, course: f.course, price: f.price || null, description: f.description || null };
       });
 
