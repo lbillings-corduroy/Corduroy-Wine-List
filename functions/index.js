@@ -2098,13 +2098,10 @@ exports.sommelierChat = functions
         foodByCourse[f.course].push(f);
       });
       const foodSection = Object.entries(foodByCourse).map(([course, items]) =>
-        `  ${course}:
-` + items.map(f =>
+        `  ${course}:\n` + items.map(f =>
           `    - [id:${f.id}] ${f.name}${f.price ? ` ($${Math.round(f.price)})` : ""}${f.description ? ": " + f.description : ""}`
-        ).join("
-")
-      ).join("
-");
+        ).join("\n")
+      ).join("\n");
 
       // Assemble the full menu block — only include sections whose menu type is currently available
       const menuBlock = [
