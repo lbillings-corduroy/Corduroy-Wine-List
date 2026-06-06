@@ -1075,10 +1075,18 @@ exports.syncFoodMenu = functions
       const db = admin.database();
       // Merge locations when the same item appears in multiple menu configs
       // (e.g. AK Entrees subgroup appears in both AK master menu and standalone Tuque's entry)
+      // Log location summary before writing
+      const locationSummary = {};
+      freshItems.forEach(item => {
+        const key = JSON.stringify(item.locations || []);
+        locationSummary[key] = (locationSummary[key] || 0) + 1;
+      });
+      console.log('[syncFoodMenu] Location distribution:', JSON.stringify(locationSummary));
+      console.log('[syncFoodMenu] Sample items:', freshItems.slice(0,3).map(i => ({ name: i.name, course: i.course, locations: i.locations })));
+
       const foodById = {};
       freshItems.forEach(item => {
         if (foodById[item.id]) {
-          // Item already seen — merge locations arrays
           const existing = foodById[item.id].locations || [];
           const incoming = item.locations || [];
           const merged = [...new Set([...existing, ...incoming])];
