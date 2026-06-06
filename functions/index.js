@@ -1035,10 +1035,10 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
     // Check if GUID matches a top-level menu — pull all subgroups as course sections
     const topLevelMenu = menus.menus.find(m => m.guid === guid);
     if (topLevelMenu) {
-      console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — locations: ${JSON.stringify(locations)}`);
+      console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — guid: ${guid}`);
       if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
         topLevelMenu.menuGroups.forEach(subgroup => {
-          collectItems(subgroup, subgroup.name, locations || [], sortOrder ?? 0);
+          collectItems(subgroup, subgroup.name, sortOrder ?? 0, guid);
           console.log(`  Section "${subgroup.name}" — ${allItems.filter(i => i.course === subgroup.name).length} items`);
         });
       }
