@@ -1009,7 +1009,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
   }
   const allItems = [];
 
-  function collectItems(g, courseName, locations) {
+  function collectItems(g, courseName, locations, sortOrder) {
     if (g.menuItems && g.menuItems.length > 0) {
       g.menuItems.forEach(item => {
         const price = item.price || null;
@@ -1018,20 +1018,20 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
         if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
         if (allItems.find(i => i.id === item.guid)) return;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [] });
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [], menuSortOrder: sortOrder ?? 0 });
       });
     }
-    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations));
+    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations, sortOrder));
   }
 
-  for (const { name: configName, guid, locations } of groups) {
+  for (const { name: configName, guid, locations, sortOrder } of groups) {
     // Check if GUID matches a top-level menu — pull all subgroups as course sections
     const topLevelMenu = menus.menus.find(m => m.guid === guid);
     if (topLevelMenu) {
       console.log(`Food config "${configName}" matched top-level menu "${topLevelMenu.name}" — locations: ${JSON.stringify(locations)}`);
       if (topLevelMenu.menuGroups && topLevelMenu.menuGroups.length > 0) {
         topLevelMenu.menuGroups.forEach(subgroup => {
-          collectItems(subgroup, subgroup.name, locations || []);
+          collectItems(subgroup, subgroup.name, locations || [], sortOrder ?? 0);
           console.log(`  Section "${subgroup.name}" — ${allItems.filter(i => i.course === subgroup.name).length} items`);
         });
       }
@@ -1045,7 +1045,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
       if (group) break;
     }
     if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName, locations || []);
+    collectItems(group, configName, locations || [], sortOrder ?? 0);
     console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
@@ -1062,7 +1062,7 @@ exports.syncFoodMenu = functions
       const foodMenuConfigs = getMenusOfType(settings, 'food');
 
       // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
-      let dynamicFoodGroups = foodMenuConfigs.map(m => ({ name: m.label, guid: m.guid, locations: m.locations || [] }));
+      let dynamicFoodGroups = foodMenuConfigs.map((m, i) => ({ name: m.label, guid: m.guid, locations: m.locations || [], sortOrder: m.sortOrder ?? i }));
       if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
 
       const token = await getToastToken();
