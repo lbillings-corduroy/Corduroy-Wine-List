@@ -2153,7 +2153,7 @@ REMEMBER: This entire conversation is anchored to the ${contextItem.name}. Whene
       const wineById = {};
       orderedWines.forEach(w => {
         const e = wineEnrich[w.id] || {};
-        wineById[w.id] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null };
+        wineById[w.id] = { id: w.id, name: e.correctedName || w.name, varietal: e.varietal || null, region: e.region || null, glassPrice: w.glassPrice || null, bottlePrice: w.bottlePrice || null, imageUrl: w.toastImageUrl || null, description: e.description || null };
       });
       const foodById2 = {};
       locationFilteredFood.forEach(f => {
