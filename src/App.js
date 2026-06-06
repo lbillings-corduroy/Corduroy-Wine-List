@@ -1034,18 +1034,33 @@ function SettingsTab() {
 function SyncTab() {
   const t = useTheme();
   const categories = [
-    { id: "wine", label: "Wine List" },
-    { id: "beer", label: "Beer List" },
-    { id: "pours", label: "Premium Pours" },
-    { id: "food", label: "Food Menu" },
-    { id: "cocktails", label: "Specialty Cocktails" },
-    { id: "nab", label: "Non-Alcoholic Beverages" },
+    { id: "wine",      label: "Wine List",                icon: "🍷" },
+    { id: "beer",      label: "Beer List",                icon: "🍺" },
+    { id: "pours",     label: "Premium Pours",            icon: "🥃" },
+    { id: "food",      label: "Food Menu",                icon: "🍽" },
+    { id: "cocktails", label: "Specialty Cocktails",      icon: "🍸" },
+    { id: "nab",       label: "Non-Alcoholic Beverages",  icon: "🥤" },
   ];
-  const [selected, setSelected] = useState(categories.map(c => c.id));
-  const [syncing, setSyncing] = useState(false);
-  const [result, setResult] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
+  const [results, setResults] = useState({});
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState(null);
+
+  async function handleSyncOne(id) {
+    setSyncingId(id);
+    setResults(prev => ({ ...prev, [id]: null }));
+    try {
+      const res = await fetch(FORCE_SYNC_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: [id] })
+      });
+      const data = await res.json();
+      setResults(prev => ({ ...prev, [id]: { ok: data.ok, message: data.ok ? "✓ Triggered — check in ~60 seconds" : (data.error || "Sync failed") } }));
+    } catch (e) {
+      setResults(prev => ({ ...prev, [id]: { ok: false, message: e.message } }));
+    }
+    setSyncingId(null);
+  }
 
   async function handleCleanup() {
     setCleaning(true);
@@ -1060,69 +1075,46 @@ function SyncTab() {
     setCleaning(false);
   }
 
-  function toggleCat(id) {
-    setSelected(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
-  }
-
-  async function handleSync() {
-    if (selected.length === 0) return;
-    setSyncing(true);
-    setResult(null);
-    try {
-      const res = await fetch(FORCE_SYNC_URL, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categories: selected })
-      });
-      const data = await res.json();
-      setResult({ ok: data.ok, message: data.message || data.error });
-    } catch (e) {
-      setResult({ ok: false, message: e.message });
-    }
-    setSyncing(false);
-  }
-
   return (
     <div>
       <div style={{ color: t.textDim, fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
-        Select the menus to sync from Toast, then tap Run Sync. Syncs run in the background — allow ~60 seconds for changes to appear in the app.
+        Tap ⟳ Sync next to a menu to pull the latest data from Toast. Full syncs run automatically at 5:15 PM daily. Use these buttons when you've added a special or made a menu change mid-service.
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        {categories.map(c => (
-          <div key={c.id} onClick={() => toggleCat(c.id)}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, background: selected.includes(c.id) ? t.accentDimSm : t.white04, border: `0.5px solid ${selected.includes(c.id) ? t.accentBorder : t.borderMid}`, borderRadius: 8, cursor: "pointer" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: selected.includes(c.id) ? t.accent : "transparent", border: `1.5px solid ${selected.includes(c.id) ? t.accent : t.textDim}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {selected.includes(c.id) && <span style={{ color: t.bgDeep, fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24 }}>
+        {categories.map(c => {
+          const isSyncing = syncingId === c.id;
+          const result = results[c.id];
+          return (
+            <div key={c.id} style={{ background: t.white04, border: `0.5px solid ${t.borderMid}`, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{c.icon}</span>
+                  <span style={{ color: t.textPrimary, fontSize: 13, fontFamily: t.fontSerif }}>{c.label}</span>
+                </div>
+                <button onClick={() => handleSyncOne(c.id)} disabled={isSyncing || syncingId !== null}
+                  style={{ background: isSyncing ? t.accentDimSm : t.accentDim, border: `0.5px solid ${t.accentBorder}`, color: isSyncing ? t.textDim : t.accent, padding: "5px 12px", borderRadius: 6, cursor: isSyncing || syncingId !== null ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap", opacity: syncingId !== null && !isSyncing ? 0.4 : 1 }}>
+                  {isSyncing ? "…" : "⟳ Sync"}
+                </button>
+              </div>
+              {result && (
+                <div style={{ marginTop: 6, fontSize: 11, color: result.ok ? t.success : t.error, fontStyle: "italic" }}>
+                  {result.message}
+                </div>
+              )}
             </div>
-            <span style={{ color: selected.includes(c.id) ? t.textPrimary : t.textDim, fontSize: 13, fontFamily: t.fontSerif }}>{c.label}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button onClick={() => setSelected(categories.map(c => c.id))} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Select All</button>
-        <button onClick={() => setSelected([])} style={{ background: "none", border: `0.5px solid ${t.borderMid}`, color: t.textDim, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>Clear</button>
-      </div>
-
-      <button onClick={handleSync} disabled={syncing || selected.length === 0}
-        style={{ width: "100%", background: syncing || selected.length === 0 ? t.accentDimSm : t.accent, color: syncing || selected.length === 0 ? t.textDim : t.bgDeep, border: "none", padding: "13px", borderRadius: 8, cursor: syncing || selected.length === 0 ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 14, fontWeight: 600, letterSpacing: "0.5px" }}>
-        {syncing ? "Triggering sync…" : `⟳ Sync ${selected.length} Menu${selected.length !== 1 ? "s" : ""} Now`}
-      </button>
-
-      {result && (
-        <div style={{ marginTop: 14, background: result.ok ? t.successDim : t.errorDim, border: `0.5px solid ${result.ok ? t.success : t.error}`, borderRadius: 8, padding: "12px 14px" }}>
-          <div style={{ color: result.ok ? t.success : t.error, fontSize: 12, fontFamily: t.fontSerif, lineHeight: 1.6 }}>{result.message}</div>
-        </div>
-      )}
 
       {/* Cleanup section */}
-      <div style={{ marginTop: 24, borderTop: `0.5px solid ${t.borderSubtle}`, paddingTop: 20 }}>
+      <div style={{ borderTop: `0.5px solid ${t.borderSubtle}`, paddingTop: 20 }}>
         <div style={{ color: t.accent, fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Data Cleanup</div>
         <div style={{ color: t.textDim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
-          Removes enrichment records for items that are no longer in any configured menu. Run this after correcting a miscategorised menu or deleting a menu from Settings.
+          Removes enrichment records for items that are no longer in any configured menu. Run after correcting a miscategorised menu or deleting one from Settings.
         </div>
         <button onClick={handleCleanup} disabled={cleaning}
-          style={{ width: "100%", background: cleaning ? "rgba(232,80,80,0.06)" : "rgba(232,80,80,0.12)", color: cleaning ? t.textDim : t.error, border: "0.5px solid rgba(232,80,80,0.4)", padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
+          style={{ width: "100%", background: cleaning ? t.errorDim : t.errorDim, color: cleaning ? t.textDim : t.error, border: `0.5px solid ${t.errorBorder}`, padding: "11px", borderRadius: 8, cursor: cleaning ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px" }}>
           {cleaning ? "Cleaning…" : "🗑 Remove Orphaned Data"}
         </button>
         {cleanResult && (
