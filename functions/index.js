@@ -1012,7 +1012,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
   }
   const allItems = [];
 
-  function collectItems(g, courseName, locations, sortOrder, menuGuid) {
+  function collectItems(g, courseName, sortOrder, menuGuid) {
     if (g.menuItems && g.menuItems.length > 0) {
       g.menuItems.forEach(item => {
         const price = item.price || null;
@@ -1025,13 +1025,13 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (isOOS) return;
         if (isHidden) return;
         if (isDupe) return;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [], menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
       });
     }
-    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, locations, sortOrder, menuGuid));
+    if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, sortOrder, menuGuid));
   }
 
-  for (const { name: configName, guid, locations, sortOrder } of groups) {
+  for (const { name: configName, guid, sortOrder } of groups) {
     // Check if GUID matches a top-level menu — pull all subgroups as course sections
     const topLevelMenu = menus.menus.find(m => m.guid === guid);
     if (topLevelMenu) {
@@ -1052,7 +1052,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
       if (group) break;
     }
     if (!group) { console.log(`Food group "${configName}" (${guid}) not found`); continue; }
-    collectItems(group, configName, locations || [], sortOrder ?? 0, guid);
+    collectItems(group, configName, sortOrder ?? 0, guid);
     console.log(`Food group "${configName}" — found ${allItems.filter(i => i.course === configName).length} items`);
   }
   return allItems;
@@ -1069,7 +1069,7 @@ exports.syncFoodMenu = functions
       const foodMenuConfigs = getMenusOfType(settings, 'food');
 
       // Build FOOD_GROUPS from settings, falling back to hardcoded if not configured
-      let dynamicFoodGroups = foodMenuConfigs.map((m, i) => ({ name: m.label, guid: m.guid, locations: m.locations || [], sortOrder: m.sortOrder ?? i }));
+      let dynamicFoodGroups = foodMenuConfigs.map((m, i) => ({ name: m.label, guid: m.guid, sortOrder: m.sortOrder ?? i }));
       if (dynamicFoodGroups.length === 0) dynamicFoodGroups = FOOD_GROUPS;
 
       const token = await getToastToken();
@@ -1089,19 +1089,19 @@ exports.syncFoodMenu = functions
         locationSummary[key] = (locationSummary[key] || 0) + 1;
       });
       console.log('[syncFoodMenu] Location distribution:', JSON.stringify(locationSummary));
-      console.log('[syncFoodMenu] Sample items:', freshItems.slice(0,3).map(i => ({ name: i.name, course: i.course, locations: i.locations })));
 
+      // Step 1: Merge locations within this sync batch
       const foodById = {};
       freshItems.forEach(item => {
         if (foodById[item.id]) {
           const existing = foodById[item.id].locations || [];
           const incoming = item.locations || [];
-          const merged = [...new Set([...existing, ...incoming])];
-          foodById[item.id] = { ...foodById[item.id], locations: merged };
+          foodById[item.id] = { ...foodById[item.id], locations: [...new Set([...existing, ...incoming])] };
         } else {
           foodById[item.id] = item;
         }
       });
+
       await db.ref('foodItems').set(foodById);
       await db.ref('foodOrder').set([...new Set(freshItems.map(i => i.id))]);
       await db.ref('foodLastUpdated').set(Date.now());
@@ -1134,68 +1134,46 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
 
     const requestedLocation = req.query.location || req.body?.location || null;
 
-    // Load availability cache to filter menus by current time
+    // Load settings to get menu configs and availability cache
     const settingsSnap = await db.ref('appSettings').once('value');
     const appSettings = settingsSnap.val() || {};
-    const toastAvailCache = appSettings.toastAvailability || appSettings.settings?.toastAvailability || {};
-    const configuredMenus = appSettings.menus || appSettings.settings?.menus || [];
+    const toastAvailCache = appSettings.toastAvailability || {};
+    const configuredMenus = appSettings.menus || [];
 
-    // Build set of currently-available menu GUIDs for the requested location
-    const availableMenuGuids = new Set();
-    configuredMenus.forEach(menu => {
-      if (menu.menuType !== 'food') return;
-      const locs = menu.locations || [];
-      if (requestedLocation && locs.length > 0 && !locs.includes(requestedLocation)) return;
-      const avail = isMenuAvailableNow(menu, toastAvailCache);
-      const ta = toastAvailCache[menu.guid];
-      console.log(`[getFoodItems] menu="${menu.label}" guid=${menu.guid} location=${JSON.stringify(locs)} available=${avail} toastDays=${JSON.stringify(ta?.toastDays)} toastHours=${JSON.stringify(ta?.toastHours)}`);
-      if (avail) availableMenuGuids.add(menu.guid);
+    // Build set of allowed menu GUIDs based on location + availability
+    // Filter by MENU, not by item — items inherit their menu's location/availability
+    const foodMenus = configuredMenus.filter(m => m.menuType === 'food');
+    const allowedMenuGuids = new Set();
+    foodMenus.forEach(menu => {
+      // Location check — menu must be assigned to requested location (or all locations)
+      if (requestedLocation) {
+        const locs = menu.locations || [];
+        if (locs.length > 0 && !locs.includes(requestedLocation)) return;
+      }
+      // Availability check — menu must be currently available
+      if (!isMenuAvailableNow(menu, toastAvailCache)) return;
+      allowedMenuGuids.add(menu.guid);
     });
 
-    console.log(`[getFoodItems] requestedLocation=${requestedLocation} availableGuids=${JSON.stringify([...availableMenuGuids])}`);
+    console.log(`[getFoodItems] location=${requestedLocation} allowedMenus=${JSON.stringify([...allowedMenuGuids])} of ${foodMenus.length} food menus`);
 
-    // Also build unavailable set for fallback filtering when items lack menuGuid
-    const unavailableGuids = new Set(
-      configuredMenus
-        .filter(m => m.menuType === 'food' && !isMenuAvailableNow(m, toastAvailCache))
-        .map(m => m.guid)
-    );
-    const useAvailabilityFilter = configuredMenus.some(m => m.menuType === 'food');
+    const useMenuFilter = foodMenus.length > 0;
 
     const ordered = (foodOrder.length > 0
       ? foodOrder.map(id => foodById[id]).filter(Boolean)
       : Object.values(foodById)
     ).filter(item => {
-      // Location filter
-      if (requestedLocation) {
-        const locs = item.locations || [];
-        if (locs.length > 0 && !locs.includes(requestedLocation)) return false;
-      }
-      // Availability filter
-      if (useAvailabilityFilter) {
-        if (item.menuGuid) {
-          // Has menuGuid — check directly
-          return !unavailableGuids.has(item.menuGuid);
-        } else {
-          // No menuGuid — use item locations to find matching menus
-          // If ALL menus matching this item's locations are unavailable, hide it
-          const itemLocs = item.locations || [];
-          const matchingMenus = configuredMenus.filter(m => {
-            if (m.menuType !== 'food') return false;
-            const mLocs = m.locations || [];
-            if (itemLocs.length === 0 && mLocs.length === 0) return true;
-            if (itemLocs.length === 0 || mLocs.length === 0) return true;
-            return mLocs.some(l => itemLocs.includes(l));
-          });
-          if (matchingMenus.length > 0 && matchingMenus.every(m => unavailableGuids.has(m.guid))) {
-            return false;
-          }
-        }
-      }
-      return true;
+      if (!useMenuFilter) return true;
+      // Filter by menu — item must belong to an allowed menu
+      if (item.menuGuid) return allowedMenuGuids.has(item.menuGuid);
+      // Fallback for items without menuGuid — show if any allowed menu has no location restriction
+      return allowedMenuGuids.size > 0 && [...allowedMenuGuids].some(guid => {
+        const m = foodMenus.find(fm => fm.guid === guid);
+        return !m || (m.locations || []).length === 0;
+      });
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
-    console.log(`[getFoodItems] useAvailabilityFilter=${useAvailabilityFilter} total=${ordered.length} sample menuGuids=${JSON.stringify([...new Set(ordered.slice(0,5).map(i => i.menuGuid))])}`);
+    console.log(`[getFoodItems] returned ${ordered.length} items`);
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
