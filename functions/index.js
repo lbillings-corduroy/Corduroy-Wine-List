@@ -505,7 +505,7 @@ Respond in JSON only (no other text):
 
 exports.syncWineMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('0,30 * * * *')
+  .pubsub.schedule('15 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Toast API sync...');
@@ -584,7 +584,7 @@ exports.syncWineMenu = functions
 
 exports.syncBeerMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('3,33 * * * *')
+  .pubsub.schedule('16 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Beer menu sync...');
@@ -658,7 +658,7 @@ exports.syncBeerMenu = functions
 
 exports.syncPoursMenu = functions
   .runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('6,36 * * * *')
+  .pubsub.schedule('17 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Premium Pours sync...');
@@ -1054,7 +1054,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
 // ─── Food Menu Sync ───────────────────────────────────────────────────────────
 exports.syncFoodMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('9,39 * * * *')
+  .pubsub.schedule('18 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Food menu sync...');
@@ -1457,7 +1457,7 @@ const NAB_MENU_GUID = 'fa091def-5bc2-434e-a436-64b29ce7932f';
 
 exports.syncCocktailsMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('12,42 * * * *')
+  .pubsub.schedule('19 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Specialty Cocktails sync...');
@@ -1508,7 +1508,7 @@ exports.getCocktails = functions.https.onRequest(async (req, res) => {
 
 exports.syncNABMenu = functions
   .runWith({ timeoutSeconds: 120, memory: '256MB' })
-  .pubsub.schedule('15,45 * * * *')
+  .pubsub.schedule('20 17 * * *')
   .onRun(async (context) => {
     try {
       console.log('Starting Non-Alcoholic Beverages sync...');
@@ -1594,6 +1594,69 @@ exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => 
     res.status(500).json({ error: error.message });
   }
 });
+
+
+// ─── Stock-Only Sync ──────────────────────────────────────────────────────────
+// Runs every 5 minutes. Only updates available/out-of-stock status on existing
+// Firebase records. Two API calls total (token + stock). No menu traversal.
+exports.syncStockOnly = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .pubsub.schedule('*/5 * * * *')
+  .onRun(async () => {
+    try {
+      const db = admin.database();
+      const token = await getToastToken();
+      const stockData = await getStockData(token);
+
+      if (!Array.isArray(stockData) || stockData.length === 0) {
+        console.log('[stockSync] No stock data returned');
+        return null;
+      }
+
+      // Build map of guid → available boolean
+      const stockMap = {};
+      stockData.forEach(item => {
+        const guid = item.guid || item.menuItem?.guid;
+        if (guid) {
+          const outOfStock = item.status === 'OUT_OF_STOCK' ||
+            (Array.isArray(item.menuItem?.visibility) && item.menuItem.visibility.length === 0);
+          stockMap[guid] = !outOfStock;
+        }
+      });
+
+      // Update all Firebase item nodes — only write records that changed
+      const nodes = ['wines', 'beers', 'pours', 'foodItems', 'cocktails', 'nab'];
+      let totalUpdated = 0;
+
+      for (const node of nodes) {
+        const snap = await db.ref(node).once('value');
+        const items = snap.val();
+        if (!items) continue;
+
+        const updates = {};
+        Object.entries(items).forEach(([id, item]) => {
+          const newAvailable = stockMap[id];
+          if (newAvailable === undefined) return; // not in stock data — leave as-is
+          const currentAvailable = item.available !== false;
+          if (newAvailable !== currentAvailable) {
+            updates[\`\${node}/\${id}/available\`] = newAvailable;
+            totalUpdated++;
+          }
+        });
+
+        if (Object.keys(updates).length > 0) {
+          await db.ref('/').update(updates);
+        }
+      }
+
+      console.log(\`[stockSync] Updated \${totalUpdated} item availability changes\`);
+      await db.ref('stockLastChecked').set(Date.now());
+      return null;
+    } catch (e) {
+      console.error('[stockSync] Error:', e.message);
+      return null;
+    }
+  });
 
 // ─── Force Sync Endpoint ──────────────────────────────────────────────────────
 
