@@ -3498,7 +3498,7 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
           <div style={{ position: "sticky", bottom: 0, background: t.bgBase, borderTop: `0.5px solid ${t.borderMid}`, padding: "12px 20px 14px", textAlign: "center" }}>
             <button onClick={() => { setChatFoods([]); setChatOpen(true); }}
               style={{ background: t.accentDimSm, border: `0.5px solid ${t.accent}`, color: t.accent, padding: "11px 28px", borderRadius: 8, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 13 }}>
-              ✦ Chat with Our Virtual Sommelier Instead
+              ✦ Chat with Our Virtual Sommelier
             </button>
           </div>
         )}
