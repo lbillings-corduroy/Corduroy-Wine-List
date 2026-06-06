@@ -1023,7 +1023,7 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (isOOS) return;
         if (isHidden) return;
         // Same item GUID from different menus simply overwrites — last write wins
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null, menuGuids: menuGuid ? [menuGuid] : [] });
       });
     }
     if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, sortOrder, menuGuid));
@@ -1091,9 +1091,21 @@ exports.syncFoodMenu = functions
       console.log('[syncFoodMenu] Location distribution:', JSON.stringify(locationSummary));
 
       // Step 1: Merge locations within this sync batch
-      // Write by item.id — same GUID overwrites, last menu's data wins
+      // Write by item.id — merge menuGuids so same item can belong to multiple menus
       const foodById = {};
-      freshItems.forEach(item => { foodById[item.id] = item; });
+      freshItems.forEach(item => {
+        if (foodById[item.id]) {
+          // Merge menuGuids arrays
+          const existing = foodById[item.id].menuGuids || [];
+          const incoming = item.menuGuids || [];
+          const merged = [...new Set([...existing, ...incoming])];
+          // Keep best menuSortOrder (lowest = first)
+          const bestSortOrder = Math.min(foodById[item.id].menuSortOrder ?? 999, item.menuSortOrder ?? 999);
+          foodById[item.id] = { ...item, menuGuids: merged, menuSortOrder: bestSortOrder };
+        } else {
+          foodById[item.id] = item;
+        }
+      });
 
       await db.ref('foodItems').set(foodById);
       await db.ref('foodOrder').set([...new Set(freshItems.map(i => i.id))]);
@@ -1134,21 +1146,18 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     const configuredMenus = appSettings.menus || [];
 
     // Build set of allowed menu GUIDs based on location + availability
-    // Filter by MENU, not by item — items inherit their menu's location/availability
     const foodMenus = configuredMenus.filter(m => m.menuType === 'food');
     const allowedMenuGuids = new Set();
     foodMenus.forEach(menu => {
-      // Location check — menu must be assigned to requested location (or all locations)
       if (requestedLocation) {
         const locs = menu.locations || [];
         if (locs.length > 0 && !locs.includes(requestedLocation)) return;
       }
-      // Availability check — menu must be currently available
       if (!isMenuAvailableNow(menu, toastAvailCache)) return;
       allowedMenuGuids.add(menu.guid);
     });
 
-    console.log(`[getFoodItems] location=${requestedLocation} allowedMenus=${JSON.stringify([...allowedMenuGuids])} of ${foodMenus.length} food menus`);
+    console.log(`[getFoodItems] location=${requestedLocation} allowedMenuGuids=${JSON.stringify([...allowedMenuGuids])}`);
 
     const useMenuFilter = foodMenus.length > 0;
 
@@ -1157,8 +1166,11 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
       : Object.values(foodById)
     ).filter(item => {
       if (!useMenuFilter) return true;
-      if (item.menuGuid) return allowedMenuGuids.has(item.menuGuid);
-      return allowedMenuGuids.size > 0;
+      // item.menuGuids is an array of all menus this item belongs to
+      // item.menuGuid (singular) is legacy — check both
+      const itemGuids = item.menuGuids || (item.menuGuid ? [item.menuGuid] : []);
+      if (itemGuids.length === 0) return allowedMenuGuids.size > 0;
+      return itemGuids.some(g => allowedMenuGuids.has(g));
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
     console.log(`[getFoodItems] returned ${ordered.length} items`);
