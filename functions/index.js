@@ -1044,7 +1044,8 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
         if (isHidden) return;
         // Same item GUID from different menus simply overwrites — last write wins
         const itemSortOrders = {}; if (menuGuid) itemSortOrders[menuGuid] = sortOrder ?? 0;
-        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null, menuGuids: menuGuid ? [menuGuid] : [], menuSortOrders: itemSortOrders });
+        const itemCourseNames = {}; if (menuGuid) itemCourseNames[menuGuid] = courseName;
+        allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null, menuGuids: menuGuid ? [menuGuid] : [], menuSortOrders: itemSortOrders, courseNames: itemCourseNames });
       });
     }
     if (g.menuGroups && g.menuGroups.length > 0) g.menuGroups.forEach(sub => collectItems(sub, courseName, sortOrder, menuGuid));
@@ -1121,7 +1122,8 @@ exports.syncFoodMenu = functions
           const mergedGuids = [...new Set([...existingGuids, ...incomingGuids])];
           // Merge menuSortOrders map
           const mergedSortOrders = { ...(foodById[item.id].menuSortOrders || {}), ...(item.menuSortOrders || {}) };
-          foodById[item.id] = { ...item, menuGuids: mergedGuids, menuSortOrders: mergedSortOrders };
+          const mergedCourseNames = { ...(foodById[item.id].courseNames || {}), ...(item.courseNames || {}) };
+          foodById[item.id] = { ...item, menuGuids: mergedGuids, menuSortOrders: mergedSortOrders, courseNames: mergedCourseNames };
         } else {
           foodById[item.id] = item;
         }
@@ -1190,13 +1192,16 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
       if (itemGuids.length === 0) return allowedMenuGuids.size > 0;
       return itemGuids.some(g => allowedMenuGuids.has(g));
     }).map(item => {
-      // Pick the menuSortOrder for whichever allowed menu this item matched
+      // Resolve sortOrder and course name for whichever allowed menu this item matched
       const itemGuids = item.menuGuids || (item.menuGuid ? [item.menuGuid] : []);
       const matchedGuid = itemGuids.find(g => allowedMenuGuids.has(g));
       const resolvedSortOrder = (item.menuSortOrders && matchedGuid)
         ? (item.menuSortOrders[matchedGuid] ?? item.menuSortOrder ?? 0)
         : (item.menuSortOrder ?? 0);
-      return { ...item, menuSortOrder: resolvedSortOrder, excluded: exclusions[item.id] === true };
+      const resolvedCourse = (item.courseNames && matchedGuid && item.courseNames[matchedGuid])
+        ? item.courseNames[matchedGuid]
+        : item.course;
+      return { ...item, menuSortOrder: resolvedSortOrder, course: resolvedCourse, excluded: exclusions[item.id] === true };
     });
 
     console.log(`[getFoodItems] returned ${ordered.length} items`);
