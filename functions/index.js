@@ -1150,6 +1150,12 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
 
     console.log(`[getFoodItems] requestedLocation=${requestedLocation} availableGuids=${JSON.stringify([...availableMenuGuids])}`);
 
+    // Also build unavailable set for fallback filtering when items lack menuGuid
+    const unavailableGuids = new Set(
+      configuredMenus
+        .filter(m => m.menuType === 'food' && !isMenuAvailableNow(m, toastAvailCache))
+        .map(m => m.guid)
+    );
     const useAvailabilityFilter = configuredMenus.some(m => m.menuType === 'food');
 
     const ordered = (foodOrder.length > 0
@@ -1161,9 +1167,26 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
         const locs = item.locations || [];
         if (locs.length > 0 && !locs.includes(requestedLocation)) return false;
       }
-      // Availability filter — only show items from currently-available menus
-      if (useAvailabilityFilter && item.menuGuid) {
-        return availableMenuGuids.has(item.menuGuid);
+      // Availability filter
+      if (useAvailabilityFilter) {
+        if (item.menuGuid) {
+          // Has menuGuid — check directly
+          return !unavailableGuids.has(item.menuGuid);
+        } else {
+          // No menuGuid — use item locations to find matching menus
+          // If ALL menus matching this item's locations are unavailable, hide it
+          const itemLocs = item.locations || [];
+          const matchingMenus = configuredMenus.filter(m => {
+            if (m.menuType !== 'food') return false;
+            const mLocs = m.locations || [];
+            if (itemLocs.length === 0 && mLocs.length === 0) return true;
+            if (itemLocs.length === 0 || mLocs.length === 0) return true;
+            return mLocs.some(l => itemLocs.includes(l));
+          });
+          if (matchingMenus.length > 0 && matchingMenus.every(m => unavailableGuids.has(m.guid))) {
+            return false;
+          }
+        }
       }
       return true;
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
