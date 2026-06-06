@@ -1016,11 +1016,15 @@ function extractFoodItemsFromGroups(menus, stockData, groups) {
     if (g.menuItems && g.menuItems.length > 0) {
       g.menuItems.forEach(item => {
         const price = item.price || null;
-        if (!price || price === 0) return;
         const stockInfo = stockMap[item.guid];
-        if (stockInfo && stockInfo.status === 'OUT_OF_STOCK') return;
-        if (Array.isArray(item.visibility) && item.visibility.length === 0) return;
-        if (allItems.find(i => i.id === item.guid)) return;
+        const isOOS = stockInfo && stockInfo.status === 'OUT_OF_STOCK';
+        const isHidden = Array.isArray(item.visibility) && item.visibility.length === 0;
+        const isDupe = !!allItems.find(i => i.id === item.guid);
+        console.log(`[food-debug] "${courseName}" item="${item.name}" price=${price} OOS=${isOOS} hidden=${isHidden} dupe=${isDupe}`);
+        if (!price || price === 0) return;
+        if (isOOS) return;
+        if (isHidden) return;
+        if (isDupe) return;
         allItems.push({ id: item.guid, name: item.name, price, course: courseName, description: item.description || null, available: true, locations: locations || [], menuSortOrder: sortOrder ?? 0, menuGuid: menuGuid || null });
       });
     }
