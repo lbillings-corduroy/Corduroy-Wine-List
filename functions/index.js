@@ -1140,17 +1140,16 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
     const availableMenuGuids = new Set();
     configuredMenus.forEach(menu => {
       if (menu.menuType !== 'food') return;
-      // Check location match
       const locs = menu.locations || [];
       if (requestedLocation && locs.length > 0 && !locs.includes(requestedLocation)) return;
-      // Check availability schedule
-      if (isMenuAvailableNow(menu, toastAvailCache)) {
-        availableMenuGuids.add(menu.guid);
-      }
+      const avail = isMenuAvailableNow(menu, toastAvailCache);
+      const ta = toastAvailCache[menu.guid];
+      console.log(`[getFoodItems] menu="${menu.label}" guid=${menu.guid} location=${JSON.stringify(locs)} available=${avail} toastDays=${JSON.stringify(ta?.toastDays)} toastHours=${JSON.stringify(ta?.toastHours)}`);
+      if (avail) availableMenuGuids.add(menu.guid);
     });
 
-    // If we have configured food menus, use availability filtering
-    // If no configured menus found, fall back to showing everything
+    console.log(`[getFoodItems] requestedLocation=${requestedLocation} availableGuids=${JSON.stringify([...availableMenuGuids])}`);
+
     const useAvailabilityFilter = configuredMenus.some(m => m.menuType === 'food');
 
     const ordered = (foodOrder.length > 0
@@ -1169,6 +1168,7 @@ exports.getFoodItems = functions.https.onRequest(async (req, res) => {
       return true;
     }).map(item => ({ ...item, excluded: exclusions[item.id] === true }));
 
+    console.log(`[getFoodItems] useAvailabilityFilter=${useAvailabilityFilter} total=${ordered.length} sample menuGuids=${JSON.stringify([...new Set(ordered.slice(0,5).map(i => i.menuGuid))])}`);
     res.json({ foodItems: ordered, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
