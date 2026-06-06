@@ -45,14 +45,18 @@ function getMenusOfType(settings, menuType) {
 
 // Returns true if a menu is currently available based on the Toast-sourced availability
 // cached in appSettings.toastAvailability. If no cached data exists, assumes available.
+// Restaurant timezone — Toast availability times are in local restaurant time, not UTC
+const RESTAURANT_TIMEZONE = 'America/New_York';
+
 function isMenuAvailableNow(menu, toastAvailabilityCache) {
   const ta = toastAvailabilityCache && toastAvailabilityCache[menu.guid];
-  if (!ta) return true; // no data fetched yet — don't block anything
+  if (!ta) return true;
 
-  const now = new Date();
-  // Toast days come back as full names e.g. "MONDAY" or abbreviated — normalize both
-  const dayFull = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'][now.getDay()];
-  const dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()];
+  // Use restaurant local time, not server UTC
+  const localStr = new Date().toLocaleString('en-US', { timeZone: RESTAURANT_TIMEZONE });
+  const localNow = new Date(localStr);
+  const dayFull = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'][localNow.getDay()];
+  const dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][localNow.getDay()];
 
   if (ta.toastDays && ta.toastDays.length > 0) {
     const upperDays = ta.toastDays.map(d => d.toUpperCase());
@@ -60,12 +64,11 @@ function isMenuAvailableNow(menu, toastAvailabilityCache) {
   }
 
   if (ta.toastHours && ta.toastHours.open && ta.toastHours.close) {
-    // Parse HH:MM or HH:MM:SS
     const parseTime = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const nowMins = localNow.getHours() * 60 + localNow.getMinutes();
     const openMins = parseTime(ta.toastHours.open);
     let closeMins = parseTime(ta.toastHours.close);
-    if (closeMins <= openMins) closeMins += 24 * 60; // midnight crossover
+    if (closeMins <= openMins) closeMins += 24 * 60;
     if (nowMins < openMins || nowMins >= closeMins) return false;
   }
 
