@@ -3373,7 +3373,8 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
         </div>
         <div style={{ height: "0.5px", background: `linear-gradient(90deg, transparent, ${t.accent}44, transparent)`, marginBottom: 10 }} />
         {view === "pick" && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          <>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
             {courses.map(c => (
               <button key={c} onClick={() => setActiveCourse(c)} style={{
                 background: activeCourse === c ? t.accent : t.white08,
@@ -3384,20 +3385,22 @@ function SommelierScreen({ onBack, favorites = [], onToggleFavorite = () => {}, 
               }}>{c}</button>
             ))}
           </div>
+          <div style={{ background: t.accentDimSm, border: `0.5px solid ${t.accentBorderSm}`, borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
+            <div style={{ color: t.textPrimary, fontSize: 13, fontFamily: t.fontSerif, fontWeight: 500, marginBottom: 3 }}>
+              Select up to 4 dishes, then tap <span style={{ color: t.accent }}>Get Wine Pairings</span> below
+            </div>
+            <div style={{ color: t.textSecondary, fontSize: 11, fontStyle: "italic", lineHeight: 1.5 }}>
+              Choose dishes from any course — for larger parties, run the pairing a second time.
+            </div>
+          </div>
+          </>
         )}
       </div>
 
       {view === "pick" && (
         <>
         <div>
-          <div style={{ background: t.bgSurface, padding: "8px 16px 10px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ flex: 1, color: t.accent, fontSize: 11, letterSpacing: "1px" }}>Select up to 4 dishes per course</div>
-            </div>
-            <div style={{ color: t.textSecondary, fontSize: 10, fontStyle: "italic", lineHeight: 1.5 }}>
-              For larger parties, run the sommelier a second time to capture additional guests' selections.
-            </div>
-          </div>
+
           <div style={{ background: t.bgSurface }}>
             {loadingFood ? (
               <div style={{ color: t.textSecondary, textAlign: "center", padding: 40 }}>Loading menu…</div>
