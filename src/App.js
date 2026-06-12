@@ -112,6 +112,7 @@ const MANAGER_PIN = process.env.REACT_APP_MANAGER_PIN || "0000";
 const ADMIN_PIN = process.env.REACT_APP_ADMIN_PIN || "9999";
 const FOOD_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getFoodItems";
 const COCKTAILS_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getCocktails";
+const SET_EXCLUSION_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/setItemExclusion";
 const NAB_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getNAB";
 const PAIRING_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/getPairing";
 const MANAGER_UPDATE_URL = "https://us-central1-corduroy-wine-list.cloudfunctions.net/managerUpdateEnrichment";
@@ -1134,6 +1135,8 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
   const [beers, setBeers] = useState([]);
   const [pours, setPours] = useState([]);
   const [food, setFood] = useState([]);
+  const [cocktails, setCocktails] = useState([]);
+  const [nab, setNab] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("wines");
   const [editingItem, setEditingItem] = useState(null);
@@ -1143,24 +1146,30 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
   const [reEnrichResult, setReEnrichResult] = useState(null);
 
   useEffect(() => {
+    // admin=1 so excluded items stay visible here and can be re-included
     Promise.all([
-      fetch(BEER_URL).then(r => r.json()),
-      fetch(POURS_URL).then(r => r.json()),
+      fetch(BEER_URL + "?admin=1").then(r => r.json()),
+      fetch(POURS_URL + "?admin=1").then(r => r.json()),
       fetch(FOOD_URL).then(r => r.json()),
-    ]).then(([bData, pData, fData]) => {
+      fetch(COCKTAILS_URL + "?admin=1").then(r => r.json()),
+      fetch(NAB_URL + "?admin=1").then(r => r.json()),
+    ]).then(([bData, pData, fData, cData, nData]) => {
       setBeers(bData.beers || []);
       setPours(pData.pours || []);
       setFood(fData.foodItems || []);
+      setCocktails(cData.cocktails || []);
+      setNab(nData.nab || []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
 
   function openEdit(item, type) {
     setEditingItem({ ...item, _type: type });
-    if (type === "wine") setEditFields({ correctedName: item.name || "", varietal: item.varietal || "", region: item.region || "", description: item.description || "", reviews: item.reviews || "" });
-    else if (type === "beer") setEditFields({ correctedName: item.name || "", style: item.style || "", brewery: item.brewery || "", abv: item.abv || "", description: item.description || "" });
-    else if (type === "pour") setEditFields({ correctedName: item.name || "", category: item.category || "", producer: item.producer || "", abv: item.abv || "", description: item.description || "" });
+    if (type === "wine") setEditFields({ correctedName: item.name || "", varietal: item.varietal || "", region: item.region || "", description: item.description || "", reviews: item.reviews || "", excluded: item.excluded || false });
+    else if (type === "beer") setEditFields({ correctedName: item.name || "", style: item.style || "", brewery: item.brewery || "", abv: item.abv || "", description: item.description || "", excluded: item.excluded || false });
+    else if (type === "pour") setEditFields({ correctedName: item.name || "", category: item.category || "", producer: item.producer || "", abv: item.abv || "", description: item.description || "", excluded: item.excluded || false });
     else if (type === "food") setEditFields({ description: item.description || "", excluded: item.excluded || false });
+    else setEditFields({ excluded: item.excluded || false }); // cocktail / nab — exclusion only
   }
 
   async function handleSave() {
@@ -1176,13 +1185,15 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
       else if (t === "beer") setBeers(prev => prev.map(b => b.id === editingItem.id ? { ...b, ...editFields, name: editFields.correctedName } : b));
       else if (t === "pour") setPours(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...editFields, name: editFields.correctedName } : p));
       else if (t === "food") setFood(prev => prev.map(f => f.id === editingItem.id ? { ...f, ...editFields } : f));
+      else if (t === "cocktail") setCocktails(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...editFields } : i));
+      else if (t === "nab") setNab(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...editFields } : i));
       setEditingItem(null);
     } catch (e) { console.error(e); }
     setSaving(false);
   }
 
   async function handleReEnrich() {
-    if (!editingItem || editingItem._type === "food") return;
+    if (!editingItem || !["wine", "beer", "pour"].includes(editingItem._type)) return;
     setReEnriching(true);
     setReEnrichResult(null);
     // Pass current edit fields as hints so Claude respects manager corrections
@@ -1238,9 +1249,13 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
     { id: "wines", label: "Wines", list: filterList(wines) },
     { id: "beer", label: "Beer", list: filterList(beers) },
     { id: "pours", label: "Pours", list: filterList(pours) },
+    { id: "cocktails", label: "Cocktails", list: filterList(cocktails) },
+    { id: "nab", label: "N/A Bev", list: filterList(nab) },
     { id: "food", label: "Food", list: filterList(food) },
   ];
+  const CATEGORY_TO_TYPE = { wines: "wine", beer: "beer", pours: "pour", cocktails: "cocktail", nab: "nab", food: "food" };
   const activeList = categories.find(c => c.id === category)?.list || [];
+  const isEnrichable = !!editingItem && ["wine", "beer", "pour"].includes(editingItem._type);
 
   const inputStyle = { width: "100%", boxSizing: "border-box", background: t.white06, border: `0.5px solid ${t.borderMid}`, color: t.textPrimary, padding: "8px 10px", borderRadius: 6, fontFamily: t.fontSerif, fontSize: 12, outline: "none", marginBottom: 8 };
   const labelStyle = { color: t.textDim, fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3, display: "block" };
@@ -1265,7 +1280,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
       {activeList.length === 0 ? (
         <div style={{ color: t.textDim, textAlign: "center", padding: 32 }}>{q ? `No results for "${managerSearch}"` : "No items"}</div>
       ) : activeList.map(item => (
-        <div key={item.id} onClick={() => openEdit(item, category === "beer" ? "beer" : category === "pours" ? "pour" : category === "food" ? "food" : "wine")}
+        <div key={item.id} onClick={() => openEdit(item, CATEGORY_TO_TYPE[category] || "wine")}
           style={{ background: editingItem?.id === item.id ? t.accentDimSm : t.white04, border: `0.5px solid ${editingItem?.id === item.id ? t.accentBorder : t.borderMid}`, borderRadius: 8, padding: "10px 12px", marginBottom: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
           {item.imageUrl && <div style={{ width: 32, height: 44, borderRadius: 3, overflow: "hidden", flexShrink: 0 }}><img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1286,6 +1301,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
               {category === "wines" && [item.varietal, item.region].filter(Boolean).join(" · ")}
               {category === "beer" && [item.style, item.brewery].filter(Boolean).join(" · ")}
               {category === "pours" && [item.category, item.producer].filter(Boolean).join(" · ")}
+              {(category === "cocktails" || category === "nab") && (item.subgroup || "")}
               {category === "food" && item.course}
               {item.manuallyEdited && <span style={{ color: t.success, marginLeft: 6 }}>✎ edited</span>}
               {item.excluded && <span style={{ color: t.error, marginLeft: 6 }}>hidden</span>}
@@ -1316,7 +1332,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
             <button onClick={() => { setEditingItem(null); setReEnrichResult(null); }} style={{ background: "none", border: "none", color: t.textDim, fontSize: 20, cursor: "pointer", padding: 0, flexShrink: 0 }}>×</button>
           </div>
 
-          {editingItem._type !== "food" && (
+          {isEnrichable && (
             <>
               <label style={labelStyle}>Name</label>
               <input style={inputStyle} value={editFields.correctedName || ""} onChange={e => setEditFields(p => ({ ...p, correctedName: e.target.value }))} />
@@ -1352,7 +1368,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
               <input style={inputStyle} value={editFields.abv || ""} onChange={e => setEditFields(p => ({ ...p, abv: e.target.value }))} />
             </>
           )}
-          {editingItem._type !== "food" && (
+          {isEnrichable && (
             <>
               <label style={labelStyle}>Tasting Notes</label>
               <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
@@ -1362,15 +1378,18 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
             <>
               <label style={labelStyle}>Description</label>
               <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editFields.description || ""} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <button onClick={() => setEditFields(p => ({ ...p, excluded: !p.excluded }))}
-                  style={{ background: editFields.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${editFields.excluded ? t.errorBorder : t.success}`, color: editFields.excluded ? t.error : t.success, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
-                  {editFields.excluded ? "Hidden from guests" : "Visible to guests"}
-                </button>
-                <span style={{ color: t.textDim, fontSize: 11 }}>Toggle to hide/show in pairings</span>
-              </div>
             </>
           )}
+          {/* Universal hide/show toggle — works on every menu type */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <button onClick={() => setEditFields(p => ({ ...p, excluded: !p.excluded }))}
+              style={{ background: editFields.excluded ? t.errorDim : t.successDim, border: `0.5px solid ${editFields.excluded ? t.errorBorder : t.success}`, color: editFields.excluded ? t.error : t.success, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: t.fontSerif, fontSize: 11 }}>
+              {editFields.excluded ? "Hidden from guests" : "Visible to guests"}
+            </button>
+            <span style={{ color: t.textDim, fontSize: 11 }}>
+              {editingItem._type === "food" ? "Toggle to hide/show in pairings" : "Hides item from the guest menu and sommelier"}
+            </span>
+          </div>
           {editingItem._type !== "food" && (
             <div style={{ color: t.borderStrong, fontSize: 11, marginBottom: 12, fontStyle: "italic" }}>Price and availability must be updated in Toast.</div>
           )}
@@ -1384,7 +1403,7 @@ function AllItemsTab({ wines, onWineUpdate, managerSearch }) {
             <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: saving ? t.accentDimSm : t.accent, color: saving ? t.textDim : t.bgDeep, border: "none", padding: "10px", borderRadius: 6, cursor: saving ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 13, fontWeight: 600 }}>
               {saving ? "Saving…" : "Save Changes"}
             </button>
-            {editingItem._type !== "food" && (
+            {isEnrichable && (
               <button onClick={handleReEnrich} disabled={reEnriching || saving}
                 title="Clear existing AI enrichment and re-run from scratch through Claude"
                 style={{ background: reEnriching ? "rgba(100,120,200,0.1)" : "rgba(100,120,200,0.15)", border: `0.5px solid ${reEnriching ? "#6070a0" : "#8090c0"}`, color: reEnriching ? "#6070a0" : "#a0b0e0", padding: "10px 12px", borderRadius: 6, cursor: reEnriching ? "default" : "pointer", fontFamily: t.fontSerif, fontSize: 11, whiteSpace: "nowrap" }}>
@@ -1417,9 +1436,9 @@ function FoodManagerTab() {
     setSaving(prev => ({ ...prev, [item.id]: true }));
     const newExcluded = !item.excluded;
     try {
-      await fetch("https://us-central1-corduroy-wine-list.cloudfunctions.net/setFoodExclusion", {
+      await fetch(SET_EXCLUSION_URL, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, excluded: newExcluded })
+        body: JSON.stringify({ itemId: item.id, itemType: "food", excluded: newExcluded })
       });
       setFoodItems(prev => prev.map(f => f.id === item.id ? { ...f, excluded: newExcluded } : f));
     } catch (e) { console.error(e); }
