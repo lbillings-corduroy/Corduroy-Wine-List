@@ -756,12 +756,14 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [winesSnap, enrichmentSnap, lastUpdatedSnap, wineOrderSnap] = await Promise.all([
+    const [winesSnap, enrichmentSnap, lastUpdatedSnap, wineOrderSnap, exclusionsSnap] = await Promise.all([
       db.ref('wines').once('value'),
       db.ref('wineEnrichment').once('value'),
       db.ref('lastUpdated').once('value'),
-      db.ref('wineOrder').once('value')
+      db.ref('wineOrder').once('value'),
+      db.ref('wineExclusions').once('value')
     ]);
+    const wineExclusions = exclusionsSnap.val() || {};
 
     const winesById = winesSnap.val() || {};
     const wineOrder = wineOrderSnap.val() || [];
@@ -786,13 +788,14 @@ exports.getWines = functions.https.onRequest(async (req, res) => {
         vintage: e.vintage || null,
         uncertain: e.uncertain || false,
         uncertainReason: e.uncertainReason || null,
+        excluded: wineExclusions[wine.id] === true,
       };
     });
 
-    // Hide uncertain items from customers, but let manager screen see all via ?admin=1
+    // Hide uncertain and manager-excluded items from customers; manager sees all via ?admin=1
     const approvedWines = req.query.admin === '1'
       ? mergedWines
-      : mergedWines.filter(w => !w.uncertain || enrichment[w.id]?.approved);
+      : mergedWines.filter(w => (!w.uncertain || enrichment[w.id]?.approved) && !w.excluded);
     res.json({ wines: approvedWines, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -805,12 +808,14 @@ exports.getBeers = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [beersSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
+    const [beersSnap, enrichmentSnap, lastUpdatedSnap, orderSnap, exclusionsSnap] = await Promise.all([
       db.ref('beers').once('value'),
       db.ref('beerEnrichment').once('value'),
       db.ref('beerLastUpdated').once('value'),
-      db.ref('beerOrder').once('value')
+      db.ref('beerOrder').once('value'),
+      db.ref('beerExclusions').once('value')
     ]);
+    const beerExclusions = exclusionsSnap.val() || {};
 
     const beersById = beersSnap.val() || {};
     const beerOrder = orderSnap.val() || [];
@@ -836,12 +841,13 @@ exports.getBeers = functions.https.onRequest(async (req, res) => {
         description: e.description || null,
         uncertain: e.uncertain || false,
         uncertainReason: e.uncertainReason || null,
+        excluded: beerExclusions[beer.id] === true,
       };
     });
 
     const approvedBeers = req.query.admin === '1'
       ? merged
-      : merged.filter(b => !b.uncertain || enrichment[b.id]?.approved);
+      : merged.filter(b => (!b.uncertain || enrichment[b.id]?.approved) && !b.excluded);
     res.json({ beers: approvedBeers, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -854,12 +860,14 @@ exports.getPours = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [poursSnap, enrichmentSnap, lastUpdatedSnap, orderSnap] = await Promise.all([
+    const [poursSnap, enrichmentSnap, lastUpdatedSnap, orderSnap, exclusionsSnap] = await Promise.all([
       db.ref('pours').once('value'),
       db.ref('poursEnrichment').once('value'),
       db.ref('poursLastUpdated').once('value'),
-      db.ref('poursOrder').once('value')
+      db.ref('poursOrder').once('value'),
+      db.ref('poursExclusions').once('value')
     ]);
+    const poursExclusions = exclusionsSnap.val() || {};
 
     const poursById = poursSnap.val() || {};
     const poursOrder = orderSnap.val() || [];
@@ -885,12 +893,13 @@ exports.getPours = functions.https.onRequest(async (req, res) => {
         description: e.description || null,
         uncertain: e.uncertain || false,
         uncertainReason: e.uncertainReason || null,
+        excluded: poursExclusions[pour.id] === true,
       };
     });
 
     const approvedPours = req.query.admin === '1'
       ? merged
-      : merged.filter(p => !p.uncertain || enrichment[p.id]?.approved);
+      : merged.filter(p => (!p.uncertain || enrichment[p.id]?.approved) && !p.excluded);
     res.json({ pours: approvedPours, lastUpdated });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1227,17 +1236,20 @@ exports.getPairing = functions
 
       // ── Wine → Food ───────────────────────────────────────────────────────
       if (type === 'wine_to_food') {
-        const [wineSnap, enrichSnap, foodSnap] = await Promise.all([
+        const [wineSnap, enrichSnap, foodSnap, foodExclSnap] = await Promise.all([
           db.ref(`wines/${itemId}`).once('value'),
           db.ref(`wineEnrichment/${itemId}`).once('value'),
           db.ref('foodItems').once('value'),
+          db.ref('foodExclusions').once('value'),
         ]);
         const wine = wineSnap.val();
         if (!wine) return res.status(404).json({ error: 'Wine not found' });
         const enrich = enrichSnap.val() || {};
+        const foodExclusions = foodExclSnap.val() || {};
         const pairingLocation = req.body.location || null;
         const allFoodItems = Object.values(foodSnap.val() || {});
         const foodItems = allFoodItems.filter(f => {
+          if (foodExclusions[f.id]) return false;
           if (!pairingLocation) return true;
           const locs = f.locations || [];
           return locs.length === 0 || locs.includes(pairingLocation);
@@ -1287,10 +1299,12 @@ Respond in JSON only (no other text):
           (req.body.itemIds || (itemId ? [itemId] : [])).map(id => ({ id, courseRole: 'main' }));
         if (itemsWithRoles.length === 0) return res.status(400).json({ error: 'items required' });
 
-        const [winesSnap, enrichSnap] = await Promise.all([
+        const [winesSnap, enrichSnap, wineExclSnap] = await Promise.all([
           db.ref('wines').once('value'),
           db.ref('wineEnrichment').once('value'),
+          db.ref('wineExclusions').once('value'),
         ]);
+        const wineExclusions = wineExclSnap.val() || {};
         const uniqueIds = [...new Set(itemsWithRoles.map(i => i.id))];
         const foodSnaps = await Promise.all(uniqueIds.map(id => db.ref(`foodItems/${id}`).once('value')));
         const foodById = {};
@@ -1304,6 +1318,7 @@ Respond in JSON only (no other text):
         // Sort wines by price and split into thirds so tiers reflect actual prices
         const wineObjects = Object.values(winesById)
           .filter(w => (w.bottlePrice || w.glassPrice) && w.available !== false
+            && !wineExclusions[w.id]
             && !(enrichment[w.id]?.uncertain && !enrichment[w.id]?.approved))
           .map(w => {
             const e = enrichment[w.id] || {};
@@ -1512,8 +1527,40 @@ Respond in JSON only (no other text):
     }
   });
 
-// ─── Food Item Exclusion ──────────────────────────────────────────────────────
+// ─── Item Exclusions (all menu types) ────────────────────────────────────────
+// Exclusion flags live in separate per-type nodes so menu syncs never overwrite
+// them. Guest-facing endpoints filter excluded items; ?admin=1 sees everything.
 
+const EXCLUSION_NODES = {
+  food: 'foodExclusions',
+  wine: 'wineExclusions',
+  beer: 'beerExclusions',
+  pour: 'poursExclusions',
+  pours: 'poursExclusions',
+  cocktail: 'cocktailsExclusions',
+  cocktails: 'cocktailsExclusions',
+  nab: 'nabExclusions',
+};
+
+exports.setItemExclusion = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const { itemId, itemType, excluded } = req.body;
+    if (!itemId) return res.status(400).json({ error: 'itemId required' });
+    const node = EXCLUSION_NODES[itemType || 'food'];
+    if (!node) return res.status(400).json({ error: `Unknown itemType: ${itemType}` });
+    const db = admin.database();
+    await db.ref(`${node}/${itemId}`).set(excluded === true ? true : null);
+    res.json({ ok: true, itemId, itemType: itemType || 'food', excluded });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Legacy endpoint — food only. Kept so any cached tablets keep working.
 exports.setFoodExclusion = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -1571,15 +1618,19 @@ exports.getCocktails = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
+    const [snap, orderSnap, lastUpdatedSnap, exclusionsSnap] = await Promise.all([
       db.ref('cocktails').once('value'),
       db.ref('cocktailsOrder').once('value'),
       db.ref('cocktailsLastUpdated').once('value'),
+      db.ref('cocktailsExclusions').once('value'),
     ]);
     const byId = snap.val() || {};
     const order = orderSnap.val() || [];
+    const exclusions = exclusionsSnap.val() || {};
     const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
-    res.json({ cocktails: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
+    const merged = ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null, excluded: exclusions[i.id] === true }));
+    const visible = req.query.admin === '1' ? merged : merged.filter(i => !i.excluded);
+    res.json({ cocktails: visible, lastUpdated: lastUpdatedSnap.val() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1622,15 +1673,19 @@ exports.getNAB = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   try {
     const db = admin.database();
-    const [snap, orderSnap, lastUpdatedSnap] = await Promise.all([
+    const [snap, orderSnap, lastUpdatedSnap, exclusionsSnap] = await Promise.all([
       db.ref('nab').once('value'),
       db.ref('nabOrder').once('value'),
       db.ref('nabLastUpdated').once('value'),
+      db.ref('nabExclusions').once('value'),
     ]);
     const byId = snap.val() || {};
     const order = orderSnap.val() || [];
+    const exclusions = exclusionsSnap.val() || {};
     const ordered = order.length > 0 ? order.map(id => byId[id]).filter(Boolean) : Object.values(byId);
-    res.json({ nab: ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null })), lastUpdated: lastUpdatedSnap.val() });
+    const merged = ordered.map(i => ({ ...i, imageUrl: i.toastImageUrl || null, excluded: exclusions[i.id] === true }));
+    const visible = req.query.admin === '1' ? merged : merged.filter(i => !i.excluded);
+    res.json({ nab: visible, lastUpdated: lastUpdatedSnap.val() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1659,16 +1714,30 @@ exports.managerUpdateEnrichment = functions.https.onRequest(async (req, res) => 
       if (Object.keys(otherUpdates).length > 0) {
         await db.ref(`foodItems/${itemId}`).set({ ...existing, ...otherUpdates, lastEditedAt: Date.now() });
       }
+    } else if (itemType === 'cocktail' || itemType === 'cocktails' || itemType === 'nab') {
+      // No enrichment node for these types — only the exclusion flag is editable
+      const { excluded } = updates;
+      if (excluded !== undefined) {
+        await db.ref(`${EXCLUSION_NODES[itemType]}/${itemId}`).set(excluded === true ? true : null);
+      }
     } else {
       const enrichPath = itemType === 'wine' ? 'wineEnrichment' : itemType === 'beer' ? 'beerEnrichment' : 'poursEnrichment';
-      const snap = await db.ref(`${enrichPath}/${itemId}`).once('value');
-      const existing = snap.val() || {};
-      await db.ref(`${enrichPath}/${itemId}`).set({
-        ...existing,
-        ...updates,
-        manuallyEdited: true,
-        lastEditedAt: Date.now()
-      });
+      const exclusionNode = EXCLUSION_NODES[itemType] || 'poursExclusions';
+      const { excluded, ...otherUpdates } = updates;
+      // excluded flag lives in its own node so it survives syncs and re-enrichment
+      if (excluded !== undefined) {
+        await db.ref(`${exclusionNode}/${itemId}`).set(excluded === true ? true : null);
+      }
+      if (Object.keys(otherUpdates).length > 0) {
+        const snap = await db.ref(`${enrichPath}/${itemId}`).once('value');
+        const existing = snap.val() || {};
+        await db.ref(`${enrichPath}/${itemId}`).set({
+          ...existing,
+          ...otherUpdates,
+          manuallyEdited: true,
+          lastEditedAt: Date.now()
+        });
+      }
     }
     res.json({ ok: true });
   } catch (error) {
@@ -1966,6 +2035,7 @@ exports.sommelierChat = functions
         cocktailsSnap, cocktailsOrderSnap,
         nabSnap, nabOrderSnap,
         appSettingsSnap,
+        wineExclSnap, beerExclSnap, poursExclSnap, cocktailsExclSnap, nabExclSnap,
       ] = await Promise.all([
         db.ref('wines').once('value'),
         db.ref('wineEnrichment').once('value'),
@@ -1984,7 +2054,17 @@ exports.sommelierChat = functions
         db.ref('nab').once('value'),
         db.ref('nabOrder').once('value'),
         db.ref('appSettings').once('value'),
+        db.ref('wineExclusions').once('value'),
+        db.ref('beerExclusions').once('value'),
+        db.ref('poursExclusions').once('value'),
+        db.ref('cocktailsExclusions').once('value'),
+        db.ref('nabExclusions').once('value'),
       ]);
+      const wineExclusions = wineExclSnap.val() || {};
+      const beerExclusions = beerExclSnap.val() || {};
+      const poursExclusions = poursExclSnap.val() || {};
+      const cocktailsExclusions = cocktailsExclSnap.val() || {};
+      const nabExclusions = nabExclSnap.val() || {};
 
       // Check which menu types are currently available per Toast-sourced schedule
       const appSettings = appSettingsSnap.val() || {};
@@ -2007,7 +2087,7 @@ exports.sommelierChat = functions
       const orderedWines = (wineOrder.length > 0
         ? wineOrder.map(id => winesById[id]).filter(Boolean)
         : Object.values(winesById)
-      ).filter(w => w.available !== false && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
+      ).filter(w => w.available !== false && !wineExclusions[w.id] && !(wineEnrich[w.id] && wineEnrich[w.id].uncertain && !wineEnrich[w.id].approved));
 
       const wineLines = orderedWines.map(w => {
         const e = wineEnrich[w.id] || {};
@@ -2026,7 +2106,7 @@ exports.sommelierChat = functions
       const orderedBeers = (beerOrder.length > 0
         ? beerOrder.map(id => beersById[id]).filter(Boolean)
         : Object.values(beersById)
-      ).filter(b => b.available !== false);
+      ).filter(b => b.available !== false && !beerExclusions[b.id]);
 
       const beerLines = orderedBeers.map(b => {
         const e = beerEnrich[b.id] || {};
@@ -2041,7 +2121,7 @@ exports.sommelierChat = functions
       const orderedPours = (poursOrder.length > 0
         ? poursOrder.map(id => poursById[id]).filter(Boolean)
         : Object.values(poursById)
-      ).filter(p => p.available !== false);
+      ).filter(p => p.available !== false && !poursExclusions[p.id]);
 
       const pourLines = orderedPours.map(p => {
         const e = poursEnrich[p.id] || {};
@@ -2055,7 +2135,7 @@ exports.sommelierChat = functions
       const orderedCocktails = (cocktailsOrder.length > 0
         ? cocktailsOrder.map(id => cocktailsById[id]).filter(Boolean)
         : Object.values(cocktailsById)
-      ).filter(c => c.available !== false);
+      ).filter(c => c.available !== false && !cocktailsExclusions[c.id]);
 
       const cocktailLines = orderedCocktails.map(c => {
         const price = c.price || c.groupPrice;
@@ -2068,7 +2148,7 @@ exports.sommelierChat = functions
       const orderedNAB = (nabOrder.length > 0
         ? nabOrder.map(id => nabById[id]).filter(Boolean)
         : Object.values(nabById)
-      ).filter(n => n.available !== false);
+      ).filter(n => n.available !== false && !nabExclusions[n.id]);
 
       const nabLines = orderedNAB.map(n => {
         const price = n.price || n.groupPrice;
